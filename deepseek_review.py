@@ -155,6 +155,119 @@ Be specific and demanding. This is the owner's real system; vague advice is wort
 """
 
 
+CODE_EXT = (".lisp", ".lsp", ".cl", ".asd", ".md", ".txt", ".yaml", ".yml", ".sh", ".py")
+
+
+def gather_corpus(root):
+    """EVERY first-party source file and contract, in FULL (not a sample). Third-party, deps
+    and generated data are excluded — they are not logic to improve."""
+    out = []
+    for dp, dn, fn in os.walk(root):
+        dn[:] = [d for d in dn if d not in EXCLUDE_DIRS and not d.startswith(".")]
+        for f in sorted(fn):
+            if f.endswith(CODE_EXT):
+                p = os.path.join(dp, f)
+                c = read(p)
+                if c is not None:
+                    out.append((os.path.relpath(p, root), c))
+    return sorted(out)
+
+
+def make_chunks(files, budget_chars):
+    """Pack files into context-sized chunks; a file larger than the budget is split."""
+    chunks, cur, size = [], [], 0
+    for rel, c in files:
+        block = f"\n===== FILE: {rel} =====\n{c}\n"
+        if len(block) > budget_chars:
+            if cur:
+                chunks.append(cur); cur, size = [], 0
+            for i in range(0, len(block), budget_chars):
+                chunks.append([(rel, block[i:i + budget_chars])])
+            continue
+        if size + len(block) > budget_chars and cur:
+            chunks.append(cur); cur, size = [], 0
+        cur.append((rel, block)); size += len(block)
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
+MAP_SYSTEM = (
+    "You are a world-class systems architect and legal-AI expert reviewing PART of a large "
+    "Common Lisp system (LAWMAX-Ω). You are terse, specific, and honest; you never flatter and "
+    "never pad. You cite exact file names.")
+MAP_USER = (
+    "Analyse the files below (one part of the whole codebase). For each meaningful module output:\n"
+    "- FILE(s), one line on PURPOSE;\n- QUALITY: S/A/B/C/D + a one-line reason;\n"
+    "- WEAKNESSES: concrete, specific (bugs, coupling, missing checks, perf, unclear invariants);\n"
+    "- UPGRADES: concrete changes that would raise it toward the highest tier.\n"
+    "Be compact. Skip trivial/boilerplate files in one line. Do NOT write a generic summary.\n\n{body}")
+REDUCE_SYSTEM = SYSTEM_PROMPT
+REDUCE_USER = (
+    "Below are (a) the system's contracts/architecture and (b) per-part analyses that together "
+    "cover the ENTIRE codebase of LAWMAX-Ω. Synthesise the definitive review with EXACTLY these "
+    "sections:\n"
+    "1. WHAT THIS SYSTEM IS (5-8 lines).\n"
+    "2. CURRENT-TIER ASSESSMENT — grade each dimension (architecture, correctness/verification, "
+    "robustness, performance, testing, security, legal-domain completeness, operability) S/A/B/C/D "
+    "with a one-line justification.\n"
+    "3. TOP GAPS TO THE HIGHEST TIER — most important first, each tied to a file/module.\n"
+    "4. PRIORITISED ROADMAP — ordered phases; each item: what to change, which file/module, why it "
+    "raises the tier, rough effort (S/M/L).\n"
+    "5. QUICK WINS.\n"
+    "6. RESIDUAL RISKS / WHAT STILL NEEDS A HUMAN.\n"
+    "Be demanding and concrete. This is the owner's real system.\n\n"
+    "===== CONTRACTS & ARCHITECTURE =====\n{arch}\n\n===== PER-PART ANALYSES =====\n{maps}\n")
+
+
+def run_deep(a, key):
+    """Read the WHOLE codebase (map), then synthesise one roadmap (reduce)."""
+    files = gather_corpus(a.repo)
+    total_chars = sum(len(c) for _, c in files)
+    chunks = make_chunks(files, a.chunk_chars)
+    pin, pout = PRICE.get(a.model, PRICE["deepseek-reasoner"])
+    est_in = approx_tokens(total_chars + 2000 * len(chunks))
+    est = est_in / 1e6 * pin + (len(chunks) + 1) * a.max_output_tokens / 1e6 * pout
+    print(f"repo:          {os.path.abspath(a.repo)}")
+    print(f"files read:    {len(files)}  (FULL content, not a sample)")
+    print(f"corpus size:   {total_chars:,} chars  (~{approx_tokens(total_chars):,} tokens)")
+    print(f"chunks:        {len(chunks)}  → {len(chunks)} map calls + 1 synthesis call")
+    print(f"model:         {a.model}")
+    print(f"cost ESTIMATE: ~€{est:.2f}")
+    if a.dry_run:
+        print("\n[dry-run] nothing sent.")
+        return 0
+    key = key or ask_key(est)
+
+    in_tok = out_tok = 0
+    maps = []
+    for i, ch in enumerate(chunks, 1):
+        body = "".join(b for _, b in ch)
+        names = ", ".join(sorted({r for r, _ in ch}))[:200]
+        print(f"  · [{i}/{len(chunks)}] reading: {names} …")
+        content, usage = call_deepseek(a.endpoint, a.model, key, MAP_SYSTEM,
+                                       MAP_USER.format(body=body), a.max_output_tokens, a.timeout)
+        in_tok += usage.get("prompt_tokens", 0); out_tok += usage.get("completion_tokens", 0)
+        maps.append(f"----- part {i} ({names}) -----\n{content}")
+
+    print("  · synthesising the roadmap from the whole codebase …")
+    arch, _ = build_digest(a.repo, 120_000, a.header_lines)   # contracts + arch, for the reduce
+    content, usage = call_deepseek(a.endpoint, a.model, key, REDUCE_SYSTEM,
+                                   REDUCE_USER.format(arch=arch, maps="\n\n".join(maps))[:600_000],
+                                   a.max_output_tokens, a.timeout)
+    in_tok += usage.get("prompt_tokens", 0); out_tok += usage.get("completion_tokens", 0)
+
+    with open(a.out, "w", encoding="utf-8") as f:
+        f.write(f"# LAWMAX-Ω — DeepSeek FULL-codebase review & roadmap to the highest tier\n\n"
+                f"_Model: {a.model}. Read {len(files)} source files in full across {len(chunks)} "
+                f"passes. This is an AI assessment; verify each claim against the code._\n\n")
+        f.write(content)
+    real = in_tok / 1e6 * pin + out_tok / 1e6 * pout
+    print(f"\n✔ wrote {a.out}")
+    print(f"  tokens: {in_tok:,} in + {out_tok:,} out  |  actual cost ≈ €{real:.2f}")
+    return 0
+
+
 def call_deepseek(endpoint, model, key, system, user, max_output_tokens, timeout):
     body = {"model": model, "temperature": 0.2, "max_tokens": max_output_tokens,
             "messages": [{"role": "system", "content": system},
@@ -175,6 +288,22 @@ def approx_tokens(chars):
     return chars // 4   # ~4 chars/token, good enough for a pre-flight estimate
 
 
+def ask_key(est):
+    """Prompt for the API key and start on entry (no env var needed)."""
+    key = os.environ.get("DEEPSEEK_API_KEY")
+    if not key:
+        try:
+            key = input(f"\nΕπικόλλησε εδώ το DeepSeek API key σου (ξεκινά με sk-) και πάτα Enter\n"
+                        f"— θα κοστίσει ~€{est:.2f} — : ").strip()
+        except (EOFError, KeyboardInterrupt):
+            sys.exit("\nΑκυρώθηκε.")
+    key = (key or "").strip()
+    if not key or key.endswith("...") or key == "sk-...":
+        sys.exit("Δεν δόθηκε πραγματικό κλειδί (μάλλον το placeholder 'sk-...'). "
+                 "Πάρε το αληθινό από https://platform.deepseek.com → API keys.")
+    return key
+
+
 def main():
     ap = argparse.ArgumentParser(description="DeepSeek repo review → highest-tier roadmap")
     ap.add_argument("--repo", default=".", help="path to the repository to review")
@@ -183,8 +312,11 @@ def main():
     ap.add_argument("--endpoint", default=os.environ.get("DEEPSEEK_ENDPOINT",
                                                          "https://api.deepseek.com/chat/completions"))
     ap.add_argument("--out", default="LAWMAX-UPGRADE-ROADMAP.md")
-    ap.add_argument("--max-chars", type=int, default=180_000, help="digest size cap (~45k tokens)")
-    ap.add_argument("--header-lines", type=int, default=45, help="lines sampled per source file")
+    ap.add_argument("--deep", action="store_true",
+                    help="read the ENTIRE codebase in full (map-reduce), not a sample")
+    ap.add_argument("--chunk-chars", type=int, default=140_000, help="chars per --deep chunk (~35k tokens)")
+    ap.add_argument("--max-chars", type=int, default=180_000, help="single-pass digest cap (~45k tokens)")
+    ap.add_argument("--header-lines", type=int, default=45, help="lines sampled per source file (single-pass)")
     ap.add_argument("--max-output-tokens", type=int, default=8000)
     ap.add_argument("--timeout", type=int, default=600)
     ap.add_argument("--dry-run", action="store_true", help="show size + cost estimate, do not call")
@@ -192,6 +324,9 @@ def main():
 
     if not os.path.isdir(a.repo):
         sys.exit(f"no such directory: {a.repo}")
+
+    if a.deep:
+        return run_deep(a, os.environ.get("DEEPSEEK_API_KEY"))
 
     digest, n_src = build_digest(a.repo, a.max_chars, a.header_lines)
     user = USER_TEMPLATE.format(digest=digest)
@@ -209,18 +344,7 @@ def main():
         print("\n[dry-run] nothing sent. Re-run without --dry-run to review.")
         return 0
 
-    # Ask for the key right here and start as soon as it is entered (no env var needed).
-    key = os.environ.get("DEEPSEEK_API_KEY")
-    if not key:
-        try:
-            key = input(f"\nΕπικόλλησε εδώ το DeepSeek API key σου (ξεκινά με sk-) και πάτα Enter\n"
-                        f"— θα κοστίσει ~€{est:.3f} — : ").strip()
-        except (EOFError, KeyboardInterrupt):
-            sys.exit("\nΑκυρώθηκε.")
-    key = (key or "").strip()
-    if not key or key.endswith("...") or key == "sk-...":
-        sys.exit("Δεν δόθηκε πραγματικό κλειδί (έβαλες το placeholder 'sk-...'). Πάρε το αληθινό από "
-                 "https://platform.deepseek.com → API keys.")
+    key = ask_key(est)
 
     print("\n· calling DeepSeek …")
     try:
