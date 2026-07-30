@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""Have DeepSeek review a repository and produce a concrete roadmap to the highest tier.
+"""DeepSeek reads a repository IN FULL and returns a roadmap to the highest tier.
 
-A senior-architect review, not a tournament: it gathers a high-signal DIGEST of the repo
-(README + contracts + system definitions + a directory map + a sample of the real source),
-sends it to DeepSeek with a rigorous "bring this to the absolute top tier" prompt, and writes
-the answer to a Markdown roadmap. Cheap and honest: `--dry-run` shows the exact size and a cost
-ESTIMATE before you spend anything, and every run prints the real token usage afterwards.
+One mode only: it reads EVERY first-party source file and contract (never a sample), analyses
+the whole codebase in parallel, then synthesises one demanding roadmap — with deep reasoning
+(deepseek-reasoner) by default. `--dry-run` shows the exact size and a cost ESTIMATE before you
+spend anything; every real run prints the actual token usage afterwards.
 
-    export DEEPSEEK_API_KEY=sk-...          # (PowerShell:  $env:DEEPSEEK_API_KEY="sk-...")
     python deepseek_review.py --repo .                 # review the current repo
-    python deepseek_review.py --repo . --dry-run       # just show size + cost estimate, no call
+    python deepseek_review.py --repo . --dry-run       # size + cost estimate, no call
 
-Only the Python standard library is used; drop this file into any repo and run it.
+Asks for your DeepSeek API key at runtime and starts on entry (no environment variable needed).
+Only the Python standard library is used.
 """
 import argparse
 import json
@@ -19,8 +18,8 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Read in priority order; the first ones matter most and are never truncated.
 PRIORITY_DOCS = [
     "README.md", "CLAUDE.md", "SYSTEM-HIERARCHY.txt", "SEMANTIC-CONTRACT.md",
     "DEPENDENCY-CONTRACT.md", "CHANGELOG.md", "PROVENANCE.yaml", "DEPLOY-PRODUCTION.md",
@@ -28,9 +27,8 @@ PRIORITY_DOCS = [
 ]
 EXCLUDE_DIRS = {".git", "third-party", "deps", "node_modules", "__pycache__", "output",
                 "output_run1", "dist", "build", ".venv", "venv", "vendor"}
-SOURCE_EXT = (".lisp", ".py", ".go", ".rs", ".ts", ".c", ".h", ".cpp", ".java", ".scala", ".clj")
-# EUR per 1M tokens (estimate; DeepSeek is among the cheapest top models). Adjust with --price.
-PRICE = {"deepseek-reasoner": (0.55, 2.19), "deepseek-chat": (0.27, 1.10)}
+CODE_EXT = (".lisp", ".lsp", ".cl", ".asd", ".md", ".txt", ".yaml", ".yml", ".sh", ".py")
+PRICE = {"deepseek-reasoner": (0.55, 2.19), "deepseek-chat": (0.27, 1.10)}   # EUR / 1M tok (est.)
 
 
 def read(path, limit=None):
@@ -42,8 +40,11 @@ def read(path, limit=None):
         return None
 
 
+def approx_tokens(chars):
+    return chars // 4
+
+
 def tree(root, max_entries=400):
-    """A pruned directory map (first-party only), one line per dir with a file count."""
     lines, n = [], 0
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith("."))
@@ -52,7 +53,7 @@ def tree(root, max_entries=400):
         if depth > 3:
             dirnames[:] = []
             continue
-        code = sum(1 for f in filenames if f.endswith(SOURCE_EXT))
+        code = sum(1 for f in filenames if f.endswith(CODE_EXT))
         lines.append(f"{'  ' * depth}{os.path.basename(dirpath) if rel != '.' else '.'}/  "
                      f"({len(filenames)} files{', ' + str(code) + ' source' if code else ''})")
         n += 1
@@ -62,119 +63,40 @@ def tree(root, max_entries=400):
     return "\n".join(lines)
 
 
-def source_inventory(root, cap=80):
-    """List first-party source files by size, and return the biggest for header sampling."""
-    files = []
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
-        for f in filenames:
-            if f.endswith(SOURCE_EXT):
-                p = os.path.join(dirpath, f)
-                try:
-                    files.append((os.path.getsize(p), os.path.relpath(p, root), p))
-                except OSError:
-                    pass
-    files.sort(reverse=True)
-    inv = "\n".join(f"  {sz:>8}  {rel}" for sz, rel, _ in files[:cap])
-    if len(files) > cap:
-        inv += f"\n  … and {len(files) - cap} more source files"
-    return inv, files, len(files)
-
-
-def build_digest(root, max_chars, header_lines):
-    parts = [f"# REPOSITORY DIGEST: {os.path.basename(os.path.abspath(root))}\n"]
-
-    parts.append("\n## KEY DOCUMENTS & CONTRACTS\n")
+def arch_context(root):
+    """Contracts + system definitions + directory map — the framing for the final synthesis
+    (the actual code is read in full by the map pass, so no source is sampled here)."""
+    parts = ["## KEY DOCUMENTS & CONTRACTS\n"]
     seen = set()
     for name in PRIORITY_DOCS:
         p = os.path.join(root, name)
         if os.path.isfile(p):
             seen.add(name)
             parts.append(f"\n----- {name} -----\n{read(p)}\n")
-    # any other top-level *.md not already included
     for f in sorted(os.listdir(root)):
         if f.endswith(".md") and f not in seen and os.path.isfile(os.path.join(root, f)):
             parts.append(f"\n----- {f} -----\n{read(os.path.join(root, f), 6000)}\n")
-
-    asd = sorted(f for f in os.listdir(root) if f.endswith(".asd"))
-    if asd:
-        parts.append("\n## SYSTEM DEFINITIONS (architecture)\n")
-        for f in asd:
-            parts.append(f"\n----- {f} -----\n{read(os.path.join(root, f))}\n")
-
+    for f in sorted(x for x in os.listdir(root) if x.endswith(".asd")):
+        parts.append(f"\n----- {f} -----\n{read(os.path.join(root, f))}\n")
     parts.append("\n## DIRECTORY MAP\n" + tree(root) + "\n")
-
-    inv, files, total = source_inventory(root)
-    parts.append(f"\n## SOURCE INVENTORY ({total} first-party source files, largest first)\n" + inv + "\n")
-
-    # sample the HEADERS of the biggest first-party source files, within the remaining budget
-    parts.append("\n## SOURCE SAMPLES (headers of the largest modules)\n")
-    used = sum(len(p) for p in parts)
-    for _sz, rel, p in files:
-        if used >= max_chars:
-            parts.append("\n… (source samples truncated to stay within budget)\n")
-            break
-        head = "\n".join((read(p) or "").splitlines()[:header_lines])
-        block = f"\n----- {rel} (first {header_lines} lines) -----\n{head}\n"
-        parts.append(block)
-        used += len(block)
-
-    digest = "".join(parts)
-    truncated = len(digest) > max_chars
-    return (digest[:max_chars] + "\n… (digest truncated)\n") if truncated else digest, total
-
-
-SYSTEM_PROMPT = (
-    "You are a world-class systems architect and legal-AI domain expert conducting a rigorous, "
-    "honest technical review. You do not flatter. You cite concrete files and modules. You mark "
-    "UNKNOWN where the provided material is insufficient rather than guessing. Your single goal is "
-    "to tell the owner exactly how to bring this system to the ABSOLUTE HIGHEST TIER of quality, "
-    "correctness, and capability."
-)
-
-USER_TEMPLATE = """Below is a high-signal digest of a repository (a Common Lisp legal-reasoning
-platform called LAWMAX-Ω, plus its contracts and architecture). Study it, then produce a report
-with EXACTLY these sections:
-
-1. WHAT THIS SYSTEM IS — in 5-8 lines, from the evidence only.
-2. CURRENT-TIER ASSESSMENT — grade each dimension (architecture, correctness/verification,
-   robustness, performance, testing, security, legal-domain completeness, operability) as
-   S / A / B / C / D with a one-line justification citing the evidence.
-3. TOP GAPS TO THE HIGHEST TIER — the specific things standing between this system and S-tier,
-   most important first, each tied to a file/module/contract.
-4. PRIORITISED ROADMAP — concrete, ordered phases. For each item: what to change, which
-   file/module, why it raises the tier, and rough effort (S/M/L).
-5. QUICK WINS — high-value, low-effort changes doable immediately.
-6. WHAT I COULD NOT ASSESS — honestly, what the digest did not let you judge, and what to send
-   next for a deeper review.
-
-Be specific and demanding. This is the owner's real system; vague advice is worthless.
-
-===== DIGEST =====
-{digest}
-"""
-
-
-CODE_EXT = (".lisp", ".lsp", ".cl", ".asd", ".md", ".txt", ".yaml", ".yml", ".sh", ".py")
+    return "".join(parts)
 
 
 def gather_corpus(root):
-    """EVERY first-party source file and contract, in FULL (not a sample). Third-party, deps
-    and generated data are excluded — they are not logic to improve."""
+    """EVERY first-party source file and contract, in FULL. Third-party, deps and generated
+    data are excluded — they are not logic to improve."""
     out = []
     for dp, dn, fn in os.walk(root):
         dn[:] = [d for d in dn if d not in EXCLUDE_DIRS and not d.startswith(".")]
         for f in sorted(fn):
             if f.endswith(CODE_EXT):
-                p = os.path.join(dp, f)
-                c = read(p)
+                c = read(os.path.join(dp, f))
                 if c is not None:
-                    out.append((os.path.relpath(p, root), c))
+                    out.append((os.path.relpath(os.path.join(dp, f), root), c))
     return sorted(out)
 
 
 def make_chunks(files, budget_chars):
-    """Pack files into context-sized chunks; a file larger than the budget is split."""
     chunks, cur, size = [], [], 0
     for rel, c in files:
         block = f"\n===== FILE: {rel} =====\n{c}\n"
@@ -199,14 +121,24 @@ MAP_SYSTEM = (
 MAP_USER = (
     "Analyse the files below (one part of the whole codebase). For each meaningful module output:\n"
     "- FILE(s), one line on PURPOSE;\n- QUALITY: S/A/B/C/D + a one-line reason;\n"
-    "- WEAKNESSES: concrete, specific (bugs, coupling, missing checks, perf, unclear invariants);\n"
+    "- WEAKNESSES: concrete and specific (bugs, coupling, missing checks, perf, unclear invariants);\n"
     "- UPGRADES: concrete changes that would raise it toward the highest tier.\n"
-    "Be compact. Skip trivial/boilerplate files in one line. Do NOT write a generic summary.\n\n{body}")
-REDUCE_SYSTEM = SYSTEM_PROMPT
+    "Be compact. Dismiss trivial/boilerplate files in one line. Do NOT write a generic summary.\n\n{body}")
+
+CONSOLIDATE_SYSTEM = MAP_SYSTEM
+CONSOLIDATE_USER = (
+    "Consolidate the partial analyses below (each covers part of the same codebase) into a compact "
+    "but COMPLETE synthesis. Keep every concrete weakness, upgrade and file reference; remove only "
+    "repetition. Preserve the S/A/B/C/D grades.\n\n{body}")
+
+REDUCE_SYSTEM = (
+    "You are a world-class systems architect and legal-AI domain expert conducting a rigorous, "
+    "honest final review. You do not flatter. You cite concrete files and modules. You mark UNKNOWN "
+    "where evidence is insufficient. Your goal is to tell the owner exactly how to bring this system "
+    "to the ABSOLUTE HIGHEST TIER.")
 REDUCE_USER = (
-    "Below are (a) the system's contracts/architecture and (b) per-part analyses that together "
-    "cover the ENTIRE codebase of LAWMAX-Ω. Synthesise the definitive review with EXACTLY these "
-    "sections:\n"
+    "Below are (a) the system's contracts/architecture and (b) analyses that together cover the "
+    "ENTIRE codebase of LAWMAX-Ω. Produce the definitive review with EXACTLY these sections:\n"
     "1. WHAT THIS SYSTEM IS (5-8 lines).\n"
     "2. CURRENT-TIER ASSESSMENT — grade each dimension (architecture, correctness/verification, "
     "robustness, performance, testing, security, legal-domain completeness, operability) S/A/B/C/D "
@@ -217,153 +149,219 @@ REDUCE_USER = (
     "5. QUICK WINS.\n"
     "6. RESIDUAL RISKS / WHAT STILL NEEDS A HUMAN.\n"
     "Be demanding and concrete. This is the owner's real system.\n\n"
-    "===== CONTRACTS & ARCHITECTURE =====\n{arch}\n\n===== PER-PART ANALYSES =====\n{maps}\n")
+    "===== CONTRACTS & ARCHITECTURE =====\n{arch}\n\n===== CODEBASE ANALYSES =====\n{maps}\n")
 
 
-def run_deep(a, key):
-    """Read the WHOLE codebase (map), then synthesise one roadmap (reduce)."""
-    files = gather_corpus(a.repo)
-    total_chars = sum(len(c) for _, c in files)
-    chunks = make_chunks(files, a.chunk_chars)
+ESCALATE_SYSTEM = (
+    "You are the most demanding reviewer alive, bound by the owner's SUPREME LAW: nothing "
+    "mediocre — ONLY the highest implementation. If a STRICTLY SUPERIOR conception exists, the "
+    "current one does not qualify and must be replaced, even if the change is larger. You never "
+    "flatter, you cite concrete files/modules/mechanisms, and you never invent progress.")
+ESCALATE_CRITIQUE = (
+    "Grounding (whole-codebase understanding + contracts):\n{grounding}\n\n"
+    "CURRENT highest-tier vision & roadmap for LAWMAX-Ω:\n---\n{vision}\n---\n\n"
+    "Attack it. Is there a STRICTLY SUPERIOR conception — a better target architecture, or a "
+    "materially more correct/complete/robust roadmap — worth climbing to? Be concrete and specific.\n"
+    "ONLY if you genuinely cannot find ANY strictly higher conception worth pursuing (i.e. climbing "
+    "further is not worthwhile — this IS the ceiling), reply with 'CEILING_REACHED' as the very "
+    "first line, then 3-6 lines justifying why this is the supreme, un-improvable target. Otherwise, "
+    "describe precisely the higher conception and why it dominates the current one.")
+ESCALATE_IMPROVE = (
+    "Rewrite the vision & roadmap to fully incorporate this strictly-higher conception. Output the "
+    "COMPLETE improved version (all six sections), concrete and prioritised — not a diff.\n\n"
+    "CURRENT:\n---\n{vision}\n---\n\nHIGHER CONCEPTION TO INCORPORATE:\n{critique}\n")
+
+
+def escalate_to_ceiling(vision, grounding, a, key, spent):
+    """Climb until DeepSeek can find no strictly higher conception, confirmed by `dry_required`
+    consecutive 'CEILING_REACHED' rounds — the owner's supreme law as a stop condition. Bounded
+    by --max-rounds and --budget-eur so it converges rather than runs forever."""
     pin, pout = PRICE.get(a.model, PRICE["deepseek-reasoner"])
-    est_in = approx_tokens(total_chars + 2000 * len(chunks))
-    est = est_in / 1e6 * pin + (len(chunks) + 1) * a.max_output_tokens / 1e6 * pout
-    print(f"repo:          {os.path.abspath(a.repo)}")
-    print(f"files read:    {len(files)}  (FULL content, not a sample)")
-    print(f"corpus size:   {total_chars:,} chars  (~{approx_tokens(total_chars):,} tokens)")
-    print(f"chunks:        {len(chunks)}  → {len(chunks)} map calls + 1 synthesis call")
-    print(f"model:         {a.model}")
-    print(f"cost ESTIMATE: ~€{est:.2f}")
-    if a.dry_run:
-        print("\n[dry-run] nothing sent.")
-        return 0
-    key = key or ask_key(est)
-
-    in_tok = out_tok = 0
-    maps = []
-    for i, ch in enumerate(chunks, 1):
-        body = "".join(b for _, b in ch)
-        names = ", ".join(sorted({r for r, _ in ch}))[:200]
-        print(f"  · [{i}/{len(chunks)}] reading: {names} …")
-        content, usage = call_deepseek(a.endpoint, a.model, key, MAP_SYSTEM,
-                                       MAP_USER.format(body=body), a.max_output_tokens, a.timeout)
-        in_tok += usage.get("prompt_tokens", 0); out_tok += usage.get("completion_tokens", 0)
-        maps.append(f"----- part {i} ({names}) -----\n{content}")
-
-    print("  · synthesising the roadmap from the whole codebase …")
-    arch, _ = build_digest(a.repo, 120_000, a.header_lines)   # contracts + arch, for the reduce
-    content, usage = call_deepseek(a.endpoint, a.model, key, REDUCE_SYSTEM,
-                                   REDUCE_USER.format(arch=arch, maps="\n\n".join(maps))[:600_000],
+    dry, rnd, log = 0, 0, []
+    g = grounding[:120_000]
+    while dry < a.dry_required and rnd < a.max_rounds:
+        if a.budget_eur and spent[0] >= a.budget_eur:
+            log.append(f"round {rnd + 1}: stopped — budget €{a.budget_eur} reached"); break
+        rnd += 1
+        crit, u = call_deepseek(a.endpoint, a.model, key, ESCALATE_SYSTEM,
+                                ESCALATE_CRITIQUE.format(grounding=g, vision=vision),
+                                a.max_output_tokens, a.timeout)
+        spent[0] += u.get("prompt_tokens", 0) / 1e6 * pin + u.get("completion_tokens", 0) / 1e6 * pout
+        if crit.strip().upper().startswith("CEILING_REACHED") or "CEILING_REACHED" in crit[:120].upper():
+            dry += 1
+            log.append(f"round {rnd}: no strictly higher conception found  (ceiling {dry}/{a.dry_required})")
+            continue
+        dry = 0
+        vision, u2 = call_deepseek(a.endpoint, a.model, key, ESCALATE_SYSTEM,
+                                   ESCALATE_IMPROVE.format(vision=vision, critique=crit),
                                    a.max_output_tokens, a.timeout)
-    in_tok += usage.get("prompt_tokens", 0); out_tok += usage.get("completion_tokens", 0)
-
-    with open(a.out, "w", encoding="utf-8") as f:
-        f.write(f"# LAWMAX-Ω — DeepSeek FULL-codebase review & roadmap to the highest tier\n\n"
-                f"_Model: {a.model}. Read {len(files)} source files in full across {len(chunks)} "
-                f"passes. This is an AI assessment; verify each claim against the code._\n\n")
-        f.write(content)
-    real = in_tok / 1e6 * pin + out_tok / 1e6 * pout
-    print(f"\n✔ wrote {a.out}")
-    print(f"  tokens: {in_tok:,} in + {out_tok:,} out  |  actual cost ≈ €{real:.2f}")
-    return 0
+        spent[0] += u2.get("prompt_tokens", 0) / 1e6 * pin + u2.get("completion_tokens", 0) / 1e6 * pout
+        log.append(f"round {rnd}: climbed to a strictly higher conception — "
+                   f"{crit.strip().splitlines()[0][:120] if crit.strip() else ''}")
+        print(f"  · escalation round {rnd}: climbed higher")
+    reached = dry >= a.dry_required
+    if reached:
+        print(f"  · CEILING reached ({a.dry_required} dry rounds) — no worthwhile climb remains")
+    elif rnd >= a.max_rounds:
+        print(f"  · stopped at --max-rounds {a.max_rounds} (still improving; raise the cap for more)")
+    return vision, log, reached
 
 
 def call_deepseek(endpoint, model, key, system, user, max_output_tokens, timeout):
     body = {"model": model, "temperature": 0.2, "max_tokens": max_output_tokens,
-            "messages": [{"role": "system", "content": system},
-                         {"role": "user", "content": user}]}
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
     req = urllib.request.Request(
         endpoint, data=json.dumps(body).encode("utf-8"),
-        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
-        method="POST")
+        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req, timeout=timeout) as r:
         obj = json.loads(r.read().decode("utf-8"))
     content = obj["choices"][0]["message"].get("content") or ""
     if obj["choices"][0].get("finish_reason") == "length":
-        content += "\n\n> [truncated by output limit — raise --max-output-tokens for the full report]"
+        content += "\n\n> [truncated by output limit]"
     return content, obj.get("usage", {})
 
 
-def approx_tokens(chars):
-    return chars // 4   # ~4 chars/token, good enough for a pre-flight estimate
-
-
 def ask_key(est):
-    """Prompt for the API key and start on entry (no env var needed)."""
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
         try:
-            key = input(f"\nΕπικόλλησε εδώ το DeepSeek API key σου (ξεκινά με sk-) και πάτα Enter\n"
+            key = input(f"\nΕπικόλλησε το DeepSeek API key σου (ξεκινά με sk-) και πάτα Enter\n"
                         f"— θα κοστίσει ~€{est:.2f} — : ").strip()
         except (EOFError, KeyboardInterrupt):
             sys.exit("\nΑκυρώθηκε.")
     key = (key or "").strip()
     if not key or key.endswith("...") or key == "sk-...":
         sys.exit("Δεν δόθηκε πραγματικό κλειδί (μάλλον το placeholder 'sk-...'). "
-                 "Πάρε το αληθινό από https://platform.deepseek.com → API keys.")
+                 "Πάρ' το από https://platform.deepseek.com → API keys.")
     return key
 
 
+def group_by_size(items, budget_chars):
+    groups, cur, size = [], [], 0
+    for it in items:
+        if size + len(it) > budget_chars and cur:
+            groups.append(cur); cur, size = [], 0
+        cur.append(it); size += len(it)
+    if cur:
+        groups.append(cur)
+    return groups
+
+
 def main():
-    ap = argparse.ArgumentParser(description="DeepSeek repo review → highest-tier roadmap")
+    ap = argparse.ArgumentParser(description="DeepSeek FULL-codebase review → highest-tier roadmap")
     ap.add_argument("--repo", default=".", help="path to the repository to review")
     ap.add_argument("--model", default="deepseek-reasoner",
-                    help="deepseek-reasoner (deep, default) or deepseek-chat (cheaper)")
+                    help="deep reasoning by default; deepseek-chat is faster/cheaper")
     ap.add_argument("--endpoint", default=os.environ.get("DEEPSEEK_ENDPOINT",
                                                          "https://api.deepseek.com/chat/completions"))
     ap.add_argument("--out", default="LAWMAX-UPGRADE-ROADMAP.md")
-    ap.add_argument("--deep", action="store_true",
-                    help="read the ENTIRE codebase in full (map-reduce), not a sample")
-    ap.add_argument("--chunk-chars", type=int, default=140_000, help="chars per --deep chunk (~35k tokens)")
-    ap.add_argument("--max-chars", type=int, default=180_000, help="single-pass digest cap (~45k tokens)")
-    ap.add_argument("--header-lines", type=int, default=45, help="lines sampled per source file (single-pass)")
+    ap.add_argument("--chunk-chars", type=int, default=140_000, help="chars per read chunk (~35k tokens)")
+    ap.add_argument("--workers", type=int, default=6, help="parallel read calls")
     ap.add_argument("--max-output-tokens", type=int, default=8000)
-    ap.add_argument("--timeout", type=int, default=600)
+    ap.add_argument("--timeout", type=int, default=900)
+    # Escalation to the ceiling is CORE: it does not stop until DeepSeek can find no strictly
+    # higher conception, confirmed by `dry-required` consecutive rounds (bounded by max-rounds/budget).
+    ap.add_argument("--max-rounds", type=int, default=6, help="escalation cap (climb toward the ceiling)")
+    ap.add_argument("--dry-required", type=int, default=2,
+                    help="consecutive 'no strictly higher' rounds to declare the ceiling")
+    ap.add_argument("--budget-eur", type=float, default=None, help="hard cost cap; escalation stops if exceeded")
+    ap.add_argument("--no-escalate", action="store_true", help="single review only, no climb")
     ap.add_argument("--dry-run", action="store_true", help="show size + cost estimate, do not call")
     a = ap.parse_args()
 
     if not os.path.isdir(a.repo):
         sys.exit(f"no such directory: {a.repo}")
 
-    if a.deep:
-        return run_deep(a, os.environ.get("DEEPSEEK_API_KEY"))
-
-    digest, n_src = build_digest(a.repo, a.max_chars, a.header_lines)
-    user = USER_TEMPLATE.format(digest=digest)
-    in_tok = approx_tokens(len(SYSTEM_PROMPT) + len(user))
+    files = gather_corpus(a.repo)
+    total_chars = sum(len(c) for _, c in files)
+    chunks = make_chunks(files, a.chunk_chars)
     pin, pout = PRICE.get(a.model, PRICE["deepseek-reasoner"])
-    est = in_tok / 1e6 * pin + a.max_output_tokens / 1e6 * pout
+    est = (approx_tokens(total_chars) / 1e6 * pin
+           + (len(chunks) + 2) * a.max_output_tokens / 1e6 * pout)
 
-    print(f"repo:            {os.path.abspath(a.repo)}")
-    print(f"source files:    {n_src}")
-    print(f"digest size:     {len(digest):,} chars  (~{in_tok:,} input tokens)")
-    print(f"model:           {a.model}")
-    print(f"cost ESTIMATE:   ~€{est:.3f}   (input ~{in_tok:,} tok + up to {a.max_output_tokens:,} output tok)")
-
+    print(f"repo:          {os.path.abspath(a.repo)}")
+    print(f"files read:    {len(files)}  (FULL content, not a sample)")
+    print(f"corpus size:   {total_chars:,} chars  (~{approx_tokens(total_chars):,} tokens)")
+    print(f"read passes:   {len(chunks)}  (parallel ×{a.workers}) + synthesis")
+    print(f"model:         {a.model}  (deep reasoning)")
+    print(f"cost ESTIMATE: ~€{est:.2f}")
     if a.dry_run:
-        print("\n[dry-run] nothing sent. Re-run without --dry-run to review.")
+        print("\n[dry-run] nothing sent.")
         return 0
+    if not files:
+        sys.exit("no source files found under --repo")
 
     key = ask_key(est)
+    in_tok = out_tok = 0
 
-    print("\n· calling DeepSeek …")
-    try:
-        content, usage = call_deepseek(a.endpoint, a.model, key, SYSTEM_PROMPT, user,
-                                       a.max_output_tokens, a.timeout)
-    except urllib.error.HTTPError as e:
-        sys.exit(f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:400]}")
-    except urllib.error.URLError as e:
-        sys.exit(f"network error: {e.reason}")
+    def do_map(i, ch):
+        body = "".join(b for _, b in ch)
+        names = ", ".join(sorted({r for r, _ in ch}))
+        try:
+            content, usage = call_deepseek(a.endpoint, a.model, key, MAP_SYSTEM,
+                                           MAP_USER.format(body=body), a.max_output_tokens, a.timeout)
+            return i, content, usage, names
+        except (urllib.error.HTTPError, urllib.error.URLError) as e:
+            detail = getattr(e, "read", lambda: b"")()
+            return i, f"[FAILED to read this part: {e}. {detail[:200] if detail else ''}]", {}, names
+
+    print(f"\n· reading the whole codebase in {len(chunks)} passes ({a.workers} in parallel)…")
+    results = [None] * len(chunks)
+    done = 0
+    with ThreadPoolExecutor(max_workers=a.workers) as ex:
+        futs = [ex.submit(do_map, i, ch) for i, ch in enumerate(chunks)]
+        for fut in as_completed(futs):
+            i, content, usage, names = fut.result()
+            results[i] = (content, names)
+            in_tok += usage.get("prompt_tokens", 0); out_tok += usage.get("completion_tokens", 0)
+            done += 1
+            print(f"  · [{done}/{len(chunks)}] {names[:80]}")
+
+    analyses = [f"----- part {i + 1} ({names}) -----\n{content}"
+                for i, (content, names) in enumerate(results)]
+
+    # Hierarchical consolidation so the final synthesis fits the context window.
+    while sum(len(x) for x in analyses) > 300_000 and len(analyses) > 1:
+        groups = group_by_size(analyses, 220_000)
+        print(f"· consolidating {len(analyses)} analyses → {len(groups)} …")
+        merged = []
+        for g in groups:
+            content, usage = call_deepseek(a.endpoint, a.model, key, CONSOLIDATE_SYSTEM,
+                                           CONSOLIDATE_USER.format(body="\n\n".join(g)),
+                                           a.max_output_tokens, a.timeout)
+            in_tok += usage.get("prompt_tokens", 0); out_tok += usage.get("completion_tokens", 0)
+            merged.append(content)
+        analyses = merged
+
+    print("· synthesising the initial vision & roadmap from the whole codebase…")
+    arch = arch_context(a.repo)[:140_000]
+    vision, usage = call_deepseek(a.endpoint, a.model, key, REDUCE_SYSTEM,
+                                  REDUCE_USER.format(arch=arch, maps="\n\n".join(analyses)),
+                                  a.max_output_tokens, a.timeout)
+    in_tok += usage.get("prompt_tokens", 0); out_tok += usage.get("completion_tokens", 0)
+
+    # ESCALATE to the ceiling — do not stop until no strictly higher conception remains.
+    spent = [in_tok / 1e6 * pin + out_tok / 1e6 * pout]
+    esc_log, reached = [], None
+    if not a.no_escalate:
+        print("\n· escalating toward the ceiling (stops only when no strictly higher conception remains)…")
+        grounding = arch + "\n\n===== CODEBASE ANALYSES =====\n" + "\n\n".join(analyses)
+        vision, esc_log, reached = escalate_to_ceiling(vision, grounding, a, key, spent)
 
     with open(a.out, "w", encoding="utf-8") as f:
-        f.write(f"# LAWMAX-Ω — DeepSeek review & roadmap to the highest tier\n\n"
-                f"_Model: {a.model}. This is an AI assessment; verify each claim against the code._\n\n")
-        f.write(content)
-
-    it, ot = usage.get("prompt_tokens", in_tok), usage.get("completion_tokens", 0)
-    real = it / 1e6 * pin + ot / 1e6 * pout
+        f.write(f"# LAWMAX-Ω — DeepSeek FULL-codebase review & roadmap to the highest tier\n\n"
+                f"_Model: {a.model}. Read {len(files)} source files in full across {len(chunks)} passes")
+        if not a.no_escalate:
+            status = ("CEILING REACHED — no strictly higher conception found" if reached
+                      else f"stopped at the {a.max_rounds}-round cap (still improving)")
+            f.write(f", then escalated to the ceiling. Outcome: **{status}**._\n\n")
+            f.write("## Escalation log\n" + "\n".join(f"- {x}" for x in esc_log) + "\n\n---\n\n")
+        else:
+            f.write("._\n\n")
+        f.write(vision)
     print(f"\n✔ wrote {a.out}")
-    print(f"  tokens: {it:,} in + {ot:,} out   |   actual cost ≈ €{real:.3f}")
+    print(f"  cost ≈ €{spent[0]:.2f}"
+          + ("" if a.no_escalate else f"  |  ceiling: {'REACHED' if reached else 'round-cap'}"))
     return 0
 
 
