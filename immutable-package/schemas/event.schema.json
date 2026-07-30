@@ -1,0 +1,7 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"lawmax-event","type":"object",
+ "required":["seq","utc","actor","role","mechanism","kind","inputs_hash","outputs_hash","budget_delta","prev_hash","this_hash"],
+ "properties":{"seq":{"type":"integer","minimum":0},"utc":{"type":"string"},"actor":{"type":"string"},
+ "role":{"type":"string"},"mechanism":{"type":"string"},"kind":{"type":"string"},"payload":{},
+ "reason":{"type":"string"},"inputs_hash":{"type":"string"},"outputs_hash":{"type":"string"},
+ "budget_delta":{"type":"object"},"prev_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+ "this_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}}}

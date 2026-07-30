@@ -1,0 +1,7 @@
+{"waves":[{"id":0,"name":"baseline-certification"},{"id":1,"name":"contracts+wrappers"},
+ {"id":2,"name":"foundational-services"},{"id":3,"name":"certified-cognition-integration"},
+ {"id":4,"name":"entrypoint-migration"},{"id":5,"name":"parallel-verification"},
+ {"id":6,"name":"controlled-cutover"},{"id":7,"name":"evidence-based-retirement"}],
+ "per_wave_required":["entry_criteria","touched_paths","acceptance_gates","preserved_regression_set",
+ "data_migration","rollback_checkpoint","production_reachability_proof"],
+ "status":"CONTENT_FILLED_AT_MIGRATION_PLAN_FROZEN"}

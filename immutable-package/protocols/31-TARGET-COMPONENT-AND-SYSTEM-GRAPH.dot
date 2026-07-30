@@ -1,0 +1,13 @@
+digraph LAWMAX_TARGET_v0 { rankdir=LR; node [shape=box];
+subgraph cluster_core {label="TRUSTED CORE"; "trusted-kernel"; "certified-ledger"; "event-memory";}
+"external-adapters"->"deliberation-workspace"->"trusted-kernel"->"certified-ledger";
+"trusted-kernel"->"event-memory"; "legal-rule-subsumption"->"trusted-kernel";
+"argumentation-adversarial"->"trusted-kernel"; "document-case-services"->"trusted-kernel";
+"domain-modules"->"legal-rule-subsumption"; "self-model-registry"->"event-memory";
+"self-improvement-lab"->"deliberation-workspace"; "human-gates"->"trusted-kernel";
+"real-time-interfaces"->"document-case-services";
+// forbidden (drawn red for review): kernel->adapters, workspace->ledger, adapters->ledger
+edge [color=red, style=dashed, constraint=false];
+"trusted-kernel"->"external-adapters" [label="FORBIDDEN"];
+"deliberation-workspace"->"certified-ledger" [label="FORBIDDEN"];
+"external-adapters"->"certified-ledger" [label="FORBIDDEN"]; }

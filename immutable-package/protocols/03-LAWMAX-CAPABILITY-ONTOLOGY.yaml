@@ -1,0 +1,36 @@
+# 03 — LAWMAX CAPABILITY ONTOLOGY v2.0 (valid YAML; schema: schemas/ontology.schema.json)
+meta: {version: "2.0", frozen_at_state: CHARTER_FROZEN, edit_policy: architecture-review-only}
+levels: {M: mechanical, S: structured-analysis, L: legal-intelligence, P: proactive, I: self-improvement}
+zones: {D1: fully-deterministic, D2: deterministic-after-certified-input, P1: probabilistic-verified, H1: human-decision}
+capabilities:
+- {id: ingest.normalize, level: M, zone: D1, evidence: [A11], tests: [VD-01]}
+- {id: ingest.extract, level: M, zone: P1, evidence: [A1, A3, A7], tests: [VD-01]}
+- {id: ingest.certify, level: M, zone: D2, evidence: [A2, A6], tests: [VD-01, VD-12]}
+- {id: entity.resolve, level: S, zone: P1, evidence: [A6], tests: [VD-02]}
+- {id: contradiction.detect, level: S, zone: D2, evidence: [A1, A2], tests: [VD-03]}
+- {id: supersedence.resolve, level: S, zone: D2, evidence: [A2], tests: [VD-06]}
+- {id: timeline.reconstruct, level: S, zone: D2, evidence: [A3], tests: [VD-04]}
+- {id: quant.verify, level: M, zone: D1, evidence: [A5], tests: [VD-05]}
+- {id: physics.plausibility, level: S, zone: P1, evidence: [A4], tests: [VD-05]}
+- {id: rule.execute, level: S, zone: D2, evidence: [A2], tests: [VD-07]}
+- {id: subsume.trace, level: S, zone: D2, evidence: [I-answers], tests: [VD-08]}
+- {id: epistemic.classify, level: S, zone: D2, evidence: [A12], tests: [VD-09]}
+- {id: admission.detect, level: L, zone: P1, evidence: [A8], tests: [VD-10a, HT-transfer]}
+- {id: omission.plan, level: L, zone: P1H1, evidence: [A9], tests: [VD-11a]}
+- {id: constraint.enforce, level: M, zone: D1, evidence: [A9, A10], tests: [VD-12]}
+- {id: adversarial.review, level: L, zone: P1, evidence: [A8, A5], tests: [VD-10a]}
+- {id: argument.generate, level: L, zone: P1, evidence: [A4, A8], tests: [VD-08]}
+- {id: analogical.transfer, level: L, zone: P1, evidence: [], tests: [HT-transfer]}
+- {id: citation.verify, level: M, zone: D1, evidence: [A12], tests: [VD-14]}
+- {id: quote.exactmatch, level: M, zone: D1, evidence: [A3, A11], tests: [VD-14]}
+- {id: draft.surgery, level: M, zone: D1, evidence: [A11], tests: [VD-13]}
+- {id: diff.verify, level: M, zone: D1, evidence: [A11], tests: [VD-13]}
+- {id: persist.eventlog, level: M, zone: D1, evidence: [A-all], tests: [VD-15]}
+- {id: rollback.restore, level: M, zone: D1, evidence: [], tests: [VD-16]}
+- {id: ledger.integrity, level: M, zone: D1, evidence: [], tests: [VD-17]}
+- {id: deadline.monitor, level: P, zone: D2, evidence: [CS-01-pending-list], tests: [VD-07]}
+- {id: gap.track, level: P, zone: D2, evidence: [CS-01-ekkremi], tests: []}
+- {id: issue.spot, level: P, zone: P1, evidence: [A1-unprompted], tests: [HT-transfer]}
+- {id: oppose.simulate, level: P, zone: P1, evidence: [], tests: [HT-transfer]}
+- {id: improve.propose, level: I, zone: P1H1, evidence: [], tests: [ACC-layer5]}
+- {id: selfmodel.report, level: I, zone: D1, evidence: [], tests: [VD-12]}

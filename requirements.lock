@@ -1,0 +1,13 @@
+# LAWMAX v2.1 — pinned runtime. Verified by executable-orchestrator/lawmax21/preflight.py,
+# which EXERCISES each dependency (Fernet round-trip, Ed25519 sign/verify, YAML load)
+# rather than merely importing it. v2.0 imported `cryptography` successfully and then
+# panicked in its Rust backend on a clean machine; an import is not evidence.
+#
+#   python3 -m pip install --require-hashes -r requirements.lock
+#
+python_requires = ">=3.9"
+
+cffi==1.16.0
+cryptography==41.0.7
+PyYAML==6.0.1
+pycparser==2.21

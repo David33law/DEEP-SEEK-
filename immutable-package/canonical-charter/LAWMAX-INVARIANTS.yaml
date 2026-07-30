@@ -1,0 +1,13 @@
+# Charter-level invariants (I1-I10 inherited from protocol 30; restated as frozen charter objects)
+invariants:
+- {id: I1, text: certified ledger append-only, writable only through trusted kernel}
+- {id: I2, text: deliberation workspace never writes ledger directly}
+- {id: I3, text: external-model adapters never mutate state; outputs enter as EXTRACTED only}
+- {id: I4, text: trusted kernel has zero outward dependencies}
+- {id: I5, text: H1 decisions only via human gate service}
+- {id: I6, text: hidden material unreachable from production and builder paths}
+- {id: I7, text: one rollback unit per component; no cross-zone components}
+- {id: I8, text: D1/D2 certified capabilities run with all external AI disabled}
+- {id: I9, text: case A-Box never enters core code or config}
+- {id: I10, text: self-improvement reaches production only via migration waves}
+status: FROZEN_AT_CHARTER_FREEZE

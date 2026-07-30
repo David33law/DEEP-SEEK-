@@ -1,0 +1,5 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"minimal-evidence-package","type":"object",
+ "required":["state","capability_slice","ticket","source_slices","contracts","test_expected_actual","budget_state"],
+ "properties":{"state":{"type":"string"},"capability_slice":{"type":"string"},"ticket":{"type":"object"},
+ "source_slices":{"type":"array"},"contracts":{"type":"array"},"test_expected_actual":{},
+ "prior_accepted_changes":{"type":"array"},"architecture_decision":{"type":"string"},"budget_state":{"type":"object"}}}

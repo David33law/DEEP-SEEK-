@@ -1,0 +1,6 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"evidence-metadata","type":"object",
+ "required":["source_path","imported_utc","file_count","manifest_sha256","classification"],
+ "properties":{"source_path":{"type":"string"},"imported_utc":{"type":"string"},
+ "file_count":{"type":"integer"},"manifest_sha256":{"type":"string"},
+ "git":{"type":"object"},"classification":{"enum":["canonical","duplicate","divergent","partial","unclassified"]},
+ "completeness_notes":{"type":"string"}}}

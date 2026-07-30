@@ -1,0 +1,3 @@
+{"status":"TEMPLATE_AWAITING_EVIDENCE_VAULT","freeze_state":"CHARTER_FROZEN",
+ "sections":["cl-trusted-core","nixos-runtime","law-world-case-evidence-model","temporal-deontic-defeasible-epistemic-event-reasoning","mirror-selfmodel-registry","event-sourced-memory-provenance","institution-roles-contracts-authority","workspace-vs-ledger","safe-self-improvement","api-independence","document-case-intelligence","adversarial-strategy","proactive-supervision","offline-and-real-time"],
+ "source_requirement":"every filled section cites vault files by hash","cs01_role":"empirical evidence only"}

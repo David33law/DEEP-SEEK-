@@ -1,0 +1,19 @@
+# 41 — ARCHITECTURE ALTITUDE LADDER v2.0 (valid YAML) + certification matrix (v2 §12)
+ladder:
+  A0: {name: patch, requires: local fix with regression proof}
+  A1: {name: mechanism, requires: proven load-bearing mechanism plus causal ablation}
+  A2: {name: subsystem, requires: multiple coordinated capabilities behind one stable boundary}
+  A3: {name: unified-cognitive-architecture, requires: end-to-end L3 legal collaboration across multiple domains (transfer-proven)}
+  A4: {name: proactive-institutional-architecture, requires: unprompted issue spotting, deadline monitoring, proactive case supervision on hidden material}
+  A5: {name: architecture-discovering-self-evaluating, requires: autonomous creation, implementation and VALID evaluation of a new mechanism (fidelity+ablation intact)}
+  A6: {name: safely-self-evolving-institutional, requires: safe proposed transition with verification, rollback and human gate before production adoption}
+mandatory_declarations:
+  current_altitude: A0-A6
+  max_reachable_without_structural_redesign: A0-A6
+  ceiling_mechanisms: list
+  missing_capabilities: list-of-ontology-ids
+  required_successor_transition: string
+rules:
+- altitude is ASSIGNED by graders and audit, never by builder self-declaration
+- presenting lower-altitude success as higher-altitude fulfillment is a reporting violation (misrepresentation class)
+- frontier memory stores declared and audited altitude separately

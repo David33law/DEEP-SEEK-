@@ -1,0 +1,3 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"lawmax-checkpoint","type":"object",
+ "required":["state","event_count","utc"],"properties":{"state":{"type":"string"},
+ "event_count":{"type":"integer"},"utc":{"type":"string"},"extra":{"type":"object"}}}

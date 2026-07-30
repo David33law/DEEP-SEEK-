@@ -1,0 +1,7 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"frontier-member","type":"object",
+ "required":["candidate_id","mechanism","declared_altitude","audited_altitude","dimension_vector","status"],
+ "properties":{"candidate_id":{"type":"string"},"mechanism":{"type":"string"},
+ "declared_altitude":{"enum":["A0","A1","A2","A3","A4","A5","A6"]},
+ "audited_altitude":{"enum":["A0","A1","A2","A3","A4","A5","A6","UNASSESSED"]},
+ "dimension_vector":{"type":"object"},"evidence_refs":{"type":"array"},
+ "status":{"enum":["ACTIVE","DOMINATED","FROZEN_AFTER_DOMINANCE_REVIEW","BEST_DISCOVERED_SO_FAR"]}}}

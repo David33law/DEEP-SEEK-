@@ -1,0 +1,10 @@
+{"status":"TEMPLATE_AWAITING_REPOSITORY_REALITY_MODEL",
+ "invariants":["I1-ledger-kernel-only","I2-workspace-no-direct-ledger","I3-adapters-no-state",
+ "I4-kernel-zero-outward-deps","I5-H1-human-only","I6-hidden-unreachable","I7-single-rollback-unit",
+ "I8-API-independence-for-D1-D2","I9-no-abox-in-core","I10-selfimprove-via-waves"],
+ "layers":["trusted-kernel","certified-ledger","epistemic-layer","provenance-event-memory",
+ "legal-rule-subsumption","argumentation-adversarial","self-model-capability-registry",
+ "self-improvement-lab","document-case-services","domain-modules","external-adapters",
+ "human-gates","runtime-deployment","real-time-interfaces"],
+ "components":"UNKNOWN_AWAITING_REALITY_MODEL",
+ "open_questions_form":"OQ-xx bound to experiments via file 32"}

@@ -1,0 +1,8 @@
+# 35 — EXPERIMENT → ARCHITECTURE DECISION MATRIX (v1.2)
+schema: {experiment_id, open_question: OQ-id, capability_ids: [], result_refs: [hidden/ablation/fidelity],
+         architectural_decision: RETAIN+EXTEND|WRAP|REPLACE|NEW-COMPONENT|DEFER|RETIRE,
+         adr_ref: ADR-id, wave_ref: wave-id(36)}
+rule: an experiment with no row here should never have been scheduled (32 mandate).
+example_row_form: {experiment_id: SLICE-1-tournament, open_question: OQ-01,
+  capability_ids: [admission.detect], result_refs: [PENDING], architectural_decision: PENDING,
+  adr_ref: PENDING, wave_ref: PENDING}

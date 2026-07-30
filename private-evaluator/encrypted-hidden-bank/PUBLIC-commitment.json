@@ -1,0 +1,19 @@
+{
+ "counts": {
+  "holdout": 3,
+  "qualification": 9,
+  "replication": 6
+ },
+ "discloses": "counts and commitment only \u2014 no case content, no domains, no answers",
+ "merkle_root": "7f756011c507597e84099051a035b6ed29d08f7711354606368fd700a84aca9e",
+ "slices": [
+  "ADMISSION_RISK",
+  "CONSTRAINT_BLOCK",
+  "TEMPORAL_BAR",
+  "DEONTIC_CONFLICT",
+  "DEFEASIBLE_OVERRIDE",
+  "CROSS_FORUM_LEAK",
+  "PROVENANCE_GAP",
+  "AUTHORITY_STALE"
+ ]
+}

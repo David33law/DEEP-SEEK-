@@ -1,0 +1,11 @@
+{"schema":"frontier-memory v1.3 — persistent, event-sourced view",
+ "member":{"candidate_id":"str","mechanism":"str","declared_altitude":"A0-A6","audited_altitude":"A0-A6",
+  "dimension_vector":{"legal_capability":0,"transfer":0,"auditability":0,"provenance":0,
+   "deterministic_independence":0,"safety":0,"rollback":0,"self_improvement_potential":0,
+   "real_time_viability":0,"migration_cost":0,"trusted_kernel_complexity":0,"external_model_dependence":0},
+  "evidence_refs":["hidden/ablation/fidelity ids"],"ceiling_ref":"45 artifact hash",
+  "challengers_spawned":["candidate ids"],"dominance_history":[{"vs":"id","verdict":"dominates|dominated|incomparable","evidence":"ref"}],
+  "status":"ACTIVE|DOMINATED|FROZEN_AFTER_DOMINANCE_REVIEW|BEST_DISCOVERED_SO_FAR"},
+ "rules":["append-only history; status changes are ledger events",
+          "declared vs audited altitude stored separately (41)",
+          "no member may be FROZEN without a dominance-review artifact (42)"]}

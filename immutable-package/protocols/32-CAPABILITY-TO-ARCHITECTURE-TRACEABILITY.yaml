@@ -1,0 +1,23 @@
+# 32 — CAPABILITY → ARCHITECTURE TRACEABILITY (v1.2)
+# RULE: no experiment without a declared architectural impact; no capability without a home layer.
+schema:
+  capability_id: ontology id (03)
+  target_layer: one of 31.nodes
+  target_component: filled after v0 synthesis (UNKNOWN allowed until then)
+  open_question: OQ-id from 30
+  experiments: [candidate/slice ids]
+  decision_outputs: [RETAIN+EXTEND | WRAP | REPLACE | NEW-COMPONENT | DEFER]
+filled_example:   # the first real cycle
+  - capability_id: admission.detect
+    target_layer: argumentation-adversarial
+    target_component: UNKNOWN_AWAITING_REALITY_MODEL   # existing argument subsystem? (OQ-01)
+    open_question: OQ-01
+    experiments: [SLICE-1 candidates A/B/C on shared substrate]
+    decision_outputs: [RETAIN+EXTEND, REPLACE, NEW-COMPONENT]
+  - capability_id: persist.eventlog
+    target_layer: event-memory
+    target_component: UNKNOWN_AWAITING_REALITY_MODEL   # existing event mechanisms? (OQ-02)
+    open_question: OQ-02
+    experiments: [substrate VD-15/16/17 vs existing repo mechanisms comparison]
+    decision_outputs: [RETAIN, WRAP, REPLACE]
+mandate: every 03 capability receives a row during SYSTEM_ARCHITECTURE_SYNTHESIS.

@@ -1,0 +1,44 @@
+# 25 — CAPABILITY DEPENDENCY MATRIX v1.1 (source of truth for slice gating; see 08)
+# per capability: prerequisites (must be green), targets (prove the capability),
+# non_regression (must stay green), irrelevant_this_cycle (explicitly out of scope)
+substrate_gate_set: [VD-00, VD-13, VD-15, VD-16, VD-17]
+slices:
+  SLICE-1-admission-risk:            # first cycle target (Charter §4 Row 0)
+    capability: [admission.detect, omission.plan(partial), constraint.enforce]
+    prerequisites: [VD-00, VD-13, VD-15, VD-17]      # structured case graph + surgery + persistence + ledger
+    targets: [VD-10a, VD-10b, VD-11a, VD-12]
+    non_regression: [substrate_gate_set]
+    irrelevant_this_cycle: [VD-01, VD-02, VD-04, VD-05, VD-06, VD-07, VD-08, VD-09, VD-11b, VD-14]
+    note: operates on ALREADY-STRUCTURED case graphs; scan ingestion and deadline engines NOT required.
+  SLICE-2-contradiction-supersedence:
+    capability: [contradiction.detect, supersedence.resolve]
+    prerequisites: [VD-00, VD-15, VD-17]
+    targets: [VD-03, VD-06]
+    non_regression: [substrate_gate_set, SLICE-1.targets]
+    irrelevant_this_cycle: [VD-01, VD-04, VD-07, VD-08, VD-10, VD-11, VD-14]
+  SLICE-3-subsumption-deadlines:
+    capability: [rule.execute, subsume.trace, epistemic.classify, deadline.monitor]
+    prerequisites: [VD-00, VD-15, VD-17, VD-03]
+    targets: [VD-07, VD-08, VD-09]
+    non_regression: [substrate_gate_set, SLICE-1.targets, SLICE-2.targets]
+    irrelevant_this_cycle: [VD-01, VD-02, VD-10, VD-11, VD-13(beyond substrate), VD-14]
+  SLICE-4-citation-quote:
+    capability: [citation.verify, quote.exactmatch]
+    prerequisites: [VD-00, VD-15]
+    targets: [VD-14]
+    non_regression: [substrate_gate_set, prior slices]
+    irrelevant_this_cycle: [VD-01..VD-09 except prereqs, VD-10, VD-11]
+  SLICE-5-ingestion-entities:
+    capability: [ingest.normalize, ingest.extract(P1), ingest.certify, entity.resolve]
+    prerequisites: [VD-00, VD-15, VD-17]
+    targets: [VD-01, VD-02]
+    non_regression: [substrate_gate_set, prior slices]
+    irrelevant_this_cycle: [VD-04..VD-11, VD-14]
+  SLICE-6-timeline-quant:
+    capability: [timeline.reconstruct, quant.verify, physics.plausibility]
+    prerequisites: [VD-00, VD-15, VD-17, VD-02]
+    targets: [VD-04, VD-05]
+    non_regression: [substrate_gate_set, prior slices]
+    irrelevant_this_cycle: [VD-07..VD-11, VD-14]
+ordering_note: slices may run in any defensible order; SLICE-1 first per Charter §4.
+full_suite_green: program milestone only (17), never a per-candidate freeze gate.

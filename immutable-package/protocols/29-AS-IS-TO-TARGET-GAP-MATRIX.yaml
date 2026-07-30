@@ -1,0 +1,34 @@
+# 29 — AS-IS -> TARGET GAP MATRIX v2.0 (valid YAML; content filled only after protocol 04)
+status: TEMPLATE_AWAITING_REPOSITORY_REALITY_MODEL
+classification_enum: [RETAIN, REPAIR, REFACTOR, SPLIT, MERGE, WRAP, MIGRATE, REPLACE, RETIRE, UNKNOWN]
+entry_schema:
+  component:
+    path: string
+    kind: [system, package, module, entrypoint, data]
+    reality_ref: evidence-id
+  classification: classification_enum
+  justification:
+    executable_evidence: list-of-command-output-refs
+    reason: string
+    dependencies: list-of-component-ids
+    migration_cost: {size: [S, M, L, XL], rationale: string}
+    regression_risk: {level: [low, med, high], exposed_capabilities: list-of-ontology-ids}
+    compatibility_strategy: [wrapper, adapter, parallel-run, freeze, none-with-reason]
+    rollback_path: string
+    capability_impact: list-of-ontology-ids
+rules:
+- retire-or-replace of a WORKING component requires proof of successor equivalence-or-superiority (38); never builder preference
+- UNKNOWN is legal and must carry a missing-evidence list
+- every production-reachable path from the reality model appears exactly once
+example_row_synthetic:
+  component: {path: src/example-argument-system.asd, kind: system, reality_ref: EV-EX-001}
+  classification: UNKNOWN
+  justification:
+    executable_evidence: ["asdf:load-system :example -> EV-EX-001"]
+    reason: loads; tests unknown; reachability unknown
+    dependencies: []
+    migration_cost: {size: M, rationale: unknown internals}
+    regression_risk: {level: med, exposed_capabilities: [argument.generate]}
+    compatibility_strategy: none-with-reason
+    rollback_path: n/a
+    capability_impact: [argument.generate]

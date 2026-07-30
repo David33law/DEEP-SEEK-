@@ -1,0 +1,10 @@
+constraints:
+- {id: C1, text: no chatbot/RAG-wrapper identity; models are tools behind ports}
+- {id: C2, text: survives loss of any external API for deterministic+certified capabilities}
+- {id: C3, text: every output carries provenance and reasoning trace}
+- {id: C4, text: versioned memory with rollback; no silent mutation}
+- {id: C5, text: human authority gates on H1, budgets, thresholds, production adoption}
+- {id: C6, text: fabricated provenance or citations = terminal violation}
+- {id: C7, text: no arbitrary engineering-attempt caps; bounded technical retries required}
+- {id: C8, text: forbidden status words final/supreme/ανώτατο — BEST_DISCOVERED_SO_FAR on budget exit}
+status: FROZEN_AT_CHARTER_FREEZE

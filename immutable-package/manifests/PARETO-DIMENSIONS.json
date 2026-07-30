@@ -1,0 +1,122 @@
+[
+ {
+  "id": "legal_capability",
+  "direction": "higher",
+  "unit": "pass-rate",
+  "scale": "0-1",
+  "measurement": "L-level tests pass fraction (graders)",
+  "noise_floor": 0.05,
+  "hard_minimum": 0.5,
+  "source_artifact": "harness report"
+ },
+ {
+  "id": "cross_domain_transfer",
+  "direction": "higher",
+  "unit": "pass-rate",
+  "scale": "0-1",
+  "measurement": "transfer suite pass fraction",
+  "noise_floor": 0.05,
+  "hard_minimum": 0.5,
+  "source_artifact": "transfer report"
+ },
+ {
+  "id": "trace_validity",
+  "direction": "higher",
+  "unit": "fraction",
+  "scale": "0-1",
+  "measurement": "valid traces / total (evaluator)",
+  "noise_floor": 0.02,
+  "hard_minimum": 0.95,
+  "source_artifact": "evaluator report"
+ },
+ {
+  "id": "provenance_completeness",
+  "direction": "higher",
+  "unit": "fraction",
+  "scale": "0-1",
+  "measurement": "outputs with full provenance / total",
+  "noise_floor": 0.02,
+  "hard_minimum": 0.98,
+  "source_artifact": "ledger audit"
+ },
+ {
+  "id": "deterministic_independence",
+  "direction": "higher",
+  "unit": "fraction",
+  "scale": "0-1",
+  "measurement": "D1/D2 tests passing with adapters OFF",
+  "noise_floor": 0.02,
+  "hard_minimum": 1.0,
+  "source_artifact": "network-off run"
+ },
+ {
+  "id": "safety_violations",
+  "direction": "lower",
+  "unit": "count",
+  "scale": "0+",
+  "measurement": "contract-breach events per run",
+  "noise_floor": 0,
+  "hard_minimum": 0,
+  "source_artifact": "event log"
+ },
+ {
+  "id": "rollback_success",
+  "direction": "higher",
+  "unit": "fraction",
+  "scale": "0-1",
+  "measurement": "successful restore drills",
+  "noise_floor": 0,
+  "hard_minimum": 1.0,
+  "source_artifact": "rollback drill report"
+ },
+ {
+  "id": "self_improvement_capability",
+  "direction": "higher",
+  "unit": "ordinal",
+  "scale": "0-3",
+  "measurement": "layer-5 acceptance rubric (audit)",
+  "noise_floor": 0,
+  "hard_minimum": 0,
+  "source_artifact": "acceptance matrix"
+ },
+ {
+  "id": "real_time_latency",
+  "direction": "lower",
+  "unit": "seconds",
+  "scale": "p95",
+  "measurement": "p95 end-to-end on fixed suite",
+  "noise_floor": 0.1,
+  "hard_minimum": null,
+  "source_artifact": "perf report"
+ },
+ {
+  "id": "migration_cost",
+  "direction": "lower",
+  "unit": "ordinal",
+  "scale": "S=1,M=2,L=3,XL=4",
+  "measurement": "gap-matrix costing (29)",
+  "noise_floor": 0,
+  "hard_minimum": null,
+  "source_artifact": "29"
+ },
+ {
+  "id": "trusted_kernel_complexity",
+  "direction": "lower",
+  "unit": "loc+deps",
+  "scale": "normalized",
+  "measurement": "kernel LOC + dependency count",
+  "noise_floor": 0.05,
+  "hard_minimum": null,
+  "source_artifact": "static analysis"
+ },
+ {
+  "id": "external_model_dependence",
+  "direction": "lower",
+  "unit": "fraction",
+  "scale": "0-1",
+  "measurement": "adapter calls / total operations (ledger)",
+  "noise_floor": 0.02,
+  "hard_minimum": null,
+  "source_artifact": "budget ledger"
+ }
+]

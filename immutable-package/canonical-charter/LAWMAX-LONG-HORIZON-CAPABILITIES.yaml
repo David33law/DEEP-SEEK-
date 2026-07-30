@@ -1,0 +1,7 @@
+# Long-horizon capability targets (bind to ontology 03 levels; content refined from vault)
+horizons:
+- {phase: H1-reactive, target_level: L3, description: full reactive legal collaborator}
+- {phase: H2-proactive, target_level: L4, description: proactive docket/evidence supervisor + opposing simulation}
+- {phase: H3-portfolio, target_level: L5, description: cross-case institutional strategy}
+- {phase: H4-self-extending, target_level: L6, description: safely self-evolving under gates}
+status: TEMPLATE — refined with vault citations before CHARTER_FROZEN

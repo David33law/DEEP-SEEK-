@@ -1,0 +1,13 @@
+# 39 — DEPRECATION & LEGACY RETIREMENT REGISTER (v1.2)
+schema:
+  component: {path, kind, reality_ref}
+  replaced_by: component-id | ABSORBED-INTO(id) | NOTHING(justify)
+  equivalence_evidence: [wave-5 report refs, test refs]     # proven equivalence OR superiority — mandatory
+  retirement_wave: 7
+  reachability_proof: scan-ref (zero inbound references)
+  restore_path: how to resurrect (checkpoint/tag)           # retirement is reversible by design
+rules:
+  - UNKNOWN is FORBIDDEN in this file: no evidence, no retirement.
+  - A component listed here must ALSO appear as RETIRE in 29 with matching evidence.
+  - Working components are never retired for aesthetic preference (29 rule restated on purpose).
+status: EMPTY_UNTIL_WAVE_7

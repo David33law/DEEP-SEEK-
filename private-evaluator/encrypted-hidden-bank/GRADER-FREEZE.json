@@ -1,0 +1,7 @@
+{
+ "frozen_at_build": {
+  "casegen.py": "f1a6a0eac27c39c86d22cb103eed4930af6769f26fc11eb3688a96fffb0c5f4e",
+  "grade.py": "2cfc8d9da60ae340ed64d9920d952e17ae58c7f35c7ce9b82935d2cd773fcbd2"
+ },
+ "rule": "the evaluator refuses to grade if these hashes change"
+}
