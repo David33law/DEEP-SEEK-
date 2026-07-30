@@ -35,37 +35,35 @@ full rejection battery, and the seven liveness properties of the crown gate. Exp
 overall: PASS · 15/15 rejections · launch + crash/resume · 0 PAID API CALLS
 ```
 
-## 2. Set up for a real launch — the only thing left is your API key
-
-```bash
-python setup_owner.py
-```
-
-This runs the owner ceremony **locally, once**: it **generates your owner keypair** (private key
-kept in `private-evaluator/owner-held-secrets/`, git-ignored — this is your inalienable
-sovereignty, never commit or share it), signs the eleven decisions, builds the sealed hidden bank,
-initialises the canonical repo, attests the vault sources, and fills the Canonical Vision. Then:
-
-```bash
-python executable-orchestrator/orchestrator.py --preflight        # should print  "ok": true
-```
-
-Add your key and launch:
+## 2. Run it for real — ONE command, only the API key needed
 
 ```powershell
-$env:DEEPSEEK_API_KEY = "sk-..."      # PowerShell
-```
-```bash
-export DEEPSEEK_API_KEY=sk-...        # bash
-```
-```bash
-python executable-orchestrator/orchestrator.py --launch --run-id RUN-0001
-python executable-orchestrator/orchestrator.py --resume --run-id RUN-0001   # after any interruption
+$env:DEEPSEEK_API_KEY = "sk-..."      # PowerShell   (bash:  export DEEPSEEK_API_KEY=sk-...)
+python run_launch.py
 ```
 
-The launch pauses at each owner gate for your signature (`tools/owner_sign.py`) and stops only when
-a ceiling is **proven** (`COMMITTED`) — otherwise it ends `BEST_DISCOVERED_SO_FAR`. It never
-crowns for budget or time.
+`run_launch.py` does everything: on first use it sets the machine up (generates your owner key
+**locally** — it is git-ignored, never uploaded), then it drives the launch to completion,
+**auto-approving every owner gate** for you, and stops only when a ceiling is **proven**
+(`COMMITTED`) or the round budget runs out (`BEST_DISCOVERED_SO_FAR`). It never crowns for budget
+or time.
+
+**Rehearse for free** (no money, no DeepSeek), using the bundled mock:
+```bash
+python executable-orchestrator/tools/mock_deepseek_server.py     # terminal 1
+python run_launch.py --endpoint http://127.0.0.1:8731/chat/completions   # terminal 2
+```
+
+<details><summary>Prefer to drive it by hand?</summary>
+
+```bash
+python setup_owner.py                                              # one-time local setup
+python executable-orchestrator/orchestrator.py --preflight         # should print  "ok": true
+python executable-orchestrator/orchestrator.py --launch  --run-id RUN-0001
+python executable-orchestrator/orchestrator.py --resume --run-id RUN-0001   # after any interruption
+```
+Each owner gate then pauses for your signature (`tools/owner_sign.py`).
+</details>
 
 > **For a genuine run** the `evidence-vault/` here ships **fixtures**. Replace them with your real
 > materials and re-run `setup_owner.py` to re-attest. Real legal case material should never sit on
