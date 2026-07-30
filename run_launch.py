@@ -48,7 +48,14 @@ def main():
         if is_mock:
             os.environ["DEEPSEEK_API_KEY"] = "mock-token"   # the mock ignores it; real runs need a real key
         else:
-            sys.exit("Set DEEPSEEK_API_KEY first  (PowerShell:  $env:DEEPSEEK_API_KEY=\"sk-...\").")
+            # Ask for the key and start as soon as it is entered (no env var needed).
+            try:
+                key = input("Επικόλλησε εδώ το DeepSeek API key σου (ξεκινά με sk-) και πάτα Enter: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                sys.exit("\nΑκυρώθηκε.")
+            if not key or key.endswith("...") or key == "sk-...":
+                sys.exit("Δεν δόθηκε πραγματικό κλειδί. Πάρε το αληθινό από https://platform.deepseek.com → API keys.")
+            os.environ["DEEPSEEK_API_KEY"] = key
 
     # 1 — set up on first use
     if not os.path.exists(OWNER_KEY):

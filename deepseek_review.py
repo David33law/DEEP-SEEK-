@@ -206,12 +206,21 @@ def main():
     print(f"cost ESTIMATE:   ~€{est:.3f}   (input ~{in_tok:,} tok + up to {a.max_output_tokens:,} output tok)")
 
     if a.dry_run:
-        print("\n[dry-run] nothing sent. Re-run without --dry-run (and with DEEPSEEK_API_KEY set) to review.")
+        print("\n[dry-run] nothing sent. Re-run without --dry-run to review.")
         return 0
 
+    # Ask for the key right here and start as soon as it is entered (no env var needed).
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
-        sys.exit("DEEPSEEK_API_KEY is not set — refusing to attempt a call.")
+        try:
+            key = input(f"\nΕπικόλλησε εδώ το DeepSeek API key σου (ξεκινά με sk-) και πάτα Enter\n"
+                        f"— θα κοστίσει ~€{est:.3f} — : ").strip()
+        except (EOFError, KeyboardInterrupt):
+            sys.exit("\nΑκυρώθηκε.")
+    key = (key or "").strip()
+    if not key or key.endswith("...") or key == "sk-...":
+        sys.exit("Δεν δόθηκε πραγματικό κλειδί (έβαλες το placeholder 'sk-...'). Πάρε το αληθινό από "
+                 "https://platform.deepseek.com → API keys.")
 
     print("\n· calling DeepSeek …")
     try:
