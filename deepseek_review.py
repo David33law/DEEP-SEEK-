@@ -221,18 +221,24 @@ def call_deepseek(endpoint, model, key, system, user, max_output_tokens, timeout
     return content, obj.get("usage", {})
 
 
+def _looks_fake(k):
+    k = (k or "").strip()
+    return (not k) or k.endswith("...") or k == "sk-..." or len(k) < 20
+
+
 def ask_key(est):
-    key = os.environ.get("DEEPSEEK_API_KEY")
-    if not key:
+    # A missing OR placeholder env value both count as "not set" → ALWAYS prompt, so a leftover
+    # $env:DEEPSEEK_API_KEY="sk-..." from an earlier command can never skip the question.
+    key = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
+    if _looks_fake(key):
         try:
             key = input(f"\nΕπικόλλησε το DeepSeek API key σου (ξεκινά με sk-) και πάτα Enter\n"
                         f"— θα κοστίσει ~€{est:.2f} — : ").strip()
         except (EOFError, KeyboardInterrupt):
             sys.exit("\nΑκυρώθηκε.")
-    key = (key or "").strip()
-    if not key or key.endswith("...") or key == "sk-...":
-        sys.exit("Δεν δόθηκε πραγματικό κλειδί (μάλλον το placeholder 'sk-...'). "
-                 "Πάρ' το από https://platform.deepseek.com → API keys.")
+    if _looks_fake(key):
+        sys.exit("Δεν δόθηκε πραγματικό κλειδί (κενό ή placeholder). Πάρ' το από "
+                 "https://platform.deepseek.com → API keys και κάνε επικόλληση εδώ.")
     return key
 
 
