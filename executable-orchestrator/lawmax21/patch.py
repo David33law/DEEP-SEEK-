@@ -104,20 +104,37 @@ class WorktreeManager:
         self.root = os.path.abspath(worktrees_root)
         os.makedirs(self.root, exist_ok=True)
 
-    def _git(self, *args, cwd=None):
+    def _git(self, *args, cwd=None, need_stdout=False):
         # Git for Windows keeps legacy MAX_PATH behaviour unless core.longpaths is enabled.
-        # National-scale repositories can contain perfectly valid deep paths, so every Git
-        # operation used to materialise/evaluate candidate worktrees explicitly opts into the
-        # Windows long-path API. This is process-local configuration: it does not rewrite the
-        # canonical repository's config and is inert on non-Windows platforms.
+        # Use explicit PIPEs instead of capture_output so any platform/runtime wrapper still
+        # receives an unambiguous stdout/stderr contract. Commands that semantically need
+        # stdout (status, rev-parse) request it explicitly; mutating commands do not depend
+        # on textual output for success.
         cmd = ["git"]
         if os.name == "nt":
             cmd += ["-c", "core.longpaths=true"]
         cmd += list(args)
-        r = subprocess.run(cmd, cwd=cwd or self.repo, capture_output=True, text=True)
+        r = subprocess.run(
+            cmd,
+            cwd=cwd or self.repo,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        out = r.stdout if isinstance(r.stdout, str) else None
+        err = r.stderr if isinstance(r.stderr, str) else ""
         if r.returncode != 0:
-            raise RuntimeError(f"git {' '.join(args)} failed: {r.stderr.strip()}")
-        return r.stdout.strip()
+            raise RuntimeError(
+                f"git {' '.join(args)} failed (rc={r.returncode}): {err.strip()}"
+            )
+        if need_stdout and out is None:
+            raise RuntimeError(
+                "git stdout capture invariant failed for successful command: "
+                + " ".join(args)
+            )
+        return (out or "").strip()
 
     def create(self, candidate_id, base="HEAD"):
         path = os.path.join(self.root, candidate_id)
@@ -138,9 +155,9 @@ class WorktreeManager:
         if not green:
             return None
         self._git("add", "-A", cwd=wt.root)
-        status = self._git("status", "--short", cwd=wt.root)
+        status = self._git("status", "--short", cwd=wt.root, need_stdout=True)
         if not status:
             return None
         self._git("-c", "user.email=info@stavropouloslaw.com", "-c", "user.name=Stavropoulos Law",
                   "commit", "-m", message, cwd=wt.root)
-        return self._git("rev-parse", "HEAD", cwd=wt.root)
+        return self._git("rev-parse", "HEAD", cwd=wt.root, need_stdout=True)
