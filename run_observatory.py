@@ -45,7 +45,10 @@ OBSERVATORY_REQUEST_DEFAULTS = {
     "thinking": {"type": "enabled"},
     "reasoning_effort": "max",
 }
-OBSERVATORY_DEFAULT_MAX_TOKENS = 65536
+# DeepSeek V4-Pro currently exposes a 384K maximum output window. This profile deliberately
+# leaves the entire documented ceiling available: truncation, not cost minimisation, is the
+# unacceptable failure mode for whole-system architecture and executable-candidate responses.
+OBSERVATORY_DEFAULT_MAX_TOKENS = 384000
 
 
 def observatory_paths(root, runtime):
@@ -93,12 +96,9 @@ def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_
 
 
 def install_overlay():
-    # Shared run() resolves these names from its module globals at execution time.
     base._paths = observatory_paths
     base.build_context = observatory_build_context
     base.preflight.run = observatory_preflight.run
-    # Whole-system Observatory proposals use architecture mechanism names; LAWMAX's historical
-    # micro-mechanism object schema remains untouched in ordinary runs/processes.
     roles.PROPOSAL_SCHEMA = observatory_roles.PROPOSAL_SCHEMA
 
 
@@ -153,8 +153,6 @@ def main(argv=None):
         return base.EXIT_PREFLIGHT
 
     try:
-        # --resume and --launch both enter the same idempotent shared run loop; signed-log replay
-        # determines which transitions are already complete.
         return base.run(
             ROOT, a.runtime, a.run_id, "LAUNCH", a.endpoint, a.model, a.key_env,
             a.backend, os.path.abspath(a.canonical_repo), PROFILE.master_system_path(ROOT),
