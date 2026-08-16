@@ -1,0 +1,18 @@
+{
+  "schema": "national-observatory-target-baseline-v1",
+  "target_repository": "STAVROPOULOSLAWCORPUS",
+  "target_commit": "05eae8d6ac0d0ceb508e250e511ee51eb4ec6fe7",
+  "target_tree": "6532a1ad6470a82f2b91c0f5783ae92e1304c1e0",
+  "cp1_reuse": {
+    "required": true,
+    "rule": "repository archaeology is reused only when target commit/tree and sealed verification receipt agree exactly"
+  },
+  "prior_cp2": {
+    "expected_archive_sha256": "00d673649d4ba1c60398c2ead12f2a6983350a308d6ec13a163c02dcc9e3afa7",
+    "expected_model": "deepseek-v4-pro",
+    "expected_dossiers": 19,
+    "expected_verdict": "NOT_SATURATED_NEW_FAMILIES_PRESERVED",
+    "expected_cp3_started": false,
+    "visibility": "QUARANTINED_UNTIL_NEW_FRONTIER"
+  }
+}
