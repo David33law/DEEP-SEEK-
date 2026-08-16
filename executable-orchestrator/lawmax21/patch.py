@@ -105,7 +105,16 @@ class WorktreeManager:
         os.makedirs(self.root, exist_ok=True)
 
     def _git(self, *args, cwd=None):
-        r = subprocess.run(["git", *args], cwd=cwd or self.repo, capture_output=True, text=True)
+        # Git for Windows keeps legacy MAX_PATH behaviour unless core.longpaths is enabled.
+        # National-scale repositories can contain perfectly valid deep paths, so every Git
+        # operation used to materialise/evaluate candidate worktrees explicitly opts into the
+        # Windows long-path API. This is process-local configuration: it does not rewrite the
+        # canonical repository's config and is inert on non-Windows platforms.
+        cmd = ["git"]
+        if os.name == "nt":
+            cmd += ["-c", "core.longpaths=true"]
+        cmd += list(args)
+        r = subprocess.run(cmd, cwd=cwd or self.repo, capture_output=True, text=True)
         if r.returncode != 0:
             raise RuntimeError(f"git {' '.join(args)} failed: {r.stderr.strip()}")
         return r.stdout.strip()
