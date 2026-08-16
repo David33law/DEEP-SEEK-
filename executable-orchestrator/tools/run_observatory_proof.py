@@ -4,6 +4,11 @@
 Runs in a disposable Git clone. Uses the shipped setup/preflight/runner/evaluator and a localhost
 DeepSeek-shape provider. Drives owner gates with a temporary owner key, injects a crash, resumes
 from the signed log, and requires COMMITTED plus CP1-reuse / prior-CP2-quarantine evidence.
+
+On Windows the disposable workspace is intentionally rooted close to the drive root. The canonical
+corpus contains legitimate deep paths; putting candidate worktrees under the user's long %TEMP%
+path needlessly consumes the Win32/Git path budget before a single repository-relative byte is
+materialised.
 """
 import argparse
 import json
@@ -20,6 +25,13 @@ ORCH = os.path.dirname(HERE)
 ROOT = os.path.dirname(ORCH)
 PORT = 8732
 RUN_ID = "OBS-PROOF-0001"
+
+
+def git_argv(*args):
+    cmd = ["git"]
+    if os.name == "nt":
+        cmd += ["-c", "core.longpaths=true"]
+    return cmd + list(args)
 
 
 def sh(argv, env=None, cwd=None):
@@ -54,21 +66,41 @@ def write_json(path, obj):
         json.dump(obj, f, ensure_ascii=False, indent=1, sort_keys=True)
 
 
+def short_temp_workspace():
+    """Allocate an intentionally short disposable root on Windows.
+
+    This is not a relaxation of any verifier. It preserves the exact repository bytes while
+    removing accidental host-path depth from candidate worktrees. The parent can be overridden
+    with OBSERVATORY_PROOF_TMP_ROOT when a different local drive is desired.
+    """
+    if os.name != "nt":
+        return tempfile.mkdtemp(prefix="observatory-proof-")
+    parent = os.environ.get("OBSERVATORY_PROOF_TMP_ROOT")
+    if not parent:
+        drive = os.environ.get("SystemDrive") or os.path.splitdrive(os.getcwd())[0] or "C:"
+        parent = os.path.join(drive + os.sep, "obs-pf")
+    parent = os.path.abspath(parent)
+    os.makedirs(parent, exist_ok=True)
+    return tempfile.mkdtemp(prefix="p-", dir=parent)
+
+
 def clone_disposable(dest):
     # Prove the exact committed source, not an uncommitted working-tree variant.
-    r = sh(["git", "-C", ROOT, "status", "--porcelain", "--untracked-files=all", "--",
-            "profiles/national-observatory", "run_observatory.py", "setup_observatory.py",
-            "executable-orchestrator/lawmax21", "private-evaluator/evaluator", "benchmark/observatory_reference_candidate.py"])
+    r = sh(git_argv("-C", ROOT, "status", "--porcelain", "--untracked-files=all", "--",
+                    "profiles/national-observatory", "run_observatory.py", "setup_observatory.py",
+                    "executable-orchestrator/lawmax21", "private-evaluator/evaluator",
+                    "benchmark/observatory_reference_candidate.py"))
     if r.returncode != 0 or r.stdout.strip():
-        raise RuntimeError("source checkout has uncommitted proof/Observatory code; refusing disposable proof\n" + r.stdout[:3000])
-    head = sh(["git", "-C", ROOT, "rev-parse", "HEAD"])
+        raise RuntimeError("source checkout has uncommitted proof/Observatory code; refusing disposable proof\n"
+                           + r.stdout[:3000])
+    head = sh(git_argv("-C", ROOT, "rev-parse", "HEAD"))
     if head.returncode != 0:
         raise RuntimeError(head.stderr)
     head = head.stdout.strip()
-    r = sh(["git", "clone", "--no-hardlinks", "--quiet", ROOT, dest])
+    r = sh(git_argv("clone", "--no-hardlinks", "--quiet", ROOT, dest))
     if r.returncode != 0:
         raise RuntimeError("disposable clone failed: " + r.stderr)
-    r = sh(["git", "-C", dest, "checkout", "--quiet", "--detach", head])
+    r = sh(git_argv("-C", dest, "checkout", "--quiet", "--detach", head))
     if r.returncode != 0:
         raise RuntimeError("disposable checkout failed: " + r.stderr)
     return head
@@ -141,10 +173,14 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     target, cp1, prior = map(os.path.abspath, (a.canonical_repo, a.cp1_evidence, a.prior_cp2))
-    temp = tempfile.mkdtemp(prefix="observatory-proof-")
-    dest = os.path.join(temp, "repo")
+    temp = short_temp_workspace()
+    dest = os.path.join(temp, "r")
+    runtime = os.path.join(temp, "rt")
     mock = None
-    result = {"proof": "national-observatory-zero-cost-e2e-v1", "paid_api_calls": 0}
+    result = {"proof": "national-observatory-zero-cost-e2e-v1", "paid_api_calls": 0,
+              "workspace": temp, "runtime": runtime,
+              "path_budget": {"workspace_chars": len(temp), "runtime_chars": len(runtime),
+                              "windows_longpaths_git": os.name == "nt"}}
     try:
         source_head = clone_disposable(dest)
         result["source_head"] = source_head
@@ -157,7 +193,6 @@ def main(argv=None):
             raise RuntimeError("setup_observatory failed\n" + result["setup"]["tail"])
 
         owner_key = os.path.join(dest, "private-evaluator", "owner-held-secrets", "OWNER.key")
-        runtime = os.path.join(dest, "proof", "runtime-observatory")
         pre = py(os.path.join(dest, "run_observatory.py"), "--preflight", "--run-id", RUN_ID,
                  "--runtime", runtime, "--canonical-repo", target,
                  "--cp1-evidence", cp1, "--prior-cp2", prior, cwd=dest)
