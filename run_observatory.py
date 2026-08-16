@@ -38,6 +38,15 @@ from lawmax21 import states as states_module  # noqa: E402
 PROFILE = profiles.resolve("national-observatory")
 _ORIGINAL_COMMITTED_SEMANTIC = install_state_semantics(states_module)
 
+# Provider policy for the real Observatory experiment. The shared Client records these fields
+# inside the logical request identity, so a crash/resume/cache replay can never silently reuse a
+# response produced under a weaker reasoning policy.
+OBSERVATORY_REQUEST_DEFAULTS = {
+    "thinking": {"type": "enabled"},
+    "reasoning_effort": "max",
+}
+OBSERVATORY_DEFAULT_MAX_TOKENS = 65536
+
 
 def observatory_paths(root, runtime):
     return {
@@ -61,7 +70,11 @@ def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_
     ledger = BudgetLedger(os.path.join(runtime, "budget", "ledger.json"), dict(D.budget))
     transport = HttpTransport(endpoint, model, api_key_env=key_env)
     system_prompt = open(PROFILE.master_system_path(root), encoding="utf-8").read()
-    client = Client(transport, os.path.join(runtime, "raw-api"), ledger, log, system_prompt)
+    client = Client(
+        transport, os.path.join(runtime, "raw-api"), ledger, log, system_prompt,
+        request_defaults=OBSERVATORY_REQUEST_DEFAULTS,
+        default_max_tokens=OBSERVATORY_DEFAULT_MAX_TOKENS,
+    )
 
     cp1 = os.environ.get("OBSERVATORY_CP1_EVIDENCE")
     prior = os.environ.get("OBSERVATORY_PRIOR_CP2")
