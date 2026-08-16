@@ -160,16 +160,13 @@ class Handler(BaseHTTPRequestHandler):
         if not (self.headers.get("Authorization") or "").startswith("Bearer "):
             return self._send(401, {"error": {"message": "missing bearer token"}})
 
-        # Proof the production provider policy, not merely the HTTP envelope. Every Observatory
-        # model call must request DeepSeek V4 thinking explicitly at maximum effort and reserve
-        # enough output room for whole-system architecture/code candidates.
         thinking = body.get("thinking") or {}
         if thinking.get("type") != "enabled":
             return self._send(400, {"error": {"message": "proof requires thinking.type=enabled"}})
         if body.get("reasoning_effort") != "max":
             return self._send(400, {"error": {"message": "proof requires reasoning_effort=max"}})
-        if int(body.get("max_tokens") or 0) < 65536:
-            return self._send(400, {"error": {"message": "proof requires max_tokens>=65536"}})
+        if int(body.get("max_tokens") or 0) < 384000:
+            return self._send(400, {"error": {"message": "proof requires max_tokens>=384000"}})
 
         prompt = "\n".join(m["content"] for m in body.get("messages", []) if m.get("role") == "user")
         content = json.dumps(answer(prompt), ensure_ascii=False)
