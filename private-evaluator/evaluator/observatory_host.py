@@ -18,6 +18,7 @@ ADAPTER = r'''
 
 __OBS_REQUIRED = ("ingest", "apply_change", "state_at", "link_jurisprudence",
                   "attach_doctrine", "provenance", "replay", "publish")
+__OBS_ALLOWED = __OBS_REQUIRED + ("extension_probe",)
 
 
 def __obs_call(method, args):
@@ -43,6 +44,28 @@ def __obs_call(method, args):
     raise RuntimeError("unknown Observatory operation: " + method)
 
 
+def __obs_extension_probe(args):
+    registrar = globals().get("register_change_handler")
+    apply_fn = globals().get("apply_change")
+    if not callable(registrar) or not callable(apply_fn):
+        return {"supported": False, "reason": "no runtime change-handler registry"}
+    kind = args["kind"]
+    marker = args["marker"]
+
+    def probe_handler(event):
+        return {"accepted": True,
+                "target_id": event.get("target_id", event.get("canonical_id", "")),
+                "change_type": kind,
+                "unresolved": [],
+                "extension_marker": marker}
+
+    registrar(kind, probe_handler)
+    event = dict(args["event"])
+    event["kind"] = kind
+    result = apply_fn(event)
+    return {"supported": True, "result": result, "marker": marker}
+
+
 def detect(case, draft):
     del draft
     script = case.get("script") if isinstance(case, dict) else None
@@ -54,11 +77,14 @@ def detect(case, draft):
     out = []
     for step in script:
         method = step.get("m")
-        if method not in __OBS_REQUIRED:
+        if method not in __OBS_ALLOWED:
             out.append({"m": method, "error": "unknown Observatory operation"})
             continue
         try:
-            result = __obs_call(method, step.get("a", {}))
+            if method == "extension_probe":
+                result = __obs_extension_probe(step.get("a", {}))
+            else:
+                result = __obs_call(method, step.get("a", {}))
             out.append({"m": method, "r": result})
         except BaseException as exc:
             out.append({"m": method, "error": type(exc).__name__ + ": " + str(exc)})
@@ -79,6 +105,15 @@ class ObservatoryCandidateHost:
     def run_session(self, script):
         # Only label-free operations/arguments are sent. Ground truth stays in observatory_grade.
         return self.host.detect({"script": script}, {})
+
+    def extension_probe(self, kind, marker, event):
+        out = self.run_session([{"m": "extension_probe",
+                                 "a": {"kind": kind, "marker": marker, "event": event}}])
+        if not isinstance(out, list) or len(out) != 1 or out[0].get("m") != "extension_probe":
+            return {"supported": False, "reason": "malformed extension-probe envelope"}
+        if out[0].get("error"):
+            return {"supported": False, "reason": out[0]["error"]}
+        return out[0].get("r") or {"supported": False, "reason": "empty extension-probe result"}
 
     def isolation_report(self):
         rep = self.host.isolation_report()

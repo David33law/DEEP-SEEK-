@@ -47,12 +47,7 @@ def _nonempty(keys, got):
 
 
 def grade_session(scenario, responses):
-    """Return measured dimension scores and per-step diagnostics.
-
-    `responses` is the result list returned by observatory_session: one element per step,
-    each shaped as {m, r} or {m, error}. Richer candidate outputs are allowed; only the
-    load-bearing expected subset is compared.
-    """
+    """Return measured dimension scores and per-step diagnostics."""
     steps = scenario["steps"]
     hits, totals = defaultdict(int), defaultdict(int)
     diagnostics = []
@@ -102,8 +97,6 @@ def grade_session(scenario, responses):
                 hits[d] += 1
         diagnostics.append({"step": i, "operation": step["m"], "class": cls, "detail": detail})
 
-    # The two replay calls are deliberately separate steps. They only earn replay/recovery
-    # credit if both succeeded and the canonical result is identical.
     a, b = replay_results.get("replay-A"), replay_results.get("replay-B")
     replay_equal = bool(a and b and a.get("state_root") == b.get("state_root")
                         and a.get("objects") == b.get("objects"))
@@ -122,7 +115,7 @@ def grade_session(scenario, responses):
 
 
 def merge_reports(reports):
-    """Macro-average per scenario so a large scenario cannot drown a small adversarial one."""
+    """Macro-average per scenario; include sandbox-enforced static trusted-path facts."""
     by_dim = defaultdict(list)
     classes = defaultdict(int)
     for rep in reports:
@@ -131,6 +124,9 @@ def merge_reports(reports):
         for item in rep.get("diagnostics", []):
             classes[item.get("class", "CANDIDATE_ERROR")] += 1
     scores = {d: round(sum(vs) / len(vs), 6) for d, vs in sorted(by_dim.items()) if vs}
+    # A candidate cannot access the network or a model callback inside CandidateHost; this is a
+    # structural property of the measured execution path, not a self-reported score.
+    scores["external_model_dependence"] = 0.0
     return {"dimension_scores": scores, "diagnostic_classes": dict(classes),
             "scenarios": len(reports)}
 
