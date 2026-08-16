@@ -24,7 +24,6 @@ def reference_source():
 
 def partial_source():
     src = reference_source()
-    # A real semantic defect: corrections are admitted but do not update binding text/status.
     return src.replace(
         'if kind in ("LEGISLATION", "AMENDMENT", "CORRECTION"):',
         'if kind in ("LEGISLATION", "AMENDMENT"):')
@@ -33,22 +32,17 @@ def partial_source():
 def weak_source():
     return reference_source() + r'''
 
-# proof-only deliberately weak override: complete API surface, little legal semantics.
 def apply_change(event):
     return {"accepted": False, "target_id": event.get("target_id", ""),
             "change_type": event.get("kind", ""), "unresolved": ["unsupported-change"]}
-
 def state_at(query):
     return {"canonical_id": query.get("canonical_id", ""), "status": "UNKNOWN", "text": None,
             "legal_time": query.get("legal_time", ""), "knowledge_time": query.get("knowledge_time", ""),
             "evidence_chain": [], "unresolved": ["weak-proof-candidate"]}
-
 def link_jurisprudence(decision):
     return {"decision_id": decision.get("decision_id", ""), "links": [], "unresolved": ["weak-proof-candidate"]}
-
 def provenance(query):
     return {"canonical_id": query.get("canonical_id", ""), "evidence_chain": [], "complete": False}
-
 def publish(query):
     s = state_at(query)
     return {"canonical_id": s["canonical_id"], "status": s["status"], "text": None,
@@ -98,7 +92,6 @@ def build_answer(prompt):
 def answer(prompt):
     rm = re.search(r"^ROLE:\s*(.+)$", prompt, re.M)
     role = rm.group(1).strip() if rm else "unknown"
-
     if role == "architecture-explorer-A":
         return proposal("bitemporal-evidence-ledger", "content-addressed evidence + bitemporal transition ledger")
     if role == "architecture-explorer-B":
@@ -166,6 +159,18 @@ class Handler(BaseHTTPRequestHandler):
             STATE["seen"].append(body)
         if not (self.headers.get("Authorization") or "").startswith("Bearer "):
             return self._send(401, {"error": {"message": "missing bearer token"}})
+
+        # Proof the production provider policy, not merely the HTTP envelope. Every Observatory
+        # model call must request DeepSeek V4 thinking explicitly at maximum effort and reserve
+        # enough output room for whole-system architecture/code candidates.
+        thinking = body.get("thinking") or {}
+        if thinking.get("type") != "enabled":
+            return self._send(400, {"error": {"message": "proof requires thinking.type=enabled"}})
+        if body.get("reasoning_effort") != "max":
+            return self._send(400, {"error": {"message": "proof requires reasoning_effort=max"}})
+        if int(body.get("max_tokens") or 0) < 65536:
+            return self._send(400, {"error": {"message": "proof requires max_tokens>=65536"}})
+
         prompt = "\n".join(m["content"] for m in body.get("messages", []) if m.get("role") == "user")
         content = json.dumps(answer(prompt), ensure_ascii=False)
         pt, ct = max(1, len(prompt) // 4), max(1, len(content) // 4)
