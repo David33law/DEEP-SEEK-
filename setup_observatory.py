@@ -99,9 +99,11 @@ def main(argv=None):
     else:
         print("· owner key already present — reusing")
 
-    # OWNER-PUBLIC-KEY.hex is inside the historical package and is intentionally local-owner
-    # specific. Re-seal the manifest after key creation/update; no Observatory profile file lives
-    # in immutable-package, so the LAWMAX package remains internally self-consistent.
+    # Protocol 19 is generated from states.py and validate_package.py rejects a single-byte drift.
+    # Regenerate it BEFORE sealing the package so the manifest can never bless stale generated
+    # documentation. The historical LAWMAX package remains internally self-consistent after the
+    # local owner key and generated state-machine document are materialised.
+    run([os.path.join(TOOLS, "generate_protocol19.py")])
     run([os.path.join(TOOLS, "make_manifest.py")])
 
     unsigned = os.path.join(ROOT, "observatory-decisions.unsigned.json")
