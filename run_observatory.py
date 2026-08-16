@@ -2,7 +2,7 @@
 """National Legal Observatory launcher over the shared LAWMAX v2.3 control plane.
 
 This file does not implement a second state machine. It injects the Observatory profile-specific
-paths/context/handlers and calls executable-orchestrator/orchestrator.py's existing run loop.
+paths/context/handlers/schema and calls executable-orchestrator/orchestrator.py's existing run loop.
 """
 import argparse
 import importlib.util
@@ -26,7 +26,7 @@ def _load_base_orchestrator():
 base = _load_base_orchestrator()
 from lawmax21 import decisions as dec  # noqa: E402
 from lawmax21 import handlers as base_handlers  # noqa: E402
-from lawmax21 import observatory_handlers, observatory_preflight, profiles  # noqa: E402
+from lawmax21 import observatory_handlers, observatory_preflight, observatory_roles, profiles, roles  # noqa: E402
 from lawmax21.observatory_escalation import install_state_semantics  # noqa: E402
 from lawmax21.observatory_runtime import ObservatoryContext  # noqa: E402
 from lawmax21.budget import BudgetLedger  # noqa: E402
@@ -60,8 +60,7 @@ def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_
     log = EventLog(os.path.join(runtime, "state", "events.jsonl"), signer=run_key)
     ledger = BudgetLedger(os.path.join(runtime, "budget", "ledger.json"), dict(D.budget))
     transport = HttpTransport(endpoint, model, api_key_env=key_env)
-    prompt_path = PROFILE.master_system_path(root)
-    system_prompt = open(prompt_path, encoding="utf-8").read()
+    system_prompt = open(PROFILE.master_system_path(root), encoding="utf-8").read()
     client = Client(transport, os.path.join(runtime, "raw-api"), ledger, log, system_prompt)
 
     cp1 = os.environ.get("OBSERVATORY_CP1_EVIDENCE")
@@ -85,6 +84,9 @@ def install_overlay():
     base._paths = observatory_paths
     base.build_context = observatory_build_context
     base.preflight.run = observatory_preflight.run
+    # Whole-system Observatory proposals use architecture mechanism names; LAWMAX's historical
+    # micro-mechanism object schema remains untouched in ordinary runs/processes.
+    roles.PROPOSAL_SCHEMA = observatory_roles.PROPOSAL_SCHEMA
 
 
 def main(argv=None):
@@ -101,7 +103,8 @@ def main(argv=None):
                                                          "https://api.deepseek.com/chat/completions"))
     ap.add_argument("--model", default=os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro"))
     ap.add_argument("--key-env", default="DEEPSEEK_API_KEY")
-    ap.add_argument("--backend", choices=("subprocess", "container"), default="subprocess")
+    ap.add_argument("--backend", choices=("subprocess", "container"), default="container",
+                    help="real untrusted-model runs should use container; subprocess is for proof/development")
     ap.add_argument("--canonical-repo", default=os.environ.get("OBSERVATORY_CANONICAL_REPO"))
     ap.add_argument("--cp1-evidence", default=os.environ.get("OBSERVATORY_CP1_EVIDENCE"))
     ap.add_argument("--prior-cp2", default=os.environ.get("OBSERVATORY_PRIOR_CP2"))
@@ -137,6 +140,8 @@ def main(argv=None):
         return base.EXIT_PREFLIGHT
 
     try:
+        # --resume and --launch both enter the same idempotent shared run loop; signed-log replay
+        # determines which transitions are already complete.
         return base.run(
             ROOT, a.runtime, a.run_id, "LAUNCH", a.endpoint, a.model, a.key_env,
             a.backend, os.path.abspath(a.canonical_repo), PROFILE.master_system_path(ROOT),
