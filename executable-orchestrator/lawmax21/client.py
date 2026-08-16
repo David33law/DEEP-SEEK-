@@ -31,7 +31,8 @@ class StructuredOutputRejected(Exception):
     pass
 
 
-# EUR per 1M tokens. Owner decision D-01 freezes the values actually used for a run.
+# Conservative accounting rate used by the historical LAWMAX contract. Profile-specific
+# callers may supply a different frozen price table when the owner chooses one for a run.
 DEFAULT_PRICES = {"input_eur_per_mtok": 0.55, "output_eur_per_mtok": 2.19}
 
 
@@ -67,8 +68,7 @@ class HttpTransport:
 
 
 def extract_content(response_obj):
-    """Pull the assistant message out of a real chat-completion envelope.
-    v2.0 never did this: it handed the whole envelope to a brace-scanner."""
+    """Pull the assistant message out of a real chat-completion envelope."""
     try:
         choice = response_obj["choices"][0]
     except (KeyError, IndexError, TypeError):
@@ -125,7 +125,8 @@ def extract_usage(response_obj, prices):
 
 class Client:
     def __init__(self, transport, raw_dir, ledger, log, system_prompt, prices=None,
-                 max_technical_retries=5, estimate_tokens_per_char=0.34):
+                 max_technical_retries=5, estimate_tokens_per_char=0.34,
+                 request_defaults=None, default_max_tokens=8192):
         self.t = transport
         self.raw = os.path.abspath(raw_dir)
         self.ledger = ledger
@@ -135,6 +136,15 @@ class Client:
         self.prices = dict(prices or DEFAULT_PRICES)
         self.max_technical_retries = max_technical_retries
         self.tpc = estimate_tokens_per_char
+        self.request_defaults = dict(request_defaults or {})
+        self.default_max_tokens = int(default_max_tokens)
+        if self.default_max_tokens <= 0:
+            raise ValueError("default_max_tokens must be positive")
+        # The profile may add provider request fields (for example thinking policy), but it
+        # must never be able to override identity-bearing core fields assembled per call.
+        forbidden = {"model", "messages"} & set(self.request_defaults)
+        if forbidden:
+            raise ValueError(f"request_defaults may not override core request fields: {sorted(forbidden)}")
         os.makedirs(os.path.join(self.raw, "requests"), exist_ok=True)
         os.makedirs(os.path.join(self.raw, "responses"), exist_ok=True)
         os.makedirs(os.path.join(self.raw, "meta"), exist_ok=True)
@@ -164,17 +174,29 @@ class Client:
     def _estimate(self, identity):
         chars = len(canonical_bytes(identity)) + len(self.system_prompt)
         est_in = int(chars * self.tpc)
-        est_out = 4096
+        # Reserve against the declared output ceiling, not a fixed 4K guess. A larger
+        # profile-specific ceiling must therefore have budget BEFORE the request can leave.
+        est_out = int((identity.get("request") or {}).get("max_tokens") or 4096)
         eur = (est_in / 1e6) * self.prices["input_eur_per_mtok"] + \
               (est_out / 1e6) * self.prices["output_eur_per_mtok"]
         return est_in + est_out, round(eur, 6)
 
     # ----------------------------------------------------------------- call
     def call(self, role, ticket, context_package_sha, messages, response_schema=None,
-             temperature=0.0, max_tokens=8192, line="main"):
+             temperature=0.0, max_tokens=None, line="main"):
         """Returns (logical_id, parsed_object_or_text, replayed: bool, usage)."""
-        body = {"model": self.t.model, "temperature": temperature, "max_tokens": max_tokens,
-                "messages": [{"role": "system", "content": self.system_prompt}] + messages}
+        ceiling = self.default_max_tokens if max_tokens is None else int(max_tokens)
+        if ceiling <= 0:
+            raise ValueError("max_tokens must be positive")
+        body = dict(self.request_defaults)
+        body.update({"model": self.t.model, "max_tokens": ceiling,
+                     "messages": [{"role": "system", "content": self.system_prompt}] + messages})
+        # DeepSeek thinking mode ignores temperature. Keep historical LAWMAX byte semantics
+        # unchanged when no explicit thinking policy is present, but omit a meaningless field
+        # for profiles that explicitly enable thinking.
+        thinking = body.get("thinking")
+        if not (isinstance(thinking, dict) and thinking.get("type") == "enabled"):
+            body["temperature"] = temperature
         identity = self.identity(role, ticket, context_package_sha, body)
         lid = self.logical_id(identity)
         meta_p, req_p, resp_p = self._paths(lid)
