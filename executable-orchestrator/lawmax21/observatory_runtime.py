@@ -17,6 +17,24 @@ from . import observatory_target as target
 from .observatory_escalation import ObservatoryEscalationLedger
 
 
+class ObservatoryFrontier(Frontier):
+    """The shared control loop may call head_to_head() without naming dimensions.
+
+    LAWMAX's Frontier defaults are legal_capability/cross_domain_transfer. Those names do not
+    belong to the Observatory Pareto contract. This profile-local subclass changes only the
+    DEFAULT selector; explicit calls still work exactly as in Frontier. Dominance remains driven
+    exclusively by the profile's PARETO-DIMENSIONS.json.
+    """
+    def __init__(self, dims_path, primary_dimension, secondary_dimension):
+        super().__init__(dims_path)
+        self.primary_dimension = primary_dimension
+        self.secondary_dimension = secondary_dimension
+
+    def head_to_head(self, primary=None, secondary=None):
+        return super().head_to_head(primary or self.primary_dimension,
+                                    secondary or self.secondary_dimension)
+
+
 class ObservatoryContext(BaseContext):
     def __init__(self, root, runtime, run_id, client, ledger, log, decisions, owner_public,
                  evaluator_dir, bank_dir, key_path, canonical_repo, suite_path, backend,
@@ -48,7 +66,9 @@ class ObservatoryContext(BaseContext):
         self.profile_pkg = os.path.join(root, "profiles", "national-observatory")
         self.vault = os.path.join(root, "evidence-vault")
         self.orch = os.path.join(root, "executable-orchestrator")
-        self.frontier = Frontier(profile.pareto_path(root))
+        self.frontier = ObservatoryFrontier(profile.pareto_path(root),
+                                             profile.primary_dimension,
+                                             profile.secondary_dimension)
         self.esc = ObservatoryEscalationLedger(
             A(self, "escalation", "ledger.json"), dry_rounds_required=2)
         self.wm = WorktreeManager(canonical_repo, A(self, "worktrees", "x")[:-2])
