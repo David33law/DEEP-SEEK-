@@ -1,5 +1,4 @@
 """Fail-closed preflight for the National Legal Observatory profile."""
-import json
 import os
 import platform
 import subprocess
@@ -9,6 +8,27 @@ from .canonical import read_json
 from . import preflight as base
 
 PreflightFailed = base.PreflightFailed
+
+OBSERVATORY_SOURCE_PATHS = (
+    "profiles/national-observatory",
+    "run_observatory.py",
+    "setup_observatory.py",
+    "benchmark/observatory_reference_candidate.py",
+    "executable-orchestrator/lawmax21/observatory_target.py",
+    "executable-orchestrator/lawmax21/profiles.py",
+    "executable-orchestrator/lawmax21/observatory_roles.py",
+    "executable-orchestrator/lawmax21/observatory_escalation.py",
+    "executable-orchestrator/lawmax21/observatory_runtime.py",
+    "executable-orchestrator/lawmax21/observatory_handlers.py",
+    "executable-orchestrator/lawmax21/observatory_preflight.py",
+    "private-evaluator/evaluator/observatory_casegen.py",
+    "private-evaluator/evaluator/observatory_grade.py",
+    "private-evaluator/evaluator/observatory_host.py",
+    "private-evaluator/evaluator/observatory_harness.py",
+    "private-evaluator/evaluator/observatory_canaries.py",
+    "private-evaluator/evaluator/observatory_bank_builder.py",
+    "private-evaluator/evaluator/observatory_evaluate.py",
+)
 
 
 def _git(repo, *args):
@@ -38,8 +58,27 @@ def _profile_paths(root):
     }
 
 
+def _source_integrity(root):
+    """Refuse uncommitted drift in every Observatory load-bearing source path.
+
+    Owner-local files and the historical immutable-package may legitimately be re-sealed by the
+    owner ceremony; they are governed by their own manifest/signature checks. This census is only
+    the additive Observatory code/profile surface.
+    """
+    if not os.path.isdir(os.path.join(root, ".git")):
+        raise PreflightFailed("Observatory source root is not a Git checkout; source identity cannot be established")
+    status = _git(root, "status", "--porcelain", "--untracked-files=all", "--", *OBSERVATORY_SOURCE_PATHS)
+    if status.strip():
+        raise PreflightFailed("uncommitted Observatory source drift detected:\n" + status[:4000])
+    head = _git(root, "rev-parse", "HEAD")
+    profile_tree = _git(root, "rev-parse", "HEAD:profiles/national-observatory")
+    return {"head": head, "profile_tree": profile_tree, "tracked_paths": list(OBSERVATORY_SOURCE_PATHS),
+            "uncommitted_changes": 0}
+
+
 def run(root, orchestrator_root, runtime, require_vault=True, owner_public=None):
     problems = []
+    source_integrity = {}
     v = base.check_python()
     if v:
         problems.append(v)
@@ -47,9 +86,11 @@ def run(root, orchestrator_root, runtime, require_vault=True, owner_public=None)
     lock = base.check_lock_concurrency(os.path.join(runtime, "state", "observatory-preflight.lock"))
     if lock:
         problems.append(lock)
-    # This checks the historical LAWMAX immutable-package. Observatory files live outside it,
-    # so a profile run cannot silently invalidate the old seal.
     problems += base.check_package(orchestrator_root)
+    try:
+        source_integrity = _source_integrity(root)
+    except PreflightFailed as exc:
+        problems.append(str(exc))
 
     P = _profile_paths(root)
     required_profile = ["OBJECTIVE-CHARTER.md", "PARETO-DIMENSIONS.json",
@@ -150,6 +191,7 @@ def run(root, orchestrator_root, runtime, require_vault=True, owner_public=None)
     report = {
         "profile": "national-observatory",
         "python": platform.python_version(),
+        "source_integrity": source_integrity,
         "canonical_target": target_report,
         "cp1_evidence": cp1_evidence or None,
         "prior_cp2": prior_cp2 or None,
