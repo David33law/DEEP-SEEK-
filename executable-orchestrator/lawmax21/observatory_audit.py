@@ -3,6 +3,7 @@ from . import observatory_audit_v2 as base
 from . import observatory_build_schema_hardening
 from . import observatory_causal_audit_hardening
 from . import observatory_causal_dossier_hardening
+from . import observatory_causal_failure_classification_hardening
 from . import observatory_cross_model_overlay
 from . import observatory_cross_model_workload_hardening
 from . import observatory_evaluator_routing_hardening
@@ -65,8 +66,9 @@ def install(ctx, handlers):
     out = observatory_cross_model_overlay.install(ctx, out)
     out = observatory_genome_realization_overlay.install(ctx, out)
 
-    # Citation validity is still not causal proof. Replication and crown now run auditor-specific
-    # AST definition-set ablations plus inert negative controls under exact source-bound evaluators.
+    # Citation validity is still not causal proof. Classify failures conservatively before the
+    # replication/crown ablation wrapper is installed: infrastructure refusal is non-evidence.
+    observatory_causal_failure_classification_hardening.install(ctx, out)
     observatory_genome_causal_ablation_hardening.install(ctx, out)
 
     # Index the direct causal receipts in the deterministic dossier before its final audit handler is
