@@ -31,6 +31,7 @@ REQUEST_DEFAULTS = {"thinking": {"type": "enabled"}, "reasoning_effort": "max"}
 DEFAULT_MAX_TOKENS = 384000
 HTTP_TIMEOUT_SECONDS = 1800
 TECHNICAL_RETRIES = 1
+PRODUCTION_MAX_ROUNDS = 0  # zero is the shared orchestrator's explicit unbounded policy
 
 
 def _load_base_orchestrator():
@@ -174,10 +175,16 @@ def main(argv=None):
         "OBSERVATORY_CP1_EVIDENCE"))
     parser.add_argument("--prior-cp2", default=os.environ.get(
         "OBSERVATORY_PRIOR_CP2"))
-    parser.add_argument("--max-rounds", type=int, default=64,
-                        help="resource backstop only; never proof of supremacy")
+    parser.add_argument(
+        "--max-rounds", type=int, default=PRODUCTION_MAX_ROUNDS,
+        help=("0 means unbounded and is mandatory for the real production provider; "
+              "a positive value is available only to bounded local proof/rehearsal runs"))
     parser.add_argument("--crash-after", type=int, default=None)
     args = parser.parse_args(argv)
+
+    if args.max_rounds < 0:
+        print("launch refused: --max-rounds must be zero or a positive integer")
+        return base.EXIT_PREFLIGHT
 
     local = _is_local(args.endpoint)
     if not local:
@@ -192,6 +199,11 @@ def main(argv=None):
             return base.EXIT_PREFLIGHT
         if args.backend != "container":
             print("production launch refused: container isolation is mandatory")
+            return base.EXIT_PREFLIGHT
+        if args.max_rounds != PRODUCTION_MAX_ROUNDS:
+            print(
+                "production launch refused: a finite round cap can stop before design-space "
+                "saturation; use --max-rounds 0")
             return base.EXIT_PREFLIGHT
 
     os.environ["OBSERVATORY_BACKEND"] = args.backend
@@ -221,6 +233,10 @@ def main(argv=None):
             report["signed_mission"] = mission
             report["protocol_version"] = observatory_protocol.PROTOCOL_VERSION
             report["proof_mode"] = observatory_protocol.proof_mode()
+            report["round_policy"] = {
+                "max_rounds": args.max_rounds,
+                "unbounded": args.max_rounds == 0,
+                "finite_cap_allowed_for_real_provider": False}
         except (observatory_preflight.PreflightFailed, dec.DecisionsRejected) as exc:
             print(str(exc)); return base.EXIT_PREFLIGHT
         print(json.dumps(report, ensure_ascii=False, indent=1)); return base.EXIT_OK
