@@ -1,5 +1,6 @@
 """Final owner ceremony wrapper with hash-bound specialized calibration evidence."""
 import os
+import sys
 from . import observatory_protocol
 from . import observatory_setup as base
 from .canonical import atomic_write_json, read_json
@@ -10,6 +11,7 @@ ROWS = {
  "formal": ("benchmark/observatory_formal_reference_candidate.py", "private-evaluator/evaluator/observatory_formal_arena.py", "proof/formal-reference-calibration.json"),
  "interoperability": ("benchmark/observatory_interoperability_reference_candidate.py", "private-evaluator/evaluator/observatory_interoperability_arena.py", "proof/interoperability-reference-calibration.json")}
 _original = base._calibrate_specialized_references
+_base_main = base.main
 
 
 def _path(relative):
@@ -34,6 +36,16 @@ def _calibrate():
     return visible
 
 
+def main(argv=None):
+    # The visible suite is part of the dynamic protocol census. Materialize it before D09 is signed;
+    # base.main rebuilds the same deterministic bytes later as a calibration step.
+    if base.EVALUATOR not in sys.path:
+        sys.path.insert(0, base.EVALUATOR)
+    import observatory_harness
+    observatory_harness.build_visible_suite(
+        os.path.join(base.ROOT, "benchmark", "observatory-visible-suite.json"))
+    return _base_main(argv)
+
+
 base._calibrate_specialized_references = _calibrate
-main = base.main
 __all__ = ["main"]
