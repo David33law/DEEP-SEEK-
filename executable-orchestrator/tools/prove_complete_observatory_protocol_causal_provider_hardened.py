@@ -13,12 +13,14 @@ import os
 
 import prove_complete_observatory_protocol_causal_hardened as base
 
-PROVIDER_ROUTING_FILE = (
+EXTRA_CAUSAL_FILES = {
     "executable-orchestrator/tools/"
-    "prove_complete_observatory_protocol_causal_provider_hardened.py")
-CAUSAL_PROVIDER_FILE = (
-    "executable-orchestrator/tools/mock_observatory_causal_server.py")
-for relative in (PROVIDER_ROUTING_FILE, CAUSAL_PROVIDER_FILE):
+    "prove_complete_observatory_protocol_causal_provider_hardened.py",
+    "executable-orchestrator/tools/mock_observatory_causal_server.py",
+    "executable-orchestrator/lawmax21/"
+    "observatory_causal_failure_classification_hardening.py",
+}
+for relative in EXTRA_CAUSAL_FILES:
     base.CAUSAL_FILES.add(relative)
     base.CORE.REQUIRED_PROTOCOL_FILES.add(relative)
 _ORIGINAL_POPEN = base.CORE.subprocess.Popen
