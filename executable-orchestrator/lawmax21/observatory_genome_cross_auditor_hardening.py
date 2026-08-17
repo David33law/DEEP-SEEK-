@@ -4,7 +4,8 @@ Distinct role names, tickets and report hashes are not enough: changing only ``a
 satisfy those checks while reproducing one reasoning trajectory. This hardening compares the actual
 per-axis AST-definition citation sets returned by the two auditors. At least four of the thirteen
 axes must use a different source-definition map, while both complete maps must separately pass the
-trusted source/evidence validator.
+trusted source/evidence validator. The shared ``_passes`` predicate is also strengthened so terminal
+conditions cannot accept a stored report that omits this independence evidence.
 """
 from . import observatory_genome_realization_overlay as genome
 from .canonical import atomic_write_json
@@ -29,10 +30,11 @@ def _axis_map(auditor):
 def install(_ctx, handlers):
     if getattr(genome, "_cross_auditor_hardening_installed", False):
         return dict(handlers)
-    original = genome._audit
+    original_audit = genome._audit
+    original_passes = genome._passes
 
     def audit(context, candidate_id, label):
-        artifact = original(context, candidate_id, label)
+        artifact = original_audit(context, candidate_id, label)
         auditors = artifact.get("auditors") or []
         if len(auditors) != 2:
             raise RuntimeError(
@@ -59,6 +61,15 @@ def install(_ctx, handlers):
         atomic_write_json(path, artifact)
         return artifact
 
+    def passes(report):
+        return (
+            original_passes(report)
+            and report.get("auditor_citation_maps_independent") is True
+            and int(report.get(
+                "auditor_citation_map_differing_count", 0))
+            >= MIN_DIFFERING_AXIS_MAPS)
+
     genome._audit = audit
+    genome._passes = passes
     genome._cross_auditor_hardening_installed = True
     return dict(handlers)
