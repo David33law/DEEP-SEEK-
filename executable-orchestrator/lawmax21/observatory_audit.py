@@ -5,6 +5,7 @@ from . import observatory_cross_model_overlay
 from . import observatory_cross_model_workload_hardening
 from . import observatory_evaluator_routing_hardening
 from . import observatory_formal_streaming_routing
+from . import observatory_genome_evidence_binding_hardening
 from . import observatory_genome_realization_overlay
 from . import observatory_phase_gate_hardening
 from . import observatory_prior_art_hardening_overlay
@@ -20,6 +21,7 @@ def install(ctx, handlers):
     observatory_formal_streaming_routing.install(ctx, handlers)
     observatory_scale_hardening.install(ctx, handlers)
     observatory_cross_model_workload_hardening.install(ctx, handlers)
+    observatory_genome_evidence_binding_hardening.install(ctx, handlers)
 
     # A public-prior-art challenger is not fully measured until every independent executable
     # campaign, including cross-model agreement and controlled-genome realization, has passed.
