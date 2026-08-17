@@ -179,7 +179,17 @@ def replay(events):
 
 def publish(query):
     s = _state(query)
-    return {"canonical_id": s["canonical_id"], "status": s["status"], "text": s["text"],
-            "evidence_chain": s["evidence_chain"],
-            "projection": {"legal_time": s["legal_time"], "knowledge_time": s["knowledge_time"],
-                           "unresolved": s["unresolved"]}}
+    return {
+        "canonical_id": s["canonical_id"],
+        "status": s["status"],
+        "text": s["text"],
+        "evidence_chain": s["evidence_chain"],
+        "projection": {
+            "canonical_id": s["canonical_id"],
+            "status": s["status"],
+            "legal_time": s["legal_time"],
+            "knowledge_time": s["knowledge_time"],
+            "channels": ["human", "api", "linked_data", "eli", "public_sector", "ai"],
+            "unresolved": s["unresolved"],
+        },
+    }
