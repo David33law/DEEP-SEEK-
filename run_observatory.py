@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """National Legal Observatory launcher over the shared LAWMAX v2.3 control plane.
 
-This file does not implement a second state machine. It injects the Observatory profile-specific
-paths/context/handlers/schema and calls executable-orchestrator/orchestrator.py's existing run loop.
+This file does not implement a second state machine. It injects profile paths, semantics,
+provider policy, currency-explicit accounting and handlers into the existing signed control loop.
 """
 import argparse
 import importlib.util
@@ -28,7 +28,7 @@ def _load_base_orchestrator():
 base = _load_base_orchestrator()
 from lawmax21 import decisions as dec  # noqa: E402
 from lawmax21 import handlers as base_handlers  # noqa: E402
-from lawmax21 import observatory_handlers, observatory_preflight, observatory_roles, profiles, roles  # noqa: E402
+from lawmax21 import observatory_audit, observatory_handlers, observatory_preflight, observatory_roles, profiles, roles  # noqa: E402
 from lawmax21.observatory_escalation import install_state_semantics  # noqa: E402
 from lawmax21.observatory_runtime import ObservatoryContext  # noqa: E402
 from lawmax21.budget import BudgetLedger  # noqa: E402
@@ -40,14 +40,10 @@ from lawmax21 import states as states_module  # noqa: E402
 PROFILE = profiles.resolve("national-observatory")
 _ORIGINAL_COMMITTED_SEMANTIC = install_state_semantics(states_module)
 
-# Provider policy for the real Observatory experiment. These fields are part of the logical
-# request identity, so crash/resume/cache replay cannot silently reuse a weaker-policy answer.
 OBSERVATORY_REQUEST_DEFAULTS = {
     "thinking": {"type": "enabled"},
     "reasoning_effort": "max",
 }
-# DeepSeek V4-Pro currently exposes a 384K maximum output window. The profile leaves the complete
-# documented ceiling available; the budget ledger reserves against this ceiling before each call.
 OBSERVATORY_DEFAULT_MAX_TOKENS = 384000
 
 
@@ -69,11 +65,31 @@ def observatory_paths(root, runtime):
     }
 
 
+def _validate_signed_provider_budget(D, model):
+    b = D.budget
+    if b.get("currency") != "USD" or "amount" not in b:
+        raise observatory_preflight.PreflightFailed(
+            "Observatory D01 must use a USD currency-explicit hard ceiling")
+    schedule = b.get("price_schedule") or {}
+    if schedule.get("model") != model:
+        raise observatory_preflight.PreflightFailed(
+            f"signed D01 price schedule is for {schedule.get('model')!r}, not {model!r}")
+    if schedule.get("currency") != b.get("currency"):
+        raise observatory_preflight.PreflightFailed(
+            "signed D01 price schedule currency does not match budget currency")
+    if schedule.get("require_cache_split") is not True:
+        raise observatory_preflight.PreflightFailed(
+            "Observatory V4 billing requires provider-reported cache-hit/cache-miss split")
+    return schedule
+
+
 def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_env, backend,
                               canonical_repo, corpus_root, run_key_path):
     P = observatory_paths(root, runtime)
     owner_pub = load_public(P["owner_pub"])
     D = dec.load(P["decisions"], owner_pub, run_id)
+    schedule = _validate_signed_provider_budget(D, model)
+
     run_key = load_private(run_key_path) if os.path.exists(run_key_path) else generate_private(run_key_path)
     log = EventLog(os.path.join(runtime, "state", "events.jsonl"), signer=run_key)
     ledger = BudgetLedger(os.path.join(runtime, "budget", "ledger.json"), dict(D.budget))
@@ -81,6 +97,7 @@ def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_
     system_prompt = open(PROFILE.master_system_path(root), encoding="utf-8").read()
     client = Client(
         transport, os.path.join(runtime, "raw-api"), ledger, log, system_prompt,
+        prices=schedule,
         request_defaults=OBSERVATORY_REQUEST_DEFAULTS,
         default_max_tokens=OBSERVATORY_DEFAULT_MAX_TOKENS,
     )
@@ -96,6 +113,7 @@ def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_
         P["evaluator"], P["bank"], os.path.join(P["secrets"], "OBSERVATORY-HIDDEN.key"),
         canonical_repo, P["suite"], backend, mode, corpus_root, PROFILE, cp1, prior)
     handlers = observatory_handlers.build_observatory_handlers(ctx, base_handlers.build_handlers(ctx))
+    handlers = observatory_audit.install(ctx, handlers)
     machine = states_module.Machine(runtime, log, owner_pub, run_id, handlers)
     machine.profile_id = PROFILE.id
     return ctx, machine, log, ledger, D
@@ -155,9 +173,21 @@ def main(argv=None):
         try:
             pub_path = P["owner_pub"]
             pub = load_public(pub_path) if os.path.exists(pub_path) else None
+            if pub is None:
+                raise observatory_preflight.PreflightFailed(
+                    "owner public key missing; run setup_observatory.py before production preflight")
+            D = dec.load(P["decisions"], pub, a.run_id)
+            schedule = _validate_signed_provider_budget(D, a.model)
             report = observatory_preflight.run(
                 ROOT, ORCH, a.runtime, require_vault=True, owner_public=pub, backend=a.backend)
-        except observatory_preflight.PreflightFailed as exc:
+            report["signed_provider_budget"] = {
+                "currency": D.budget["currency"],
+                "amount": D.budget["amount"],
+                "model": schedule["model"],
+                "price_schedule": schedule,
+                "decisions_sha256": D.sha256(),
+            }
+        except (observatory_preflight.PreflightFailed, dec.DecisionsRejected) as exc:
             print(str(exc))
             return base.EXIT_PREFLIGHT
         print(json.dumps(report, ensure_ascii=False, indent=1))
