@@ -120,6 +120,86 @@
     "source_artifact": "conflict/unknown report"
   },
   {
+    "id": "distributed_fault_survival",
+    "direction": "higher",
+    "unit": "fraction",
+    "scale": "0-1",
+    "measurement": "bounded distributed partition/crash/corruption/fault campaign passed under the exact controlled commit and replication model",
+    "noise_floor": 0.0,
+    "hard_minimum": 1.0,
+    "source_artifact": "distributed fault arena"
+  },
+  {
+    "id": "distributed_events_per_second",
+    "direction": "higher",
+    "unit": "events_per_second",
+    "scale": "fixed five-node bounded workload",
+    "measurement": "aggregate event throughput while preserving one canonical root and the declared fault model",
+    "noise_floor": 0.01,
+    "hard_minimum": null,
+    "source_artifact": "distributed fault arena"
+  },
+  {
+    "id": "national_scale_survival",
+    "direction": "higher",
+    "unit": "fraction",
+    "scale": "0-1",
+    "measurement": "large deterministic ingest, restart, duplicate, tail, checkpoint recovery, partition balance, publication and rebuild campaign passed",
+    "noise_floor": 0.0,
+    "hard_minimum": 1.0,
+    "source_artifact": "national scale arena"
+  },
+  {
+    "id": "scale_events_per_second",
+    "direction": "higher",
+    "unit": "events_per_second",
+    "scale": "signed deterministic workload",
+    "measurement": "large-history aggregate ingest throughput under exact event/partition count",
+    "noise_floor": 0.01,
+    "hard_minimum": null,
+    "source_artifact": "national scale arena"
+  },
+  {
+    "id": "scale_batch_latency_p95",
+    "direction": "lower",
+    "unit": "seconds",
+    "scale": "p95 fixed batch",
+    "measurement": "p95 in-candidate ingest-batch latency on the signed large-history workload",
+    "noise_floor": 0.01,
+    "hard_minimum": null,
+    "source_artifact": "national scale arena"
+  },
+  {
+    "id": "scale_bytes_per_event",
+    "direction": "lower",
+    "unit": "bytes_per_event",
+    "scale": "authority storage / unique event",
+    "measurement": "declared durable authority bytes per admitted unique event after checkpointed large-history ingestion",
+    "noise_floor": 1.0,
+    "hard_minimum": null,
+    "source_artifact": "national scale arena"
+  },
+  {
+    "id": "machine_checked_model_survival",
+    "direction": "higher",
+    "unit": "fraction",
+    "scale": "0-1",
+    "measurement": "two independently generated controlled-genome transition models pass hidden exhaustive traces and agree on behavioral digest",
+    "noise_floor": 0.0,
+    "hard_minimum": 1.0,
+    "source_artifact": "bounded formal model arena"
+  },
+  {
+    "id": "formal_trace_coverage",
+    "direction": "higher",
+    "unit": "traces",
+    "scale": "minimum traces across independent models",
+    "measurement": "number of hidden finite action traces exhaustively evaluated by each agreeing model",
+    "noise_floor": 1.0,
+    "hard_minimum": null,
+    "source_artifact": "bounded formal model arena"
+  },
+  {
     "id": "publication_latency",
     "direction": "lower",
     "unit": "seconds",
