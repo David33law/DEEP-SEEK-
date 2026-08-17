@@ -8,7 +8,7 @@ ORCH = os.path.join(ROOT, "executable-orchestrator")
 if ORCH not in sys.path:
     sys.path.insert(0, ORCH)
 
-from lawmax21.observatory_launcher import main
+from lawmax21.observatory_launcher_v2 import main
 
 
 if __name__ == "__main__":
