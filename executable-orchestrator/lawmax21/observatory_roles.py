@@ -1,7 +1,9 @@
 """Role schemas for whole-system National Observatory model work.
 
-These schemas enforce structure and boundedness, not arbitrary brevity. They are installed only by
-the Observatory launcher; historical LAWMAX schema byte-semantics remain untouched.
+Architecture diversity is classified through controlled structural classes. Free-form ``detail``
+explains a choice but cannot buy design-space distance merely through synonyms. This prevents
+"append-only journal" and "hash-chained ledger" from counting as distinct families unless they
+actually choose different load-bearing classes.
 """
 
 ALTITUDES = ["L0","L1","L2","L3","L4","L5","L6","L7","L8","L9","L10","L11","L12"]
@@ -22,11 +24,74 @@ GENOME_FIELDS = [
     "scaling_partition_model",
 ]
 
+GENOME_CLASSES = {
+    "canonical_authority_seat": [
+        "evidence_set", "ordered_ledger", "replicated_state_machine", "proof_dag",
+        "declarative_ir", "canonical_database", "federated_authority_set",
+        "derived_state_root", "hybrid", "other"],
+    "evidence_primitive": [
+        "raw_source_bytes", "signed_source_record", "content_addressed_object",
+        "typed_observation", "proof_object", "authority_assertion", "hybrid", "other"],
+    "identity_model": [
+        "structural_address", "source_declared_identity", "content_identity",
+        "composite_identity", "persistent_registry", "theorem_identity",
+        "federated_identity", "hybrid", "other"],
+    "state_derivation_model": [
+        "replay_reducer", "incremental_dataflow", "rule_engine", "event_calculus",
+        "verified_compiler", "proof_checker", "replicated_transition_function",
+        "query_derived", "hybrid", "other"],
+    "temporal_model": [
+        "bitemporal_intervals", "multitemporal_intervals", "event_calculus_time",
+        "temporal_logic", "transaction_cut_replay", "version_dag_time", "hybrid", "other"],
+    "normative_effect_model": [
+        "versioned_rule_pack", "event_calculus", "typed_directive_interpreter",
+        "theorem_proof", "compiler_transform", "constraint_solver",
+        "governed_human_resolution", "hybrid", "other"],
+    "consistency_commit_model": [
+        "single_writer_sequence", "transactional_database", "consensus_log",
+        "quorum_certificate", "deterministic_merge", "content_root_commit",
+        "proof_commit", "hybrid", "other"],
+    "replication_distribution_model": [
+        "single_primary_read_replicas", "sharded_single_writer", "raft_paxos",
+        "bft_consensus", "crdt_convergence", "federated_witnesses",
+        "independent_replay_replicas", "hybrid", "other"],
+    "trusted_core_topology": [
+        "monolithic_kernel", "minimal_verifier", "compiler_kernel", "state_machine_kernel",
+        "multi_component_tcb", "replicated_tcb", "capability_microkernel", "hybrid", "other"],
+    "provenance_proof_model": [
+        "hash_chain", "merkle_dag", "signed_receipts", "transparency_log",
+        "proof_carrying_derivation", "theorem_certificate", "provenance_graph",
+        "hybrid", "other"],
+    "publication_topology": [
+        "compiled_read_only_projections", "content_addressed_artifacts", "query_views",
+        "signed_release_batches", "federated_mirrors", "proof_serving_api", "hybrid", "other"],
+    "governance_evolution_model": [
+        "signed_rule_packs", "shadow_replay_activation", "threshold_governance",
+        "immutable_versioned_core", "capability_policy", "formal_upgrade_proofs",
+        "human_adjudication_ledger", "hybrid", "other"],
+    "scaling_partition_model": [
+        "source_sharding", "namespace_sharding", "time_partition",
+        "distributed_log_partitions", "dataflow_partition", "proof_dag_partition",
+        "federated_domains", "single_node_scale_up", "hybrid", "other"],
+}
+
+
+def _axis_schema(name):
+    return {
+        "type": "object", "additionalProperties": False,
+        "required": ["class", "detail"],
+        "properties": {
+            "class": {"enum": GENOME_CLASSES[name]},
+            "detail": {"type": "string", "minLength": 10, "maxLength": 5000},
+        },
+    }
+
+
 GENOME_SCHEMA = {
     "type": "object", "additionalProperties": False,
     "required": GENOME_FIELDS,
     "properties": {
-        **{k: {"type": "string", "minLength": 2, "maxLength": 4000} for k in GENOME_FIELDS},
+        **{k: _axis_schema(k) for k in GENOME_FIELDS},
         "novel_axes": {
             "type": "array", "maxItems": 16,
             "items": {
