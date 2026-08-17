@@ -1,12 +1,12 @@
 """National Observatory escalation semantics over the shared escalation ledger.
 
-The Observatory crown is intentionally much harder than "all current tests passed". Search-loop
-closure and final supremacy closure are separate: the loop may nominate a HESA finalist once
-search-space conditions saturate, but COMMITTED additionally requires durable-systems evidence,
-lower-bound closure, independent destruction and a falsifiable public supremacy case.
+Search-loop closure and final supremacy closure are separate. Architecture-search admission is
+also profile-specific: family-name inequality is not diversity. The v0 search artifact must contain
+at least twelve pairwise structurally distinct controlled genomes and must still be blind to CP2.
 """
 from .escalation import EscalationLedger
 from . import observatory_target as target
+from . import observatory_roles as oroles
 
 
 SUPREMACY_KEYS = [
@@ -42,8 +42,7 @@ OBSERVATORY_PROOF_SCHEMA = {
             "required": [
                 "dryness", "attacked_by_radical", "simplification_tested",
                 "families_exhausted", "altitude_saturated", "all_layers_reached",
-                "evolvable_without_refactor",
-                *SUPREMACY_KEYS,
+                "evolvable_without_refactor", *SUPREMACY_KEYS,
             ],
             "properties": {
                 "dryness": {"type": "boolean"},
@@ -187,7 +186,6 @@ class ObservatoryEscalationLedger(EscalationLedger):
         return c
 
     def must_continue(self):
-        """Close only the SEARCH loop here; tail-only supremacy evidence is evaluated later."""
         c = self.search_conditions()
         if all(c.values()):
             return False, "search ceiling proven: " + ", ".join(k for k in c)
@@ -250,14 +248,49 @@ class ObservatoryEscalationLedger(EscalationLedger):
 
 
 def install_state_semantics(states_module):
-    """Install profile-local terminal schemas/guard without replacing the shared state machine."""
-    original = states_module.SEMANTIC["COMMITTED"]
+    """Install Observatory-only proposal and terminal semantics into the shared state machine."""
+    original_committed = states_module.SEMANTIC["COMMITTED"]
+    original_proposals = states_module.SEMANTIC.get("TARGET_ARCHITECTURE_SEARCH")
     for terminal in ("COMMITTED", "BEST_DISCOVERED_SO_FAR", "HALTED"):
         states_module.SCHEMAS[terminal] = OBSERVATORY_PROOF_SCHEMA
 
+    def proposals(rt, art):
+        if getattr(rt, "profile_id", "lawmax") != "national-observatory":
+            if original_proposals:
+                return original_proposals(rt, art)
+            return None
+        if art.get("search_mode") != "SUPREMACY_SEARCH_FOREST_V1":
+            raise states_module.GuardFailed("Observatory search did not use the supremacy search forest")
+        if art.get("prior_cp2_visible") is not False:
+            raise states_module.GuardFailed("prior CP2 was visible before the independent frontier")
+        props = art.get("proposals") or []
+        if len(props) < 12:
+            raise states_module.GuardFailed(f"supremacy search produced only {len(props)} structural finalists")
+
+        def sig(p):
+            g = p.get("genome")
+            if not isinstance(g, dict):
+                raise states_module.GuardFailed("architecture proposal is missing controlled genome")
+            out = []
+            for axis in oroles.GENOME_FIELDS:
+                value = g.get(axis)
+                if not isinstance(value, dict) or value.get("class") not in oroles.GENOME_CLASSES[axis]:
+                    raise states_module.GuardFailed(f"proposal has invalid controlled genome axis {axis}")
+                out.append(value["class"])
+            return tuple(out)
+
+        signatures = [(p.get("seed_id"), sig(p)) for p in props]
+        for i, (aid, a) in enumerate(signatures):
+            for bid, b in signatures[i + 1:]:
+                distance = sum(1 for x, y in zip(a, b) if x != y)
+                if distance < 2:
+                    raise states_module.GuardFailed(
+                        f"structural finalists {aid!r}/{bid!r} differ on only {distance} controlled genome axes")
+        return None
+
     def committed(rt, art):
         if getattr(rt, "profile_id", "lawmax") != "national-observatory":
-            return original(rt, art)
+            return original_committed(rt, art)
         if art["terminal_state"] != "COMMITTED":
             raise states_module.GuardFailed("Observatory escalation proof does not conclude COMMITTED")
         if not art["ceiling_proven"]:
@@ -284,5 +317,6 @@ def install_state_semantics(states_module):
             raise states_module.GuardFailed(
                 "Observatory COMMITTED blocked — unsupported third-party endorsement claim")
 
+    states_module.SEMANTIC["TARGET_ARCHITECTURE_SEARCH"] = proposals
     states_module.SEMANTIC["COMMITTED"] = committed
-    return original
+    return original_committed
