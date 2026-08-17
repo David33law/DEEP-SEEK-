@@ -14,6 +14,7 @@ from . import observatory_prior_art_hardening_overlay
 from . import observatory_scale_hardening
 from . import observatory_semantic_evidence_binding_hardening
 from . import observatory_shared_corpus_hardening
+from . import observatory_supremacy_dossier_hardening
 from . import observatory_supremacy_dossier_overlay
 
 
@@ -34,6 +35,11 @@ def install(ctx, handlers):
     # materially different per-axis citation maps rather than duplicated prose with different IDs.
     observatory_genome_evidence_binding_hardening.install(ctx, handlers)
     observatory_genome_cross_auditor_hardening.install(ctx, handlers)
+
+    # The deterministic dossier builder is hardened before its INDEPENDENT_AUDIT wrapper is created,
+    # so CP1 identity, CP2 quarantine, hidden commitment, signed log, budget and owner-gate subjects
+    # are part of the same final hashed artifact.
+    observatory_supremacy_dossier_hardening.install(ctx, handlers)
 
     # Public-prior-art challengers are not fully measured until all executable campaigns pass.
     required_reports = {
