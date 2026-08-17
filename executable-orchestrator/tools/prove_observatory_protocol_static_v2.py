@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Final static extension for streaming formal, protocol-v5 and source-bound genome routing."""
+"""Static extension for streaming formal, protocol-v5, genome and dossier routing."""
 import json
 import os
 import sys
@@ -21,6 +21,7 @@ EXTRA_MODULES = [
     "lawmax21.observatory_genome_auditor_diversity_hardening",
     "lawmax21.observatory_genome_evidence_binding_hardening",
     "lawmax21.observatory_genome_cross_auditor_hardening",
+    "lawmax21.observatory_supremacy_dossier_overlay",
 ]
 EXTRA_FILES = {
     "private-evaluator/evaluator/observatory_formal_arena_v3.py",
@@ -33,6 +34,7 @@ EXTRA_FILES = {
     "executable-orchestrator/lawmax21/observatory_genome_auditor_diversity_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_evidence_binding_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_cross_auditor_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_supremacy_dossier_overlay.py",
     "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md",
     "executable-orchestrator/tools/mock_observatory_protocol_server.py",
     "executable-orchestrator/tools/mock_observatory_genome_server.py",
@@ -71,6 +73,7 @@ def main():
             "base.install",
             "observatory_cross_model_overlay.install",
             "observatory_genome_realization_overlay.install",
+            "observatory_supremacy_dossier_overlay.install",
             "observatory_phase_gate_hardening.install"]
         positions = [audit.index(token) for token in ordered]
         if positions != sorted(positions):
@@ -94,6 +97,9 @@ def main():
         cross_auditor = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_genome_cross_auditor_hardening.py")
+        dossier = _text(
+            "executable-orchestrator/lawmax21/"
+            "observatory_supremacy_dossier_overlay.py")
         auditor_diversity = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_genome_auditor_diversity_hardening.py")
@@ -126,6 +132,7 @@ def main():
                 "genome realization hard minimum is not phase-aware")
         for token in (
                 "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5",
+                "deterministic_supremacy_dossier_required",
                 "unbounded_production_rounds_required",
                 "stagnation_escalates_search_required",
                 '"production_max_rounds": 0'):
@@ -139,9 +146,19 @@ def main():
                 "genome evidence hardening does not reject stale/generic reports")
         if "MIN_DIFFERING_AXIS_MAPS = 4" not in cross_auditor \
                 or "auditor_citation_maps_independent" not in cross_auditor \
-                or "genome._audit = audit" not in cross_auditor:
+                or "genome._passes = passes" not in cross_auditor:
             raise RuntimeError(
-                "cross-auditor genome citation independence is not load-bearing")
+                "cross-auditor genome citation independence is not terminal-load-bearing")
+        for token in (
+                'SUPREMACY_KEY = "supremacy_dossier_verified"',
+                "OMEGA-SUPREMACY-DOSSIER.json",
+                "EVIDENCE_SUPPORTED_SUPREMACY_WITHIN_SIGNED_PROTOCOL_AND_TESTED_BOUNDS",
+                "evidence_index",
+                "ctx.esc._sup()[\"final_dossier\"]",
+                'out["INDEPENDENT_AUDIT"] = independent_audit'):
+            if token not in dossier:
+                raise RuntimeError(
+                    "deterministic supremacy dossier lacks: " + token)
         if "invariant-to-code perspective" not in auditor_diversity \
                 or "counterexample/removal perspective" not in auditor_diversity \
                 or '"temperature": 0.35' not in auditor_diversity:
@@ -180,6 +197,7 @@ def main():
             "genome_evidence_source_binding_verified": True,
             "genome_auditor_diversity_verified": True,
             "genome_cross_auditor_independence_verified": True,
+            "deterministic_supremacy_dossier_verified": True,
             "unbounded_production_search_verified": True,
             "protocol_v5_verified": True})
     except Exception as exc:
