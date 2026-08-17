@@ -4,16 +4,19 @@ A removed function name in an exception is not axis evidence when one broad func
 many unrelated classes. This hardening parses the exact mutated source, recovers the bodies of the
 renamed definitions and requires their AST identifiers/string literals to contain axis-relevant
 semantic vocabulary unless the hidden evaluator independently exposes a relevant hard dimension or
-failed axis-specific test signature.
+failed axis-specific test signature. Replication and crown check counts are reproduced from persisted
+campaign files in the terminal summary.
 """
 from __future__ import annotations
 
 import ast
 import re
+from types import MethodType
 
 from . import observatory_causal_attribution_scope_hardening as scope
 from . import observatory_causal_axis_attribution_hardening as axis
 from . import observatory_genome_causal_ablation_hardening as causal
+from .canonical import read_json
 
 
 _NORMALIZE = re.compile(r"[^a-z0-9_]+")
@@ -71,9 +74,33 @@ def _definition_axis_support(context, task, result):
     }
 
 
-def install(_ctx, handlers):
+def _campaign_state(context, report):
+    receipt = (report or {}).get("causal_ablation_evidence") or {}
+    relative = receipt.get("path")
+    if not relative:
+        return {"checked": False, "tasks": 0, "failure_scoped": 0}
+    try:
+        campaign = read_json(causal._runtime_path(context, relative))
+    except Exception:
+        return {"checked": False, "tasks": 0, "failure_scoped": 0}
+    tasks = campaign.get("tasks") or []
+    checked = sum(
+        1 for task in tasks
+        if (task.get("attribution") or {}).get(
+            "definition_vocabulary_sha256_inputs")
+        and (task.get("attribution") or {}).get(
+            "whole_receipt_searched") is False)
+    return {
+        "checked": bool(tasks and checked == len(tasks)),
+        "tasks": len(tasks),
+        "failure_scoped": checked,
+    }
+
+
+def install(ctx, handlers):
     if getattr(axis, "_definition_semantics_hardening_installed", False):
         return dict(handlers)
+    original_summary = ctx.esc.supremacy_summary
 
     def attribution(context, task, result):
         receipt = axis._receipt(context, result)
@@ -146,6 +173,30 @@ def install(_ctx, handlers):
             "whole_receipt_searched": False,
         }
 
+    def summary(self):
+        result = original_summary()
+        incumbent = self.s.get("incumbent")
+        scores = (ctx.scores.get(incumbent) or {}) if incumbent else {}
+        replication = _campaign_state(
+            ctx, scores.get("genome_realization_replication") or {})
+        crown = _campaign_state(
+            ctx, scores.get("genome_realization_crown") or {})
+        result.update({
+            "genome_definition_semantic_attribution_required": True,
+            "genome_definition_semantic_replication_checked":
+                replication["checked"],
+            "genome_definition_semantic_crown_checked": crown["checked"],
+            "genome_definition_semantic_replication_tasks":
+                replication["tasks"],
+            "genome_definition_semantic_replication_failure_scoped":
+                replication["failure_scoped"],
+            "genome_definition_semantic_crown_tasks": crown["tasks"],
+            "genome_definition_semantic_crown_failure_scoped":
+                crown["failure_scoped"],
+        })
+        return result
+
     axis._attribution = attribution
+    ctx.esc.supremacy_summary = MethodType(summary, ctx.esc)
     axis._definition_semantics_hardening_installed = True
     return dict(handlers)
