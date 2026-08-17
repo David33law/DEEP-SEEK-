@@ -6,6 +6,7 @@ from . import observatory_cross_model_workload_hardening
 from . import observatory_evaluator_routing_hardening
 from . import observatory_formal_streaming_routing
 from . import observatory_genome_auditor_diversity_hardening
+from . import observatory_genome_cross_auditor_hardening
 from . import observatory_genome_evidence_binding_hardening
 from . import observatory_genome_realization_overlay
 from . import observatory_phase_gate_hardening
@@ -27,9 +28,11 @@ def install(ctx, handlers):
     observatory_scale_hardening.install(ctx, handlers)
     observatory_cross_model_workload_hardening.install(ctx, handlers)
 
-    # Tighten the genome auditor before its handler wrappers are constructed. Every citation then
-    # has to bind an actual definition and a passing report for the exact current source bytes.
+    # Tighten the genome auditor before its handler wrappers are constructed. Every citation must
+    # bind an actual definition and passing exact-source report, and the two auditors must produce
+    # materially different per-axis citation maps rather than duplicated prose with different IDs.
     observatory_genome_evidence_binding_hardening.install(ctx, handlers)
+    observatory_genome_cross_auditor_hardening.install(ctx, handlers)
 
     # Public-prior-art challengers are not fully measured until all executable campaigns pass.
     required_reports = {
