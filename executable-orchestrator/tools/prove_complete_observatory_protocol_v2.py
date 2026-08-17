@@ -32,7 +32,9 @@ def main(argv=None):
         and static.get("final_static_extension") == "PASS"
         and static.get("protocol_version") == PROTOCOL
         and static.get("executable_genome_realization_bound") is True
-        and static.get("genome_realization_routing_verified") is True)
+        and static.get("genome_realization_routing_verified") is True
+        and static.get("genome_evidence_source_binding_verified") is True
+        and static.get("genome_auditor_diversity_verified") is True)
     if not required:
         print(json.dumps(static, ensure_ascii=False, indent=1))
         return 1
@@ -47,6 +49,10 @@ def main(argv=None):
                 "executable_genome_realization_bound"),
             "genome_realization_routing_verified": static.get(
                 "genome_realization_routing_verified"),
+            "genome_evidence_source_binding_verified": static.get(
+                "genome_evidence_source_binding_verified"),
+            "genome_auditor_diversity_verified": static.get(
+                "genome_auditor_diversity_verified"),
             "protocol_bundle_sha256": static.get("protocol_bundle_sha256"),
             "protocol_files": static.get("protocol_files"),
             "python_files_compiled": static.get("python_files_compiled"),
