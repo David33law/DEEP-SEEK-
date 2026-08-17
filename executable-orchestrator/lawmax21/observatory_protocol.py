@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import os
 
-PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-4"
+PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5"
 PROOF_MODE_ENV = "OBSERVATORY_ZERO_COST_PROOF"
 PUBLICATION_CHANNELS = ["human", "api", "linked_data", "eli", "public_sector", "ai"]
 REQUIRED_NOVELTY_METHODS = [
@@ -30,13 +30,16 @@ MISSION_FLAGS = {
     "machine_checked_models_required": True,
     "legal_interoperability_required": True,
     "cross_model_consistency_required": True,
+    "executable_genome_realization_required": True,
     "authoritative_prior_art_challenge_required": True,
     "active_novelty_saturation_required": True,
     "meta_search_required": True,
     "mechanical_genome_coverage_required": True,
     "independent_closure_auditors_required": True,
     "implementation_diversity_required": True,
+    "strict_executable_source_schema_required": True,
     "bounded_candidate_output_required": True,
+    "terminal_negative_proof_required": True,
     "proof_mode_forbidden_in_production": True,
 }
 SEARCH_POLICY = {
@@ -50,6 +53,7 @@ SEARCH_POLICY = {
     "scale_distinct_implementations_required": 2,
     "formal_models_required": 2,
     "interoperability_implementations_required": 2,
+    "genome_realization_auditors_required": 2,
 }
 PRODUCTION_WORKLOADS = {
     "distributed": {"qualification": 5000, "replication": 10000, "crown": 50000},
@@ -83,6 +87,7 @@ CONTRACT_FILES = {
     "formal_model_contract_sha256": "profiles/national-observatory/FORMAL-MODEL-CONTRACT.md",
     "interoperability_contract_sha256": "profiles/national-observatory/INTEROPERABILITY-CONTRACT.md",
     "cross_model_contract_sha256": "profiles/national-observatory/CROSS-MODEL-CONSISTENCY-CONTRACT.md",
+    "genome_realization_contract_sha256": "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md",
     "novelty_search_contract_sha256": "profiles/national-observatory/NOVELTY-SEARCH-CONTRACT.md",
     "prior_art_contract_sha256": "profiles/national-observatory/PRIOR-ART-CHALLENGE-CONTRACT.md",
     "prior_art_manifest_sha256": "profiles/national-observatory/PUBLIC-PRIOR-ART-MANIFEST.json",
@@ -182,16 +187,19 @@ def mission_binding(root, git_value):
                "runner_tree": git_value("rev-parse", "HEAD^{tree}"),
                "research_protocol_files": protocol_files(root),
                "research_protocol_bundle_sha256": protocol_bundle_sha256(root)}
-    mission.update(contract_hashes(root)); return mission
+    mission.update(contract_hashes(root))
+    return mission
 
 
 def validate_mission(root, mission, git_value):
     expected = mission_binding(root, git_value)
-    missing = [key for key, value in expected.items() if mission.get(key) != value]
+    mismatched = [key for key, value in expected.items() if mission.get(key) != value]
     extra = sorted(set(mission) - set(expected))
-    if missing or extra:
+    if mismatched or extra:
         detail = []
-        if missing: detail.append("mismatched: " + ", ".join(missing))
-        if extra: detail.append("unexpected: " + ", ".join(extra))
+        if mismatched:
+            detail.append("mismatched: " + ", ".join(mismatched))
+        if extra:
+            detail.append("unexpected: " + ", ".join(extra))
         raise RuntimeError("signed Observatory mission drift — " + "; ".join(detail))
     return expected
