@@ -76,6 +76,9 @@ def parse_candidate(prompt):
 
 
 def build_answer(prompt):
+    # The proof must fail if the real builder path ever regresses to family + first mechanism.
+    if "COMPLETE ARCHITECTURE BLUEPRINT" not in prompt or "BLUEPRINT SHA256" not in prompt:
+        return {"candidate_id": "BAD-HANDOFF", "family": "invalid", "mechanism": "invalid", "files": []}
     cid, family, mechanism = parse_candidate(prompt)
     if cid == "OBS-02":
         src = partial_source()
@@ -97,6 +100,8 @@ def answer(prompt):
         return proposal("norm-calculus-graph", "typed normative event calculus over canonical legal identities")
     if role == "architecture-explorer-C":
         return proposal("federated-authority-mesh", "source-authority mesh converging into one canonical temporal state")
+    if role == "architecture-outlier":
+        return proposal("proof-kernel-legal-state", "proof-object kernel deriving legal state from admitted theorem obligations")
     if role == "builder":
         return build_answer(prompt)
     if role == "future-scale-critic":
