@@ -13,9 +13,9 @@ LAYERS = [
     ("L3", "Bitemporal Legal State Model",
      "Can effective-time state differ from transaction/knowledge-time state, with both answers reconstructed and justified?"),
     ("L4", "Normative Change & Effect Engine",
-     "Can amendment, repeal, suspension, revival, correction, transition and codification effects be derived as explicit checkable state transitions?"),
+     "Can amendment, repeal, suspension, revival, correction, transition, commencement and codification effects be derived as explicit checkable state transitions?"),
     ("L5", "Complete Change Detection & Reconciliation",
-     "When a late, duplicate, conflicting or corrected source arrives, does the system detect the material delta and reconcile without destructive overwrite?"),
+     "Does every injected legally material change get detected and attributed, including late, duplicate, conflicting, corrected and republished sources, with zero silent material loss and no destructive overwrite?"),
     ("L6", "Jurisprudence-to-Version Graph",
      "Does each judicial decision link to the exact temporal version and authority status of the provisions it interprets or applies?"),
     ("L7", "Doctrine/Theory Epistemic Layer",
@@ -23,9 +23,9 @@ LAYERS = [
     ("L8", "Proof-Carrying Provenance",
      "Does every derived state and public output carry enough provenance for an independent verifier to reproduce the derivation from admitted evidence?"),
     ("L9", "Unknown, Conflict & Anomaly Governance",
-     "Does the system expose unresolved identity/effect/source conflicts and abstain instead of silently manufacturing certainty?"),
+     "Does the system expose unresolved identity/effect/source conflicts and abstain instead of silently manufacturing certainty or omission?"),
     ("L10", "National Publication & Interchange Plane",
-     "Can one canonical state produce consistent human, API, graph and machine-readable projections without creating a second source of truth?"),
+     "Can one canonical state produce mutually consistent human, API/bulk, linked-data/graph, ELI-compatible Greek/EU, public-sector and AI-grounding projections without creating a second writable source of truth?"),
     ("L11", "Deterministic Replay, Recovery & Rebuild",
      "From preserved evidence and declared transformations, can a clean machine reconstruct the same legal state after crash, corruption drill or full rebuild?"),
     ("L12", "Governed Self-Observation & Human Sovereignty",
@@ -40,6 +40,9 @@ AXIOMS = [
     ("primary_evidence_required",
      "no authoritative legal assertion without admitted primary evidence",
      "trusted state contains a legal assertion not derivable from admitted source evidence"),
+    ("no_silent_material_loss",
+     "no legally material source/change event may silently escape detection, attribution, temporal-effect analysis, provenance or publication",
+     "an injected legally material event is omitted or disappears without an explicit unresolved/anomaly record"),
     ("bitemporal_noncollapse",
      "legal/effective time and system knowledge time never collapse into one clock",
      "a representation cannot distinguish what applied then from what the system knew then"),
@@ -53,13 +56,13 @@ AXIOMS = [
      "probabilistic models may propose; deterministic checkable mechanisms decide trusted identity/effect/provenance",
      "canonical identity, legal effect or provenance admission depends on an unverified model judgment"),
     ("honest_unknown",
-     "unresolved conflict is represented as unresolved rather than guessed away",
-     "the system emits authoritative certainty where its own evidence graph contains an unresolved conflict"),
+     "unresolved conflict is represented as unresolved rather than guessed or omitted away",
+     "the system emits authoritative certainty or silent absence where its evidence graph contains an unresolved conflict"),
     ("deterministic_rebuild",
      "canonical state is reproducible from evidence plus declared transformations",
      "a clean replay from the same admitted evidence produces materially different canonical state"),
     ("one_canonical_seat",
-     "each legal concept has one canonical authority seat; projections cannot become competing truths",
+     "each legal concept has one canonical authority seat; all publication forms are projections and cannot become competing truths",
      "two writable authoritative homes can independently define the same canonical legal fact"),
     ("human_governance_nonbypassable",
      "governance gates over trusted-policy changes cannot be bypassed",
@@ -112,8 +115,13 @@ def target_summary():
     return {
         "target": "National Legal Observatory — Greek Legal Order",
         "definition": (
-            "A national-scale, bitemporal, provenance-complete and reconstructable observatory "
-            "of legislation, legal change, jurisprudence and doctrine."
+            "A permanent national-scale, bitemporal, provenance-complete and reconstructable "
+            "canonical legal information infrastructure for legislation, legal change, "
+            "jurisprudence and doctrine, publishing consistent human/public-sector/Greek-EU/AI projections."
+        ),
+        "completeness_rule": (
+            "No legally material change may silently escape detection, attribution, temporal-effect "
+            "analysis, provenance or publication. Explicit UNKNOWN is valid; silent omission is not."
         ),
         "candidate_mode": CANDIDATE_MODE,
         "required_operations": REQUIRED_OPERATIONS,
