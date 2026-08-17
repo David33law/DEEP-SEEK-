@@ -45,6 +45,21 @@ def _campaigns(s):
             "replication": s.get("interoperability_replication_passed", False),
             "crown": s.get("interoperability_crown_passed", False),
             "contract": s.get("interoperability_contract")},
+        "cross_model_consistency": {
+            "qualification": s.get("cross_model_consistency_passed", False),
+            "replication": s.get("cross_model_replication_passed", False),
+            "crown": s.get("cross_model_crown_passed", False),
+            "qualification_histories": s.get("cross_model_qualification_histories", 0),
+            "replication_histories": s.get("cross_model_replication_histories", 0),
+            "crown_histories": s.get("cross_model_crown_histories", 0),
+            "contract": s.get("cross_model_contract")},
+        "controlled_genome_realization": {
+            "qualification": s.get("genome_realization_proven", False),
+            "replication": s.get("genome_realization_replication_passed", False),
+            "crown": s.get("genome_realization_crown_passed", False),
+            "auditors": s.get("genome_realization_auditors", 0),
+            "axes": s.get("genome_realization_axes", 0),
+            "contract": s.get("genome_realization_contract")},
         "prior_art": {
             "all_sources_assessed": s.get("prior_art_all_sources_assessed", False),
             "challengers_measured": s.get("prior_art_challengers_measured", False),
