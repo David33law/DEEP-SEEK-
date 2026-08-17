@@ -4,7 +4,7 @@
 The inherited proof already verifies exact mutated source bytes, evaluator receipts, inert controls,
 portable owner signatures, every arena and the deterministic dossier. This extension additionally
 requires every causal task to fail for a mechanically persisted reason relevant to the controlled
-axis and artifact group rather than from an unrelated candidate defect.
+axis and artifact group rather than from an unrelated candidate defect or successful receipt metadata.
 """
 from __future__ import annotations
 
@@ -14,13 +14,15 @@ import os
 import prove_complete_observatory_protocol_causal_provider_hardened as previous
 
 CORE = previous.base.CORE
-AXIS_FILE = (
+AXIS_FILES = {
     "executable-orchestrator/lawmax21/"
-    "observatory_causal_axis_attribution_hardening.py")
-E2E_FILE = (
+    "observatory_causal_axis_attribution_hardening.py",
+    "executable-orchestrator/lawmax21/"
+    "observatory_causal_attribution_scope_hardening.py",
     "executable-orchestrator/tools/"
-    "prove_complete_observatory_protocol_axis_hardened.py")
-for relative in (AXIS_FILE, E2E_FILE):
+    "prove_complete_observatory_protocol_axis_hardened.py",
+}
+for relative in AXIS_FILES:
     previous.base.CAUSAL_FILES.add(relative)
     CORE.REQUIRED_PROTOCOL_FILES.add(relative)
 _ORIGINAL_VERIFY = CORE.verify_protocol
@@ -60,10 +62,11 @@ def _verify_campaign(runtime, incumbent, label):
         if task.get("axis_specific_failure_attributed") is not True \
                 or task.get("causal_failure_observed") is not True \
                 or task.get("observed_candidate_pass") is not False \
-                or not details.get("mode"):
+                or not details.get("mode") \
+                or details.get("whole_receipt_searched") is not False:
             raise RuntimeError(
-                f"axis-specific causal {label}: unrelated or unattributed "
-                f"failure for {task.get('auditor_id')}/"
+                f"axis-specific causal {label}: unrelated, unattributed or "
+                f"whole-receipt-derived failure for {task.get('auditor_id')}/"
                 f"{task.get('axis')}/{task.get('group')}")
         if details.get("mode") == "semantic-hard-dimension":
             if not details.get("matched_dimensions") \
@@ -87,6 +90,8 @@ def _verify_campaign(runtime, incumbent, label):
             "group": task.get("group"),
             "artifact": task.get("artifact"),
             "mode": details.get("mode"),
+            "failure_payload_fields": details.get(
+                "failure_payload_fields") or [],
         })
     if len(attributed) != int(causal.get("tasks_executed", -1)):
         raise RuntimeError(
@@ -97,6 +102,7 @@ def _verify_campaign(runtime, incumbent, label):
         "tasks": len(tasks),
         "axis_specific_tasks": len(attributed),
         "attribution_modes": sorted({row["mode"] for row in attributed}),
+        "whole_receipt_searched": False,
     }
 
 
@@ -108,7 +114,7 @@ def _verify(repo, runtime, source_head, preflight, launch):
         raise RuntimeError(
             "signed mission does not require axis-specific causal attribution")
     files = set(mission.get("research_protocol_files") or [])
-    missing = sorted({AXIS_FILE, E2E_FILE} - files)
+    missing = sorted(AXIS_FILES - files)
     if missing:
         raise RuntimeError(
             "signed protocol omitted axis-attribution files: "
