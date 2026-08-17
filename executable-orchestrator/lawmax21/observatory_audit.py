@@ -1,13 +1,15 @@
 """Profile-specific independent audit for the National Legal Observatory.
 
-Diverse implementation search, prior-art falsification, active novelty, meta-search, hardening,
-taxonomy completion and search integrity are installed here because this is the final profile layer.
-They wrap the complete crown search inside the same signed state machine and final independent audit.
+Diverse semantic and distributed implementation search, prior-art falsification, active novelty,
+meta-search, hardening, taxonomy completion and search integrity are installed here because this is
+the final profile layer. They wrap the complete crown search inside the same signed state machine and
+final independent audit.
 """
 
 from .canonical import atomic_write_json
 from .handlers import A, tree_hash
-from . import (observatory_implementation_search_overlay,
+from . import (observatory_distributed_overlay,
+               observatory_implementation_search_overlay,
                observatory_meta_hardening_overlay, observatory_meta_search_overlay,
                observatory_novelty_overlay, observatory_prior_art_overlay,
                observatory_search_integrity_overlay,
@@ -20,8 +22,9 @@ observatory_novelty_overlay.NOVELTY_BUILD_LIMIT = 100_000
 
 
 def install(ctx, handlers):
-    """Install implementation search → prior art → novelty/meta closure → audit."""
+    """Install implementation → distributed → prior art → novelty/meta closure → audit."""
     out = observatory_implementation_search_overlay.install(ctx, handlers)
+    out = observatory_distributed_overlay.install(ctx, out)
     out = observatory_prior_art_overlay.install(ctx, out)
     out = observatory_novelty_overlay.install(ctx, out)
     out = observatory_meta_search_overlay.install(ctx, out)
@@ -65,6 +68,27 @@ def install(ctx, handlers):
                     "semantic_implementation_search_closed", False),
                 "hidden_cases_disclosed_to_reviser": False,
                 "aggregate_diagnostics_only": True,
+            },
+            "distributed_fault_campaign": {
+                "contract": supremacy.get("distributed_contract"),
+                "minimum_distinct_sources": supremacy.get(
+                    "distributed_minimum_distinct_sources", 0),
+                "revision_limit": supremacy.get("distributed_revision_limit", 0),
+                "qualification_events": supremacy.get(
+                    "distributed_qualification_events", 0),
+                "replication_events": supremacy.get(
+                    "distributed_replication_events", 0),
+                "crown_events": supremacy.get("distributed_crown_events", 0),
+                "implementation_diversity_proven": supremacy.get(
+                    "distributed_implementation_diversity_proven", False),
+                "failure_model_proven": supremacy.get(
+                    "distributed_failure_model_proven", False),
+                "replication_passed": supremacy.get(
+                    "distributed_replication_passed", False),
+                "crown_passed": supremacy.get(
+                    "distributed_crown_passed", False),
+                "candidate_labels_must_match_controlled_genome": True,
+                "bounded_local_fault_model_only": True,
             },
             "authoritative_prior_art_challenge": {
                 "manifest": "PUBLIC-PRIOR-ART-MANIFEST.json",
