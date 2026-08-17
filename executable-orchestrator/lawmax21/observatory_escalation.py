@@ -1,8 +1,8 @@
 """National Observatory escalation semantics over the shared escalation ledger.
 
-The Observatory crown is intentionally much harder than "all current tests passed". In addition
-to the twelve executable Observatory layers, COMMITTED requires evidence that the supremacy-search
-protocol itself has saturated: structural-genome search, recombination, durable-systems evidence,
+The Observatory crown is intentionally much harder than "all current tests passed". Search-loop
+closure and final supremacy closure are separate: the loop may nominate a HESA finalist once
+search-space conditions saturate, but COMMITTED additionally requires durable-systems evidence,
 lower-bound closure, independent destruction and a falsifiable public supremacy case.
 """
 from .escalation import EscalationLedger
@@ -17,6 +17,12 @@ SUPREMACY_KEYS = [
     "lower_bound_closed",
     "destroyer_survived",
     "public_supremacy_case",
+]
+
+SEARCH_SUPREMACY_KEYS = [
+    "search_forest_executed",
+    "genome_saturated",
+    "recombination_tested",
 ]
 
 OBSERVATORY_PROOF_SCHEMA = {
@@ -142,6 +148,19 @@ class ObservatoryEscalationLedger(EscalationLedger):
             "third_party_endorsement_claimed": bool(third_party_endorsement_claimed)}
         self._flush()
 
+    def _base_search_conditions(self):
+        inc = self.s["incumbent"]
+        covered = self.layers_covered(inc) if inc else []
+        return {
+            "dryness": self.dry_rounds() >= self.K,
+            "attacked_by_radical": bool(self.s["radical_attacks"]),
+            "simplification_tested": bool(self.s["simplification_attempts"]),
+            "families_exhausted": not self.untried_families(),
+            "altitude_saturated": bool(inc) and target.audited_altitude(covered) == self.highest_evidenced_altitude(),
+            "all_layers_reached": bool(inc) and not target.missing_layers(covered),
+            "evolvable_without_refactor": self.incumbent_evolvability() == "EVOLVABLE",
+        }
+
     def _supremacy_conditions(self):
         inc = self.s["incumbent"]
         sup = self._sup()
@@ -160,20 +179,25 @@ class ObservatoryEscalationLedger(EscalationLedger):
                 and not bool(case.get("third_party_endorsement_claimed")),
         }
 
+    def search_conditions(self):
+        c = self._base_search_conditions()
+        sup = self._supremacy_conditions()
+        for key in SEARCH_SUPREMACY_KEYS:
+            c[key] = sup[key]
+        return c
+
+    def must_continue(self):
+        """Close only the SEARCH loop here; tail-only supremacy evidence is evaluated later."""
+        c = self.search_conditions()
+        if all(c.values()):
+            return False, "search ceiling proven: " + ", ".join(k for k in c)
+        unmet = [k for k, v in c.items() if not v]
+        return True, "search escalation still required — unmet: " + ", ".join(unmet)
+
     def conditions(self):
-        inc = self.s["incumbent"]
-        covered = self.layers_covered(inc) if inc else []
-        base = {
-            "dryness": self.dry_rounds() >= self.K,
-            "attacked_by_radical": bool(self.s["radical_attacks"]),
-            "simplification_tested": bool(self.s["simplification_attempts"]),
-            "families_exhausted": not self.untried_families(),
-            "altitude_saturated": bool(inc) and target.audited_altitude(covered) == self.highest_evidenced_altitude(),
-            "all_layers_reached": bool(inc) and not target.missing_layers(covered),
-            "evolvable_without_refactor": self.incumbent_evolvability() == "EVOLVABLE",
-        }
-        base.update(self._supremacy_conditions())
-        return base
+        c = self._base_search_conditions()
+        c.update(self._supremacy_conditions())
+        return c
 
     def audited_altitude(self, candidate_id):
         return target.audited_altitude(self.layers_covered(candidate_id))
