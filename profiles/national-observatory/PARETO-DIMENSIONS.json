@@ -4,9 +4,9 @@
     "direction": "higher",
     "unit": "fraction",
     "scale": "0-1",
-    "measurement": "expected authoritative source/change items detected and admitted / ground truth",
-    "noise_floor": 0.002,
-    "hard_minimum": 0.98,
+    "measurement": "expected authoritative source/change items detected and admitted or explicitly unresolved / ground truth",
+    "noise_floor": 0.0,
+    "hard_minimum": 1.0,
     "source_artifact": "observatory hidden replay"
   },
   {
@@ -14,9 +14,9 @@
     "direction": "higher",
     "unit": "fraction",
     "scale": "0-1",
-    "measurement": "material legal changes detected / material changes injected",
-    "noise_floor": 0.002,
-    "hard_minimum": 0.98,
+    "measurement": "legally material changes detected and attributed / material changes injected; silent omission scores zero for the missed trial",
+    "noise_floor": 0.0,
+    "hard_minimum": 1.0,
     "source_artifact": "change-recall report"
   },
   {
@@ -80,6 +80,16 @@
     "source_artifact": "provenance verifier"
   },
   {
+    "id": "publication_projection_consistency",
+    "direction": "higher",
+    "unit": "fraction",
+    "scale": "0-1",
+    "measurement": "publication trials in which human/API/linked-data/ELI/public-sector/AI channels expose the same canonical identity/status and remain projections of one authority seat",
+    "noise_floor": 0.0,
+    "hard_minimum": 1.0,
+    "source_artifact": "publication projection verifier"
+  },
+  {
     "id": "replay_determinism",
     "direction": "higher",
     "unit": "fraction",
@@ -104,7 +114,7 @@
     "direction": "higher",
     "unit": "fraction",
     "scale": "0-1",
-    "measurement": "ambiguous/conflicting trials correctly left unresolved rather than guessed",
+    "measurement": "ambiguous/conflicting trials correctly left unresolved rather than guessed or omitted",
     "noise_floor": 0.0,
     "hard_minimum": 1.0,
     "source_artifact": "conflict/unknown report"
@@ -114,7 +124,7 @@
     "direction": "lower",
     "unit": "seconds",
     "scale": "p95",
-    "measurement": "source admission to verified projection publication on fixed workload",
+    "measurement": "source admission to verified canonical multi-channel projection publication on fixed workload",
     "noise_floor": 0.1,
     "hard_minimum": null,
     "source_artifact": "performance report"
