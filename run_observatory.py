@@ -6,9 +6,11 @@ provider policy, currency-explicit accounting and Observatory/supremacy/crown/no
 the existing signed control loop.
 """
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +26,22 @@ REQUIRED_NOVELTY_METHODS = [
     "G94-surgical-genome-mutation",
     "G95-trusted-boundary-recut",
     "G96-ontology-and-taxonomy-challenge",
+]
+
+PROTOCOL_FILES = [
+    "run_observatory.py",
+    "setup_observatory.py",
+    "executable-orchestrator/orchestrator.py",
+    "executable-orchestrator/lawmax21/observatory_roles.py",
+    "executable-orchestrator/lawmax21/observatory_runtime.py",
+    "executable-orchestrator/lawmax21/observatory_supremacy_overlay.py",
+    "executable-orchestrator/lawmax21/observatory_crown_overlay.py",
+    "executable-orchestrator/lawmax21/observatory_novelty_overlay.py",
+    "executable-orchestrator/lawmax21/observatory_escalation.py",
+    "executable-orchestrator/lawmax21/observatory_audit.py",
+    "private-evaluator/evaluator/observatory_systems_arena.py",
+    "executable-orchestrator/tools/run_observatory_proof.py",
+    "executable-orchestrator/tools/prove_active_novelty_saturation.py",
 ]
 
 
@@ -67,6 +85,27 @@ def _is_local_endpoint(endpoint):
     e = (endpoint or "").lower()
     return (e.startswith("http://127.0.0.1:") or e.startswith("http://localhost:")
             or e.startswith("https://127.0.0.1:") or e.startswith("https://localhost:"))
+
+
+def _git_value(*args):
+    r = subprocess.run(["git", "-C", ROOT, *args], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise observatory_preflight.PreflightFailed(
+            f"git {' '.join(args)} failed: {r.stderr.strip()}")
+    return r.stdout.strip()
+
+
+def _protocol_bundle_sha256():
+    h = hashlib.sha256()
+    for rel in PROTOCOL_FILES:
+        path = os.path.join(ROOT, *rel.split("/"))
+        if not os.path.isfile(path):
+            raise observatory_preflight.PreflightFailed(
+                f"research protocol file missing: {rel}")
+        h.update(rel.encode("utf-8"))
+        h.update(b"\0")
+        h.update(bytes.fromhex(sha256_file(path)))
+    return h.hexdigest()
 
 
 def observatory_paths(root, runtime):
@@ -123,6 +162,18 @@ def _validate_signed_mission(D, root):
     if list(mission.get("novelty_methods") or []) != REQUIRED_NOVELTY_METHODS:
         raise observatory_preflight.PreflightFailed(
             "signed D09 novelty-miner portfolio does not match the production protocol")
+    if list(mission.get("research_protocol_files") or []) != PROTOCOL_FILES:
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 research-protocol file set does not match the launcher")
+    if mission.get("runner_head") != _git_value("rev-parse", "HEAD"):
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 runner HEAD does not match the executing repository")
+    if mission.get("runner_tree") != _git_value("rev-parse", "HEAD^{tree}"):
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 runner tree does not match the executing repository")
+    if mission.get("research_protocol_bundle_sha256") != _protocol_bundle_sha256():
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 research protocol bundle has drifted")
     if not REQUIRED_PUBLICATION_CHANNELS.issubset(set(mission.get("publication_channels") or [])):
         raise observatory_preflight.PreflightFailed(
             "signed D09 does not bind all required national publication channels")
