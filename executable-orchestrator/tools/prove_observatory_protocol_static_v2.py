@@ -20,6 +20,7 @@ EXTRA_MODULES = [
     "lawmax21.observatory_genome_realization_overlay",
     "lawmax21.observatory_genome_auditor_diversity_hardening",
     "lawmax21.observatory_genome_evidence_binding_hardening",
+    "lawmax21.observatory_genome_cross_auditor_hardening",
 ]
 EXTRA_FILES = {
     "private-evaluator/evaluator/observatory_formal_arena_v3.py",
@@ -31,6 +32,7 @@ EXTRA_FILES = {
     "executable-orchestrator/lawmax21/observatory_genome_realization_overlay.py",
     "executable-orchestrator/lawmax21/observatory_genome_auditor_diversity_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_evidence_binding_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_genome_cross_auditor_hardening.py",
     "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md",
     "executable-orchestrator/tools/mock_observatory_protocol_server.py",
     "executable-orchestrator/tools/mock_observatory_genome_server.py",
@@ -64,6 +66,7 @@ def main():
             "observatory_scale_hardening.install",
             "observatory_cross_model_workload_hardening.install",
             "observatory_genome_evidence_binding_hardening.install",
+            "observatory_genome_cross_auditor_hardening.install",
             "observatory_prior_art_hardening_overlay.install",
             "base.install",
             "observatory_cross_model_overlay.install",
@@ -88,6 +91,9 @@ def main():
         evidence_binding = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_genome_evidence_binding_hardening.py")
+        cross_auditor = _text(
+            "executable-orchestrator/lawmax21/"
+            "observatory_genome_cross_auditor_hardening.py")
         auditor_diversity = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_genome_auditor_diversity_hardening.py")
@@ -118,14 +124,24 @@ def main():
         if "genome_realization_qualification" not in phase:
             raise RuntimeError(
                 "genome realization hard minimum is not phase-aware")
-        if "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5" not in protocol:
-            raise RuntimeError("protocol-v5 binding is absent")
+        for token in (
+                "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5",
+                "unbounded_production_rounds_required",
+                "stagnation_escalates_search_required",
+                '"production_max_rounds": 0'):
+            if token not in protocol:
+                raise RuntimeError("protocol-v5 binding is absent: " + token)
         if "no passing source-bound evidence" not in evidence_binding \
                 or "candidate_sha256" not in evidence_binding \
                 or "MIN_UNIQUE_DEFINITION_CITATIONS = 8" not in evidence_binding \
                 or "_persisted_receipt" not in evidence_binding:
             raise RuntimeError(
                 "genome evidence hardening does not reject stale/generic reports")
+        if "MIN_DIFFERING_AXIS_MAPS = 4" not in cross_auditor \
+                or "auditor_citation_maps_independent" not in cross_auditor \
+                or "genome._audit = audit" not in cross_auditor:
+            raise RuntimeError(
+                "cross-auditor genome citation independence is not load-bearing")
         if "invariant-to-code perspective" not in auditor_diversity \
                 or "counterexample/removal perspective" not in auditor_diversity \
                 or '"temperature": 0.35' not in auditor_diversity:
@@ -163,6 +179,8 @@ def main():
             "genome_realization_routing_verified": True,
             "genome_evidence_source_binding_verified": True,
             "genome_auditor_diversity_verified": True,
+            "genome_cross_auditor_independence_verified": True,
+            "unbounded_production_search_verified": True,
             "protocol_v5_verified": True})
     except Exception as exc:
         report["status"] = "FAIL"
