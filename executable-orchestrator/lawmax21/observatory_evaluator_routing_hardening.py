@@ -13,6 +13,9 @@ from .canonical import atomic_write_json, read_json
 from .handlers import A
 
 
+_EVALUATOR_TAIL_LIMIT = 4000
+
+
 def _sha256_file(path):
     digest = hashlib.sha256()
     with open(path, "rb") as handle:
@@ -21,13 +24,24 @@ def _sha256_file(path):
     return digest.hexdigest()
 
 
+def _process_receipt(result):
+    return {
+        "evaluator_returncode": result.returncode,
+        "evaluator_stdout_tail": (result.stdout or "")[-_EVALUATOR_TAIL_LIMIT:],
+        "evaluator_stderr_tail": (result.stderr or "")[-_EVALUATOR_TAIL_LIMIT:],
+    }
+
+
 def _finish(ctx, out, result, path):
+    process = _process_receipt(result)
     if not os.path.exists(out):
-        return {"status": "FAIL", "passed": False,
-                "reason": "bounded evaluator produced no report: "
-                          + (result.stdout + result.stderr)[-1600:]}
+        return {
+            "status": "FAIL", "passed": False,
+            "reason": "bounded evaluator produced no report",
+            **process,
+        }
     report = read_json(out)
-    report["evaluator_returncode"] = result.returncode
+    report.update(process)
     report["evidence_path"] = os.path.relpath(
         out, ctx.runtime).replace("\\", "/")
     report["candidate_path"] = os.path.relpath(
@@ -114,7 +128,8 @@ def _formal(ctx, cid, perspective, label, depth, candidate_path=None):
     report = _finish(ctx, out, result, path)
     report["shared_hidden_corpus_id"] = hashlib.sha256(
         corpus.encode()).hexdigest()
-    atomic_write_json(out, report)
+    if report.get("evidence_path"):
+        atomic_write_json(out, report)
     return report
 
 
@@ -137,7 +152,8 @@ def _interop(ctx, cid, perspective, label, cases, candidate_path=None):
     report = _finish(ctx, out, result, path)
     report["shared_hidden_corpus_id"] = hashlib.sha256(
         corpus.encode()).hexdigest()
-    atomic_write_json(out, report)
+    if report.get("evidence_path"):
+        atomic_write_json(out, report)
     return report
 
 
