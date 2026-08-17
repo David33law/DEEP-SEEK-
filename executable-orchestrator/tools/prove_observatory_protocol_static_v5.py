@@ -3,8 +3,9 @@
 
 Runs the complete portable-owner protocol-v5 static proof, then verifies that causal source ablation
 is bound to the owner-signed mission, explicit terminal conditions, final overlay order, independent
-audit, hard Pareto gate, deterministic dossier, causal-aware localhost provider and authoritative
-Docker E2E path. No provider call, candidate execution or owner mutation occurs here.
+audit, hard Pareto gate, deterministic dossier, conservative failure classification, causal-aware
+localhost provider and authoritative Docker E2E path. No provider call, candidate execution or owner
+mutation occurs here.
 """
 from __future__ import annotations
 
@@ -29,11 +30,13 @@ REQUIRED_MODULES = (
     "lawmax21.observatory_genome_causal_ablation_hardening",
     "lawmax21.observatory_causal_audit_hardening",
     "lawmax21.observatory_causal_dossier_hardening",
+    "lawmax21.observatory_causal_failure_classification_hardening",
 )
 REQUIRED_FILES = {
     "executable-orchestrator/lawmax21/observatory_genome_causal_ablation_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_audit_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_dossier_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_causal_failure_classification_hardening.py",
     "executable-orchestrator/tools/mock_observatory_causal_server.py",
     "executable-orchestrator/tools/prove_observatory_protocol_static_v5.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_causal_hardened.py",
@@ -128,6 +131,7 @@ def main():
             "base.install",
             "observatory_cross_model_overlay.install",
             "observatory_genome_realization_overlay.install",
+            "observatory_causal_failure_classification_hardening.install",
             "observatory_genome_causal_ablation_hardening.install",
             "observatory_causal_dossier_hardening.install",
             "observatory_supremacy_dossier_overlay.install",
@@ -149,12 +153,22 @@ def main():
             "genome_causal_ablation_replication_passed",
             "genome_causal_ablation_crown_passed"),
             "causal genome implementation")
+        failure_classifier = _text(
+            "executable-orchestrator/lawmax21/"
+            "observatory_causal_failure_classification_hardening.py")
+        _require(failure_classifier, (
+            "_INFRASTRUCTURE_MARKERS",
+            "infrastructure failure is non-evidence",
+            "candidate_sha256", "evaluator_returncode",
+            "candidate-specific diagnostic evidence"),
+            "causal failure classification")
         contract = _text(
             "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md")
         _require(contract, (
             "Causal source-ablation proof",
             "Inert negative controls",
             "auditor-specific axis/group/artifact citation set",
+            "Infrastructure refusal",
             "genome_causal_ablation_replication_passed",
             "genome_causal_ablation_crown_passed"),
             "genome realization contract")
@@ -205,6 +219,7 @@ def main():
             "_genome_provider_popen",
             "mock_observatory_protocol_server.py",
             "mock_observatory_causal_server.py",
+            "observatory_causal_failure_classification_hardening.py",
             "CORE.subprocess.Popen",
             "Real-provider endpoints are never affected"),
             "causal-aware local-provider route")
@@ -243,6 +258,7 @@ def main():
             "auditor_specific_definition_set_ablation": True,
             "inert_negative_controls_required": True,
             "exact_mutated_source_receipts_required": True,
+            "infrastructure_failure_exclusion_verified": True,
             "causal_dossier_direct_indexing_required": True,
             "causal_genome_ablation_bound": True,
             "genome_aware_local_provider_verified": True,
