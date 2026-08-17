@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Final proof entrypoint: static protocol proof followed by the full v4 E2E proof."""
+"""Final proof entrypoint: extended static protocol proof followed by full v4 E2E."""
 import json
 import os
 import subprocess
@@ -9,7 +9,7 @@ import prove_complete_observatory_protocol as base
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-STATIC = os.path.join(HERE, "prove_observatory_protocol_static.py")
+STATIC = os.path.join(HERE, "prove_observatory_protocol_static_v2.py")
 STATIC_REPORT = os.path.join(ROOT, "proof", "observatory-protocol-static.json")
 E2E_REPORT = os.path.join(ROOT, "proof", "complete-observatory-protocol-e2e.json")
 
@@ -22,13 +22,14 @@ def main(argv=None):
         print(result.stdout); print(result.stderr, file=sys.stderr)
         return result.returncode
     static = json.load(open(STATIC_REPORT, encoding="utf-8"))
-    if static.get("status") != "PASS":
+    if static.get("status") != "PASS" or static.get("final_static_extension") != "PASS":
         print(json.dumps(static, ensure_ascii=False, indent=1)); return 1
     code = base.main(argv)
     if os.path.isfile(E2E_REPORT):
         e2e = json.load(open(E2E_REPORT, encoding="utf-8"))
         e2e["static_protocol_proof"] = {
             "status": static.get("status"),
+            "final_static_extension": static.get("final_static_extension"),
             "protocol_bundle_sha256": static.get("protocol_bundle_sha256"),
             "protocol_files": static.get("protocol_files"),
             "python_files_compiled": static.get("python_files_compiled"),
