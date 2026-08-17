@@ -1,7 +1,7 @@
 """Executable controlled-genome realization audit for Observatory architectures.
 
-Two independent auditors must bind every controlled class to real AST symbols, frozen INV-* IDs and
-persisted executable evidence. The trusted validator reproduces every citation mechanically. The
+Two independent auditors must bind every controlled class to real AST definitions, frozen INV-* IDs
+and persisted executable evidence. The trusted validator reproduces every citation mechanically. The
 audit runs at qualification, independent replication and crown and becomes an explicit terminal
 condition.
 """
@@ -10,7 +10,6 @@ import glob
 import hashlib
 import json
 import os
-import re
 from types import MethodType
 
 from . import observatory_crown_overlay as crownmod
@@ -22,6 +21,7 @@ from .canonical import atomic_write_json, read_json, sha256_file, sha256_obj
 from .handlers import A
 
 AUDITORS = ("A", "B")
+SOURCE_EXCERPT_LIMIT = 80_000
 SUPREMACY_KEYS = (
     "genome_realization_proven",
     "genome_realization_replication_passed",
@@ -41,7 +41,7 @@ REQUIRED_GROUPS = {
     "normative_effect_model": ("semantic", "formal", "interoperability"),
     "consistency_commit_model": ("distributed", "formal"),
     "replication_distribution_model": ("distributed", "formal"),
-    "trusted_core_topology": ("formal", "executable"),
+    "trusted_core_topology": ("formal", "systems"),
     "provenance_proof_model": ("semantic", "interoperability"),
     "publication_topology": ("semantic", "interoperability"),
     "governance_evolution_model": ("semantic", "formal"),
@@ -111,33 +111,41 @@ def _artifact_paths(ctx, cid):
         "interoperability_B": interop_paths[1]}
 
 
-def _symbols(source):
+def _ast_inventory(source):
     tree = ast.parse(source)
-    names = set()
+    definitions = set()
+    symbols = set()
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            names.add(node.name)
+            definitions.add(node.name)
+            symbols.add(node.name)
         elif isinstance(node, ast.Name):
-            names.add(node.id)
+            symbols.add(node.id)
         elif isinstance(node, ast.Attribute):
-            names.add(node.attr)
+            symbols.add(node.attr)
         elif isinstance(node, ast.arg):
-            names.add(node.arg)
-    return sorted(names)
+            symbols.add(node.arg)
+    return sorted(definitions), sorted(symbols)
 
 
 def _source_census(ctx, cid):
     census = {}
     for artifact, path in _artifact_paths(ctx, cid).items():
         if not os.path.isfile(path):
-            raise RuntimeError(f"{cid}: genome-realization artifact missing: {artifact}={path}")
+            raise RuntimeError(
+                f"{cid}: genome-realization artifact missing: {artifact}={path}")
         source = open(path, encoding="utf-8").read()
+        definitions, symbols = _ast_inventory(source)
+        if not definitions:
+            raise RuntimeError(
+                f"{cid}: genome-realization artifact has no AST definitions: {artifact}")
         census[artifact] = {
             "path": os.path.relpath(path, ctx.runtime).replace("\\", "/"),
             "sha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
             "bytes": len(source.encode("utf-8")),
-            "symbols": _symbols(source),
-            "source_excerpt": source[:220000]}
+            "definitions": definitions,
+            "symbols": symbols,
+            "source_excerpt": source[:SOURCE_EXCERPT_LIMIT]}
     return census
 
 
@@ -157,25 +165,63 @@ def _invariant_ids(ctx, cid):
     return ids
 
 
+def _evidence_group(path):
+    name = os.path.basename(path).lower()
+    if name.startswith("systems-"):
+        return "systems"
+    if name.startswith("distributed-"):
+        return "distributed"
+    if name.startswith("scale-"):
+        return "scale"
+    if name.startswith("formal-"):
+        return "formal"
+    if name.startswith("interoperability-"):
+        return "interoperability"
+    if name.startswith("cross-model-"):
+        return "cross_model"
+    if ("observatory-hidden-" in name or "visible" in name
+            or "fidelity" in name or "implementation-search" in name):
+        return "semantic"
+    return "other"
+
+
 def _evidence_catalog(ctx, cid):
     paths = set()
     reports_root = A(ctx, "reports", "x")[:-1]
+    candidate_reports = []
     if os.path.isdir(reports_root):
         for path in glob.glob(os.path.join(reports_root, "*.json")):
             if cid in os.path.basename(path):
                 paths.add(path)
+                candidate_reports.append(path)
     for path in (
             A(ctx, "candidates", "implementation-search.json"),
             A(ctx, "frontier", f"members-round{ctx.round}.json")):
         if os.path.isfile(path):
             paths.add(path)
+    if not candidate_reports:
+        raise RuntimeError(f"{cid}: no candidate-specific executable reports exist")
     catalog = {}
     for path in sorted(paths):
         relative = os.path.relpath(path, ctx.runtime).replace("\\", "/")
-        catalog[relative] = {"path": relative, "sha256": sha256_file(path),
-                             "bytes": os.path.getsize(path)}
-    if not catalog:
-        raise RuntimeError(f"{cid}: no persisted executable evidence available")
+        row = {"path": relative, "sha256": sha256_file(path),
+               "bytes": os.path.getsize(path),
+               "group": _evidence_group(path)}
+        try:
+            parsed = read_json(path)
+        except Exception:
+            parsed = None
+        if isinstance(parsed, dict):
+            row["status"] = parsed.get("status")
+            row["passed"] = parsed.get("passed")
+        catalog[relative] = row
+    required_groups = {
+        group for groups in REQUIRED_GROUPS.values() for group in groups}
+    available_groups = {row["group"] for row in catalog.values()}
+    missing = sorted(required_groups - available_groups)
+    if missing:
+        raise RuntimeError(
+            f"{cid}: persisted evidence lacks required groups: {', '.join(missing)}")
     return catalog
 
 
@@ -200,7 +246,8 @@ def _validate(ctx, cid, report, census, invariants, evidence):
     reviews = report.get("axis_reviews") or []
     by_axis = {row.get("axis"): row for row in reviews}
     if len(by_axis) != len(reviews) or set(by_axis) != set(oroles.GENOME_FIELDS):
-        raise RuntimeError("genome-realization auditor did not review every axis exactly once")
+        raise RuntimeError(
+            "genome-realization auditor did not review every axis exactly once")
     genome = ctx.candidates[cid].get("genome") or {}
     validated = []
     for axis in oroles.GENOME_FIELDS:
@@ -213,37 +260,62 @@ def _validate(ctx, cid, report, census, invariants, evidence):
         cited_groups = set()
         verified_symbols = []
         for citation in row.get("source_symbols") or []:
-            artifact = citation["artifact"]; symbol = citation["symbol"]
-            if symbol not in set(census[artifact]["symbols"]):
+            artifact = citation["artifact"]
+            symbol = citation["symbol"]
+            if symbol not in set(census[artifact]["definitions"]):
                 raise RuntimeError(
-                    f"{cid}/{axis}: invented source symbol {artifact}:{symbol}")
-            group = _artifact_group(artifact); cited_groups.add(group)
-            if group in ("semantic", "systems", "distributed", "scale", "interoperability"):
-                cited_groups.add("executable")
-            verified_symbols.append({"artifact": artifact, "symbol": symbol})
+                    f"{cid}/{axis}: citation is not a real AST definition "
+                    f"{artifact}:{symbol}")
+            group = _artifact_group(artifact)
+            cited_groups.add(group)
+            verified_symbols.append({
+                "artifact": artifact, "symbol": symbol,
+                "source_sha256": census[artifact]["sha256"]})
         missing_groups = sorted(set(REQUIRED_GROUPS[axis]) - cited_groups)
         if missing_groups:
             raise RuntimeError(
-                f"{cid}/{axis}: missing required artifact groups: {', '.join(missing_groups)}")
-        cited_invariants = set(str(value) for value in row.get("invariant_ids") or [])
+                f"{cid}/{axis}: missing required source groups: "
+                + ", ".join(missing_groups))
+        cited_invariants = set(
+            str(value) for value in row.get("invariant_ids") or [])
         unknown = sorted(cited_invariants - invariants)
         if unknown or not cited_invariants:
-            raise RuntimeError(f"{cid}/{axis}: invented or absent INV-* citations: {unknown}")
+            raise RuntimeError(
+                f"{cid}/{axis}: invented or absent INV-* citations: {unknown}")
         verified_evidence = []
+        evidence_groups = set()
         for reference in row.get("evidence_refs") or []:
             if reference not in evidence:
-                raise RuntimeError(f"{cid}/{axis}: nonexistent evidence path {reference}")
+                raise RuntimeError(
+                    f"{cid}/{axis}: nonexistent evidence path {reference}")
             verified_evidence.append(evidence[reference])
-        validated.append({"axis": axis, "class": expected,
-                          "verified_symbols": verified_symbols,
-                          "verified_invariant_ids": sorted(cited_invariants),
-                          "verified_evidence": verified_evidence,
-                          "removal_failure": row["removal_failure"],
-                          "falsifier": row["falsifier"]})
+            evidence_groups.add(evidence[reference]["group"])
+        missing_evidence_groups = sorted(
+            set(REQUIRED_GROUPS[axis]) - evidence_groups)
+        if missing_evidence_groups:
+            raise RuntimeError(
+                f"{cid}/{axis}: missing required evidence groups: "
+                + ", ".join(missing_evidence_groups))
+        validated.append({
+            "axis": axis, "class": expected,
+            "verified_symbols": verified_symbols,
+            "verified_invariant_ids": sorted(cited_invariants),
+            "verified_evidence": verified_evidence,
+            "removal_failure": row["removal_failure"],
+            "falsifier": row["falsifier"]})
     if report.get("overall_pass") is not True \
             or report.get("architecture_level_blockers"):
-        raise RuntimeError(f"{cid}: architecture-level realization audit did not pass")
+        raise RuntimeError(
+            f"{cid}: architecture-level realization audit did not pass")
     return validated
+
+
+def _passes(report):
+    return (isinstance(report, dict)
+            and report.get("status") == "PASS"
+            and report.get("passed") is True
+            and report.get("consensus") is True
+            and report.get("all_axes_realized") is True)
 
 
 def _audit(ctx, cid, label):
@@ -251,49 +323,82 @@ def _audit(ctx, cid, label):
     invariants = _invariant_ids(ctx, cid)
     evidence = _evidence_catalog(ctx, cid)
     genome = ctx.candidates[cid].get("genome") or {}
-    contract = open(os.path.join(ctx.profile_pkg, "GENOME-REALIZATION-CONTRACT.md"),
-                    encoding="utf-8").read()
+    contract_path = os.path.join(
+        ctx.profile_pkg, "GENOME-REALIZATION-CONTRACT.md")
+    contract = open(contract_path, encoding="utf-8").read()
+    prompt_census = {
+        key: {
+            "path": value["path"],
+            "sha256": value["sha256"],
+            "definitions": value["definitions"],
+            "symbols": value["symbols"],
+            "source_excerpt": value["source_excerpt"],
+        }
+        for key, value in census.items()
+    }
     reports = []
     for tag in AUDITORS:
         logical_id, report, _, _ = ctx.ask(
             f"genome-realization-auditor-{tag}",
             f"OBS-GENOME-REALIZATION-{label}-{tag}::{cid}",
             "Prove or refute whether every controlled genome axis is genuinely realized in the "
-            "actual source artifacts and executable evidence. Cite only AST symbols, INV-* IDs and "
-            "runtime evidence paths supplied below. A label, constant, comment or family name alone "
-            "is never enough. Return every axis exactly once and fail closed on uncertainty.",
+            "actual source artifacts and executable evidence. Cite only AST definitions, INV-* IDs "
+            "and runtime evidence paths supplied below. A label, constant, imported name, comment "
+            "or family name alone is never enough. Return every axis exactly once, cite every "
+            "required source/evidence group and fail closed on uncertainty.",
             [("CONTROLLED GENOME", json.dumps(genome, ensure_ascii=False)),
              ("COMPLETE BLUEPRINT", json.dumps(
-                 ctx.candidates[cid].get("blueprint") or {}, ensure_ascii=False)),
+                 ctx.candidates[cid].get("blueprint") or {},
+                 ensure_ascii=False)),
              ("FORMALIZATION", json.dumps(
-                 ctx.candidates[cid].get("formalization") or {}, ensure_ascii=False)),
-             ("AST SOURCE CENSUS", json.dumps({key: {
-                 "path": value["path"], "sha256": value["sha256"],
-                 "symbols": value["symbols"], "source_excerpt": value["source_excerpt"]}
-                 for key, value in census.items()}, ensure_ascii=False)[:900000]),
+                 ctx.candidates[cid].get("formalization") or {},
+                 ensure_ascii=False)),
+             ("AST SOURCE CENSUS", json.dumps(
+                 prompt_census, ensure_ascii=False)),
              ("PERSISTED EVIDENCE CATALOG", json.dumps(
                  list(evidence.values()), ensure_ascii=False)),
              ("GENOME REALIZATION CONTRACT", contract)],
             AUDIT_SCHEMA, line="successor", temperature=0.0)
-        validated = _validate(ctx, cid, report, census, invariants, evidence)
-        reports.append({"auditor": tag, "logical_id": logical_id,
-                        "report": report, "validated_axes": validated,
-                        "report_sha256": sha256_obj(report)})
-    consensus = all(len(row["validated_axes"]) == len(oroles.GENOME_FIELDS)
-                    for row in reports)
-    artifact = {"candidate_id": cid, "label": label,
-                "genome_sha256": sha256_obj(genome),
-                "source_census": {key: {k: v for k, v in value.items()
-                                        if k != "source_excerpt"}
-                                  for key, value in census.items()},
-                "evidence_catalog": list(evidence.values()),
-                "auditors": reports, "consensus": consensus,
-                "all_axes_realized": consensus,
-                "contract_sha256": sha256_file(os.path.join(
-                    ctx.profile_pkg, "GENOME-REALIZATION-CONTRACT.md"))}
+        validated = _validate(
+            ctx, cid, report, census, invariants, evidence)
+        reports.append({
+            "auditor": tag,
+            "auditor_id": report["auditor_id"],
+            "logical_id": logical_id,
+            "report": report,
+            "validated_axes": validated,
+            "report_sha256": sha256_obj(report)})
+    independent = (
+        len(reports) == len(AUDITORS)
+        and len({row["auditor_id"] for row in reports}) == len(AUDITORS)
+        and len({row["logical_id"] for row in reports}) == len(AUDITORS)
+        and len({row["report_sha256"] for row in reports}) == len(AUDITORS))
+    consensus = independent and all(
+        len(row["validated_axes"]) == len(oroles.GENOME_FIELDS)
+        for row in reports)
     path = A(ctx, "architecture", f"genome-realization-{label}-{cid}.json")
+    relative = os.path.relpath(path, ctx.runtime).replace("\\", "/")
+    artifact = {
+        "status": "PASS" if consensus else "FAIL",
+        "passed": consensus,
+        "candidate_id": cid,
+        "label": label,
+        "genome_sha256": sha256_obj(genome),
+        "source_census": {
+            key: {k: v for k, v in value.items()
+                  if k != "source_excerpt"}
+            for key, value in census.items()},
+        "evidence_catalog": list(evidence.values()),
+        "auditors": reports,
+        "independent_auditors": independent,
+        "consensus": consensus,
+        "all_axes_realized": consensus,
+        "verified_axis_count": (
+            len(oroles.GENOME_FIELDS) if consensus else 0),
+        "contract_sha256": sha256_file(contract_path),
+        "evidence_path": relative,
+    }
     atomic_write_json(path, artifact)
-    artifact["evidence_path"] = os.path.relpath(path, ctx.runtime).replace("\\", "/")
     return artifact
 
 
@@ -304,22 +409,25 @@ def _install_ledger(ctx):
     original_summary = ctx.esc.supremacy_summary
 
     def conditions(self):
-        result = original_conditions(); incumbent = self.s.get("incumbent")
+        result = original_conditions()
+        incumbent = self.s.get("incumbent")
         scores = (ctx.scores.get(incumbent) or {}) if incumbent else {}
         result.update({
-            "genome_realization_proven": bool((scores.get(
-                "genome_realization_qualification") or {}).get("consensus") is True),
-            "genome_realization_replication_passed": bool((scores.get(
-                "genome_realization_replication") or {}).get("consensus") is True),
-            "genome_realization_crown_passed": bool((scores.get(
-                "genome_realization_crown") or {}).get("consensus") is True)})
+            "genome_realization_proven": _passes(scores.get(
+                "genome_realization_qualification")),
+            "genome_realization_replication_passed": _passes(scores.get(
+                "genome_realization_replication")),
+            "genome_realization_crown_passed": _passes(scores.get(
+                "genome_realization_crown"))})
         return result
 
     def summary(self):
-        result = original_summary(); result.update(conditions(self))
-        result.update({"genome_realization_auditors": len(AUDITORS),
-                       "genome_realization_axes": len(oroles.GENOME_FIELDS),
-                       "genome_realization_contract": "GENOME-REALIZATION-CONTRACT.md"})
+        result = original_summary()
+        result.update(conditions(self))
+        result.update({
+            "genome_realization_auditors": len(AUDITORS),
+            "genome_realization_axes": len(oroles.GENOME_FIELDS),
+            "genome_realization_contract": "GENOME-REALIZATION-CONTRACT.md"})
         return result
 
     ctx.esc._supremacy_conditions = MethodType(conditions, ctx.esc)
@@ -349,16 +457,20 @@ def _filter(ctx, score_key, reason):
         if member.get("status") != "ACTIVE":
             continue
         report = (ctx.scores.get(cid) or {}).get(score_key) or {}
-        if report.get("consensus") is not True:
+        if not _passes(report):
             member["status"] = "REJECTED_GENOME_REALIZATION"
-            member["reason"] = reason; rejected.append(cid)
+            member["reason"] = reason
+            rejected.append(cid)
     if not ctx.frontier.non_dominated():
-        raise RuntimeError("no candidate survived executable genome-realization audit")
-    ctx._save_arena(); return rejected
+        raise RuntimeError(
+            "no candidate survived executable genome-realization audit")
+    ctx._save_arena()
+    return rejected
 
 
 def install(ctx, handlers):
-    _install_ledger(ctx); out = dict(handlers)
+    _install_ledger(ctx)
+    out = dict(handlers)
     original_vector = ctx.dimension_vector
 
     def dimension_vector(self, cid, hidden_rep, fidelity_rep=None):
@@ -366,32 +478,41 @@ def install(ctx, handlers):
         report = (self.scores.get(cid) or {}).get(
             "genome_realization_qualification") or {}
         vector["genome_realization_survival"] = (
-            1.0 if report.get("consensus") is True else 0.0)
+            1.0 if _passes(report) else 0.0)
         return vector
 
     ctx.dimension_vector = MethodType(dimension_vector, ctx)
     original_private = out["PRIVATE_QUALIFICATION"]
 
     def private_qualification(machine):
-        path = original_private(machine); artifact = read_json(path); rows = []
+        path = original_private(machine)
+        artifact = read_json(path)
+        rows = []
         for cid in sorted(ctx.candidates):
             report = _audit(ctx, cid, "qualification")
             ctx.record_score(cid, "genome_realization_qualification", report)
-            rows.append({"candidate_id": cid, "passed": report["consensus"],
-                         "evidence_path": report["evidence_path"]})
+            rows.append({
+                "candidate_id": cid,
+                "passed": _passes(report),
+                "evidence_path": report["evidence_path"]})
         if len([row for row in rows if row["passed"]]) < 2:
-            raise RuntimeError("fewer than two architectures survived genome realization")
-        artifact["genome_realization"] = rows; atomic_write_json(path, artifact)
+            raise RuntimeError(
+                "fewer than two architectures survived genome realization")
+        artifact["genome_realization"] = rows
+        atomic_write_json(path, artifact)
         return path
 
     out["PRIVATE_QUALIFICATION"] = private_qualification
     original_provisional = out["PROVISIONAL_FRONTIER_MEMBER"]
 
     def provisional(machine):
-        path = original_provisional(machine); artifact = read_json(path)
+        path = original_provisional(machine)
+        artifact = read_json(path)
         artifact["genome_realization_rejected"] = _filter(
-            ctx, "genome_realization_qualification", "genome realization failed")
-        artifact["members"] = ctx.frontier.report(); atomic_write_json(path, artifact)
+            ctx, "genome_realization_qualification",
+            "genome realization failed")
+        artifact["members"] = ctx.frontier.report()
+        atomic_write_json(path, artifact)
         return path
 
     out["PROVISIONAL_FRONTIER_MEMBER"] = provisional
@@ -400,41 +521,54 @@ def install(ctx, handlers):
     def round_build(context, idea, cid, kind, ticket):
         result = original_round(context, idea, cid, kind, ticket)
         report = _audit(context, cid, "qualification")
-        context.record_score(cid, "genome_realization_qualification", report)
-        if report.get("consensus") is not True:
-            raise RuntimeError(f"{cid}: executable genome realization failed")
+        context.record_score(
+            cid, "genome_realization_qualification", report)
+        if not _passes(report):
+            raise RuntimeError(
+                f"{cid}: executable genome realization failed")
         return result
 
     crownmod._build_round_candidate = round_build
     original_frontier = out["FRONTIER_REVIEW"]
 
     def frontier_review(machine):
-        path = original_frontier(machine); artifact = read_json(path)
+        path = original_frontier(machine)
+        artifact = read_json(path)
         artifact["genome_realization_rejected"] = _filter(
             ctx, "genome_realization_qualification",
             "round candidate genome realization failed")
-        artifact["statuses"] = {key: value["status"]
-                                for key, value in ctx.frontier.report().items()}
-        atomic_write_json(path, artifact); return path
+        artifact["statuses"] = {
+            key: value["status"]
+            for key, value in ctx.frontier.report().items()}
+        atomic_write_json(path, artifact)
+        return path
 
     out["FRONTIER_REVIEW"] = frontier_review
     original_replication = out["PRIVATE_REPLICATION"]
 
     def private_replication(machine):
-        path = original_replication(machine); artifact = read_json(path); rows = []
+        path = original_replication(machine)
+        artifact = read_json(path)
+        rows = []
         for cid in artifact.get("finalists") or []:
             report = _audit(ctx, cid, "replication")
             ctx.record_score(cid, "genome_realization_replication", report)
-            passed = report.get("consensus") is True
-            rows.append({"candidate_id": cid, "passed": passed,
-                         "evidence_path": report.get("evidence_path")})
+            passed = _passes(report)
+            rows.append({
+                "candidate_id": cid, "passed": passed,
+                "evidence_path": report.get("evidence_path")})
             if not passed and cid in ctx.frontier.members:
-                ctx.frontier.members[cid]["status"] = "REJECTED_GENOME_REALIZATION_REPLICATION"
-                ctx.frontier.members[cid]["reason"] = "genome realization replication failed"
+                ctx.frontier.members[cid][
+                    "status"] = "REJECTED_GENOME_REALIZATION_REPLICATION"
+                ctx.frontier.members[cid][
+                    "reason"] = "genome realization replication failed"
         if not ctx.frontier.non_dominated():
-            raise RuntimeError("all finalists failed genome realization replication")
-        ctx._save_arena(); artifact["genome_realization_replication"] = rows
-        atomic_write_json(path, artifact); return path
+            raise RuntimeError(
+                "all finalists failed genome realization replication")
+        ctx._save_arena()
+        artifact["genome_realization_replication"] = rows
+        atomic_write_json(path, artifact)
+        return path
 
     out["PRIVATE_REPLICATION"] = private_replication
     original_systems = crownmod._run_systems
@@ -443,10 +577,12 @@ def install(ctx, handlers):
         report = original_systems(context, cid, label, events)
         if label == "crown":
             realization = _audit(context, cid, "crown")
-            context.record_score(cid, "genome_realization_crown", realization)
+            context.record_score(
+                cid, "genome_realization_crown", realization)
             report["genome_realization_crown"] = realization
-            if realization.get("consensus") is not True:
-                report["status"] = "FAIL"; report["passed"] = False
+            if not _passes(realization):
+                report["status"] = "FAIL"
+                report["passed"] = False
                 report["genome_realization_failure"] = True
         return report
 
@@ -454,13 +590,15 @@ def install(ctx, handlers):
     original_synthesis = out["ARCHITECTURE_EVIDENCE_SYNTHESIS"]
 
     def synthesis(machine):
-        path = original_synthesis(machine); artifact = read_json(path)
+        path = original_synthesis(machine)
+        artifact = read_json(path)
         winner = artifact.get("candidate_id")
         report = ((ctx.scores.get(winner) or {}).get(
             "genome_realization_crown") or {}) if winner else {}
         artifact["genome_realization_crown"] = report
-        artifact["genome_realization_crown_passed"] = report.get("consensus") is True
-        atomic_write_json(path, artifact); return path
+        artifact["genome_realization_crown_passed"] = _passes(report)
+        atomic_write_json(path, artifact)
+        return path
 
     out["ARCHITECTURE_EVIDENCE_SYNTHESIS"] = synthesis
     return out
