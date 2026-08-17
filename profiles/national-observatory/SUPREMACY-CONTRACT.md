@@ -1,4 +1,4 @@
-# NATIONAL LEGAL OBSERVATORY — SUPREMACY CONTRACT v1
+# NATIONAL LEGAL OBSERVATORY — SUPREMACY CONTRACT v2
 
 ## 1. Immutable objective
 
@@ -42,7 +42,7 @@ Architecture-family diversity is measured by load-bearing structure, never by na
 12. governance/evolution model;
 13. scaling/partition model.
 
-Candidates may declare additional structural axes. Two named families that differ on fewer than two load-bearing genome axes are one structural family for design-space accounting unless executable evidence demonstrates otherwise.
+Candidates may declare additional structural axes. Two named families that differ on fewer than two load-bearing genome axes are one structural family for design-space accounting unless executable evidence demonstrates otherwise. Canonical design-space identity is derived from the ordered controlled class vector; explanatory wording does not create novelty.
 
 ## 6. Search-forest obligation
 
@@ -97,7 +97,9 @@ The protocol must distinguish a bad implementation from an unattainable requirem
 
 "Unknown source no actor knows exists" cannot be turned into proven omniscience. "One canonical truth" does not excuse pretending distributed consistency has no failure model. Identity ambiguity cannot always be guessed away. Honest impossibility statements strengthen rather than weaken the final architecture.
 
-## 13. Design-space saturation
+## 13. Active design-space saturation
+
+The binding operational definition is `NOVELTY-SEARCH-CONTRACT.md`.
 
 COMMITTED is forbidden merely because:
 
@@ -106,9 +108,14 @@ COMMITTED is forbidden merely because:
 - a fixed number of rounds elapsed;
 - money/time was exhausted;
 - every known family name was attempted;
+- existing challengers repeated old controlled genomes;
 - a model or owner called a result state of the art.
 
-A supremacy terminal requires evidence that repeated independent search waves stopped producing new load-bearing genomes; radical and anti-attractor challengers failed; recombinations failed to dominate; simplification could not match the incumbent with less trusted complexity; both proof arenas passed; independent destroyers found no surviving blocking defect; lower-bound analysis has no unresolved attainable improvement; and the final holdout/audit remain clean.
+Every candidate saturation wave must actively execute all six CP2-direct-blind novelty methods: assumption inversion, morphological-gap search, cross-domain structural transfer, surgical genome mutation, trusted-boundary recutting and ontology/taxonomy challenge.
+
+A wave is not dry unless all six methods completed, no unseen controlled genome appeared, no new genome was admitted, no deferred genome remains, no constructibility question is unresolved and no direct prior-CP2 content was exposed. Three consecutive genuinely dry waves are mandatory. Any new genome, backlog, unresolved build or missing method resets the count.
+
+A supremacy terminal additionally requires that radical and anti-attractor challengers failed; recombinations failed to dominate; simplification could not match the incumbent with less trusted complexity; both proof arenas passed; independent destroyers found no surviving blocking defect; lower-bound analysis has no unresolved attainable improvement; and the final holdout/audit remain clean.
 
 If resources or external constraints stop the search before those conditions close, the only valid label is BEST_DISCOVERED_SO_FAR.
 
