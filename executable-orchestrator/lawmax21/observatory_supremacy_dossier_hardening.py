@@ -54,9 +54,10 @@ def install(_ctx, handlers):
              "candidate_arena", rows, parsed)
         v0_row, _ = _add(context, A(context, "gates", "v0_subject.json"),
                          "owner_v0_subject", rows, parsed)
-        v1_row, _ = _add(
-            context, A(context, "architecture", "target_v1_evidence_revised.json"),
-            "owner_v1_subject", rows, parsed)
+        _add(context, A(context, "architecture", "target_v1_evidence_revised.json"),
+             "evidence_revised_target_v1", rows, parsed)
+        v1_row, _ = _add(context, A(context, "gates", "v1_subject.json"),
+                         "owner_v1_subject", rows, parsed)
         migration_row, _ = _add(
             context, A(context, "architecture", "migration_plan.json"),
             "owner_migration_subject", rows, parsed)
