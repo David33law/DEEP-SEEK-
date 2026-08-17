@@ -9,6 +9,14 @@ from .handlers import A, tree_hash
 from . import observatory_novelty_overlay
 
 
+# Six miners × six seeds. No structurally new, nonduplicate seed is deferred merely to economize
+# model calls; only failed construction remains backlog.
+observatory_novelty_overlay.NOVELTY_BUILD_LIMIT = (
+    len(observatory_novelty_overlay.NOVELTY_METHODS)
+    * observatory_novelty_overlay.NOVELTY_SEEDS_PER_METHOD
+)
+
+
 def install(ctx, handlers):
     """Install active novelty saturation, then replace the LAWMAX currency-specific audit."""
     out = observatory_novelty_overlay.install(ctx, handlers)
@@ -46,6 +54,8 @@ def install(ctx, handlers):
                 "open_backlog": supremacy.get("novelty_open_backlog", 0),
                 "unresolved": supremacy.get("novelty_unresolved", 0),
                 "genome_saturated": supremacy.get("genome_saturated", False),
+                "build_limit": observatory_novelty_overlay.NOVELTY_BUILD_LIMIT,
+                "economy_deferral_allowed": False,
             },
         })
         return p
