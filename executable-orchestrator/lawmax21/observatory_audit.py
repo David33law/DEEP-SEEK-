@@ -87,7 +87,7 @@ def install(ctx, handlers):
                 "auditor_fact_reproduction_required": True,
                 "model_blocking_flag_not_authoritative": True,
                 "taxonomy_consensus_required": 2,
-                "post_resolution_refomalization_required": True,
+                "post_resolution_reformalization_required": True,
             },
         })
         return p
