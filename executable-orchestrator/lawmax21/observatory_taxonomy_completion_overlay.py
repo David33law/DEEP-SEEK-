@@ -10,7 +10,6 @@ that consensus operational at the two earliest architecture boundaries:
 
 A genuine extension or adjudicator disagreement remains blocking. Prior CP2 content is never read.
 """
-import json
 import os
 
 from . import observatory_meta_hardening_overlay as hardening
@@ -55,7 +54,7 @@ def install(ctx, handlers):
                 ctx, proposal, formal, {
                     **forest_summary,
                     "taxonomy_resolution_ids": resolution_ids,
-                    "phase": "post-taxonomy-v0-refomalization",
+                    "phase": "post-taxonomy-v0-reformalization",
                 })
             proposal["formalization"] = formal
             proposal["formalization_logical_id"] = formal_lid
@@ -63,7 +62,7 @@ def install(ctx, handlers):
             proposal["prebuild_destroyer"] = destroy
             proposal["prebuild_destroyer_logical_id"] = destroy_lid
             proposal["prebuild_destroyer_sha256"] = sha256_obj(destroy)
-            proposal["post_taxonomy_refomalized"] = True
+            proposal["post_taxonomy_reformalized"] = True
             normalized_ids.append(
                 novelty.controlled_genome_id(proposal.get("genome") or {}))
             changed = True
