@@ -1,17 +1,8 @@
 """DeepSeek client. Real HTTP, real usage accounting, honest identity for every request.
 
-v2.0 keyed its cache on (role, ticket, context_hash) — so a different question with the
-same ticket was served a stale answer, and the dry-run advertised that as a passing
-"replay test". Here the logical id covers the ENTIRE request: protocol version, endpoint,
-model, system-prompt hash, context-package hash, role, ticket and the canonical request
-body. Two requests share an id only when they are byte-identical in every dimension that
-could change the answer.
-
-Order is fixed and load-bearing:
-    reserve budget -> write raw request -> send -> write raw response -> parse
-                   -> validate against the caller's schema -> settle budget
-A crash anywhere leaves the raw bytes on disk, so `--resume` can always see exactly what
-was asked and what came back.
+The logical id covers the entire identity-bearing request. Budget is reserved before a byte leaves
+the machine and settled only from provider-reported usage. Historical LAWMAX pricing remains
+supported, while currency-explicit profiles can freeze cache-hit/cache-miss/output price schedules.
 """
 import json
 import os
@@ -31,15 +22,48 @@ class StructuredOutputRejected(Exception):
     pass
 
 
-# Conservative accounting rate used by the historical LAWMAX contract. Profile-specific
-# callers may supply a different frozen price table when the owner chooses one for a run.
+# Historical LAWMAX contract. New provider profiles should pass a signed, currency-explicit table.
 DEFAULT_PRICES = {"input_eur_per_mtok": 0.55, "output_eur_per_mtok": 2.19}
 
 
+def normalize_prices(prices):
+    p = dict(prices or DEFAULT_PRICES)
+    if "input_eur_per_mtok" in p or "output_eur_per_mtok" in p:
+        if "input_eur_per_mtok" not in p or "output_eur_per_mtok" not in p:
+            raise ValueError("legacy price table requires both input_eur_per_mtok and output_eur_per_mtok")
+        return {
+            "currency": "EUR",
+            "input_cache_hit_per_mtok": float(p["input_eur_per_mtok"]),
+            "input_cache_miss_per_mtok": float(p["input_eur_per_mtok"]),
+            "output_per_mtok": float(p["output_eur_per_mtok"]),
+            "require_cache_split": False,
+            "model": p.get("model"),
+            "source": p.get("source"),
+        }
+
+    required = ("currency", "input_cache_hit_per_mtok",
+                "input_cache_miss_per_mtok", "output_per_mtok")
+    missing = [k for k in required if k not in p]
+    if missing:
+        raise ValueError(f"currency-explicit price table missing: {missing}")
+    out = {
+        "currency": str(p["currency"]).upper(),
+        "input_cache_hit_per_mtok": float(p["input_cache_hit_per_mtok"]),
+        "input_cache_miss_per_mtok": float(p["input_cache_miss_per_mtok"]),
+        "output_per_mtok": float(p["output_per_mtok"]),
+        "require_cache_split": bool(p.get("require_cache_split", True)),
+        "model": p.get("model"),
+        "source": p.get("source"),
+        "verified_date": p.get("verified_date"),
+    }
+    if any(out[k] < 0 for k in ("input_cache_hit_per_mtok",
+                                 "input_cache_miss_per_mtok", "output_per_mtok")):
+        raise ValueError("price table contains a negative rate")
+    return out
+
+
 class HttpTransport:
-    """The only transport used by --launch. It cannot be swapped at runtime by a flag:
-    orchestrator.py constructs it from frozen config, and the mock server is reached by
-    pointing `endpoint` at localhost — same code path, same parsing, same accounting."""
+    """The only transport used by --launch."""
 
     def __init__(self, endpoint, model, api_key_env="DEEPSEEK_API_KEY", timeout=180):
         self.endpoint, self.model, self.key_env, self.timeout = endpoint, model, api_key_env, timeout
@@ -68,7 +92,7 @@ class HttpTransport:
 
 
 def extract_content(response_obj):
-    """Pull the assistant message out of a real chat-completion envelope."""
+    """Pull the assistant final answer out of a chat-completion envelope."""
     try:
         choice = response_obj["choices"][0]
     except (KeyError, IndexError, TypeError):
@@ -110,17 +134,48 @@ def extract_json_object(text):
 
 
 def extract_usage(response_obj, prices):
+    p = normalize_prices(prices)
     u = response_obj.get("usage") or {}
     pt = u.get("prompt_tokens")
     ct = u.get("completion_tokens")
     if pt is None or ct is None:
         raise ApiError("response carries no usage.prompt_tokens/completion_tokens — "
                        "cost cannot be accounted, so the call is not admissible")
-    eur = (pt / 1e6) * prices["input_eur_per_mtok"] + (ct / 1e6) * prices["output_eur_per_mtok"]
-    return {"prompt_tokens": pt, "completion_tokens": ct,
-            "total_tokens": u.get("total_tokens", pt + ct),
-            "cached_tokens": (u.get("prompt_tokens_details") or {}).get("cached_tokens", 0),
-            "eur": round(eur, 6)}
+    pt, ct = int(pt), int(ct)
+
+    hit = u.get("prompt_cache_hit_tokens")
+    miss = u.get("prompt_cache_miss_tokens")
+    if hit is None or miss is None:
+        # Historical response shape used by old LAWMAX mocks/clients. It is acceptable only
+        # for a price table that does not distinguish hit from miss. A V4 production schedule
+        # requires the provider's explicit split so the ledger cannot guess its bill.
+        nested = (u.get("prompt_tokens_details") or {}).get("cached_tokens")
+        if p["require_cache_split"]:
+            raise ApiError("provider usage omitted prompt_cache_hit_tokens/prompt_cache_miss_tokens — "
+                           "currency-explicit cost cannot be settled exactly")
+        hit = int(nested or 0)
+        miss = pt - hit
+    hit, miss = int(hit), int(miss)
+    if hit < 0 or miss < 0 or hit + miss != pt:
+        raise ApiError(
+            f"provider cache accounting inconsistent: hit={hit}, miss={miss}, prompt={pt}")
+
+    amount = ((hit / 1e6) * p["input_cache_hit_per_mtok"]
+              + (miss / 1e6) * p["input_cache_miss_per_mtok"]
+              + (ct / 1e6) * p["output_per_mtok"])
+    usage = {
+        "prompt_tokens": pt,
+        "completion_tokens": ct,
+        "total_tokens": int(u.get("total_tokens", pt + ct)),
+        "prompt_cache_hit_tokens": hit,
+        "prompt_cache_miss_tokens": miss,
+        "reasoning_tokens": int((u.get("completion_tokens_details") or {}).get("reasoning_tokens", 0) or 0),
+        "billing_currency": p["currency"],
+        "billing_amount": round(amount, 9),
+    }
+    if p["currency"] == "EUR":
+        usage["eur"] = usage["billing_amount"]  # historical readers remain byte-compatible in meaning
+    return usage
 
 
 class Client:
@@ -133,15 +188,17 @@ class Client:
         self.log = log
         self.system_prompt = system_prompt
         self.system_sha = sha256_bytes(system_prompt.encode("utf-8"))
-        self.prices = dict(prices or DEFAULT_PRICES)
+        self.prices = normalize_prices(prices or DEFAULT_PRICES)
         self.max_technical_retries = max_technical_retries
         self.tpc = estimate_tokens_per_char
         self.request_defaults = dict(request_defaults or {})
         self.default_max_tokens = int(default_max_tokens)
         if self.default_max_tokens <= 0:
             raise ValueError("default_max_tokens must be positive")
-        # The profile may add provider request fields (for example thinking policy), but it
-        # must never be able to override identity-bearing core fields assembled per call.
+        if getattr(self.ledger, "currency", self.prices["currency"]) != self.prices["currency"]:
+            raise ValueError(
+                f"budget currency {getattr(self.ledger, 'currency', None)} does not match "
+                f"provider price currency {self.prices['currency']}")
         forbidden = {"model", "messages"} & set(self.request_defaults)
         if forbidden:
             raise ValueError(f"request_defaults may not override core request fields: {sorted(forbidden)}")
@@ -159,6 +216,7 @@ class Client:
             "context_package_sha256": context_package_sha,
             "role": role,
             "ticket": ticket,
+            "price_schedule": self.prices,
             "request": request_body,
         }
 
@@ -174,12 +232,12 @@ class Client:
     def _estimate(self, identity):
         chars = len(canonical_bytes(identity)) + len(self.system_prompt)
         est_in = int(chars * self.tpc)
-        # Reserve against the declared output ceiling, not a fixed 4K guess. A larger
-        # profile-specific ceiling must therefore have budget BEFORE the request can leave.
         est_out = int((identity.get("request") or {}).get("max_tokens") or 4096)
-        eur = (est_in / 1e6) * self.prices["input_eur_per_mtok"] + \
-              (est_out / 1e6) * self.prices["output_eur_per_mtok"]
-        return est_in + est_out, round(eur, 6)
+        # Worst-case pre-call reservation: every estimated input token is a cache MISS and the
+        # model may consume the full declared output ceiling. Actual billing is settled later.
+        amount = ((est_in / 1e6) * self.prices["input_cache_miss_per_mtok"]
+                  + (est_out / 1e6) * self.prices["output_per_mtok"])
+        return est_in + est_out, round(amount, 9)
 
     # ----------------------------------------------------------------- call
     def call(self, role, ticket, context_package_sha, messages, response_schema=None,
@@ -191,9 +249,6 @@ class Client:
         body = dict(self.request_defaults)
         body.update({"model": self.t.model, "max_tokens": ceiling,
                      "messages": [{"role": "system", "content": self.system_prompt}] + messages})
-        # DeepSeek thinking mode ignores temperature. Keep historical LAWMAX byte semantics
-        # unchanged when no explicit thinking policy is present, but omit a meaningless field
-        # for profiles that explicitly enable thinking.
         thinking = body.get("thinking")
         if not (isinstance(thinking, dict) and thinking.get("type") == "enabled"):
             body["temperature"] = temperature
@@ -206,10 +261,9 @@ class Client:
             parsed = self._parse(read_json(resp_p), response_schema, role)
             return lid, parsed, True, meta["usage"]
 
-        est_tokens, est_eur = self._estimate(identity)
-        self.ledger.reserve(lid, role, est_tokens, est_eur, line=line)
+        est_tokens, est_money = self._estimate(identity)
+        self.ledger.reserve(lid, role, est_tokens, est_money, line=line)
 
-        # raw request on disk BEFORE a single byte leaves the machine
         atomic_write_json(req_p, {"logical_id": lid, "utc": utc(), "identity": identity})
 
         try:
@@ -218,7 +272,7 @@ class Client:
                 response_obj = json.loads(raw_text)
             except json.JSONDecodeError:
                 response_obj = {"_non_json_body": raw_text}
-            atomic_write_json(resp_p, response_obj)  # raw response BEFORE parsing
+            atomic_write_json(resp_p, response_obj)
             if status != 200:
                 raise ApiError(f"HTTP {status}: {json.dumps(response_obj)[:400]}")
             usage = extract_usage(response_obj, self.prices)
@@ -230,7 +284,7 @@ class Client:
         atomic_write_json(meta_p, {"logical_id": lid, "role": role, "ticket": ticket,
                                    "utc": utc(), "status": status, "usage": usage,
                                    "identity_sha256": sha256_obj(identity)})
-        self.ledger.settle(lid, usage["total_tokens"], usage["eur"], usage=usage)
+        self.ledger.settle(lid, usage["total_tokens"], usage["billing_amount"], usage=usage)
         if self.log is not None:
             self.log.append("api-call", "deepseek-client",
                             {"logical_id": lid, "role": role, "ticket": ticket,
