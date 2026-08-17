@@ -8,34 +8,34 @@ from .canonical import read_json
 from . import preflight as base
 
 PreflightFailed = base.PreflightFailed
+CONTAINER_IMAGE = "python:3.11-slim"
 
+# Census the entire load-bearing shared control/evaluator surface, not only additive profile files.
+# Owner-local generated artefacts and immutable-package reseals remain governed by their own
+# manifest/signature checks and therefore are intentionally outside this Git cleanliness census.
 OBSERVATORY_SOURCE_PATHS = (
     "profiles/national-observatory",
     "run_observatory.py",
     "setup_observatory.py",
     "benchmark/observatory_reference_candidate.py",
-    "executable-orchestrator/lawmax21/observatory_target.py",
-    "executable-orchestrator/lawmax21/profiles.py",
-    "executable-orchestrator/lawmax21/observatory_roles.py",
-    "executable-orchestrator/lawmax21/observatory_escalation.py",
-    "executable-orchestrator/lawmax21/observatory_runtime.py",
-    "executable-orchestrator/lawmax21/observatory_handlers.py",
-    "executable-orchestrator/lawmax21/observatory_preflight.py",
-    "private-evaluator/evaluator/observatory_casegen.py",
-    "private-evaluator/evaluator/observatory_grade.py",
-    "private-evaluator/evaluator/observatory_host.py",
-    "private-evaluator/evaluator/observatory_harness.py",
-    "private-evaluator/evaluator/observatory_canaries.py",
-    "private-evaluator/evaluator/observatory_bank_builder.py",
-    "private-evaluator/evaluator/observatory_evaluate.py",
+    "executable-orchestrator/orchestrator.py",
+    "executable-orchestrator/lawmax21",
+    "private-evaluator/evaluator",
+    "executable-orchestrator/tools/generate_protocol19.py",
+    "executable-orchestrator/tools/make_manifest.py",
+    "executable-orchestrator/tools/owner_sign.py",
 )
 
 
 def _git(repo, *args):
-    r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True)
+    cmd = ["git"]
+    if os.name == "nt":
+        cmd += ["-c", "core.longpaths=true"]
+    cmd += ["-C", repo, *args]
+    r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
-        raise PreflightFailed(f"git {' '.join(args)} failed for {repo}: {r.stderr.strip()[:500]}")
-    return r.stdout.strip()
+        raise PreflightFailed(f"git {' '.join(args)} failed for {repo}: {(r.stderr or '').strip()[:500]}")
+    return (r.stdout or "").strip()
 
 
 def _find_one(root, name):
@@ -59,26 +59,63 @@ def _profile_paths(root):
 
 
 def _source_integrity(root):
-    """Refuse uncommitted drift in every Observatory load-bearing source path.
-
-    Owner-local files and the historical immutable-package may legitimately be re-sealed by the
-    owner ceremony; they are governed by their own manifest/signature checks. This census is only
-    the additive Observatory code/profile surface.
-    """
+    """Refuse any uncommitted drift in the complete Observatory load-bearing source surface."""
     if not os.path.isdir(os.path.join(root, ".git")):
         raise PreflightFailed("Observatory source root is not a Git checkout; source identity cannot be established")
     status = _git(root, "status", "--porcelain", "--untracked-files=all", "--", *OBSERVATORY_SOURCE_PATHS)
     if status.strip():
-        raise PreflightFailed("uncommitted Observatory source drift detected:\n" + status[:4000])
+        raise PreflightFailed("uncommitted Observatory/shared source drift detected:\n" + status[:4000])
     head = _git(root, "rev-parse", "HEAD")
     profile_tree = _git(root, "rev-parse", "HEAD:profiles/national-observatory")
     return {"head": head, "profile_tree": profile_tree, "tracked_paths": list(OBSERVATORY_SOURCE_PATHS),
             "uncommitted_changes": 0}
 
 
-def run(root, orchestrator_root, runtime, require_vault=True, owner_public=None):
+def _container_probe(root):
+    """Execute one real CandidateHost canary under the exact production container backend.
+
+    The image must already exist locally: preflight is observational and never hides a network
+    pull or other setup mutation. This guarantees an unavailable Docker/Podman engine is detected
+    before the first paid architecture/model call.
+    """
+    evaluator = os.path.join(root, "private-evaluator", "evaluator")
+    if evaluator not in sys.path:
+        sys.path.insert(0, evaluator)
+    import candidate_host
+
+    runtime = candidate_host.container_runtime()
+    if not runtime:
+        raise PreflightFailed(
+            "production backend requires container isolation, but neither podman nor docker info succeeds")
+
+    try:
+        inspected = subprocess.run(
+            [runtime, "image", "inspect", CONTAINER_IMAGE],
+            capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise PreflightFailed(f"container image inspection failed: {exc}") from exc
+    if inspected.returncode != 0:
+        raise PreflightFailed(
+            f"required local container image {CONTAINER_IMAGE!r} is unavailable; "
+            f"run `{runtime} pull {CONTAINER_IMAGE}` before production preflight")
+
+    source = "def detect(case, draft):\n    return []\n"
+    try:
+        host = candidate_host.CandidateHost(source, backend="container", image=CONTAINER_IMAGE, timeout=30)
+        result = host.detect({}, {})
+    except Exception as exc:  # fail closed across runtime/bootstrap/container policy failures
+        raise PreflightFailed(f"production CandidateHost container canary failed: {exc}") from exc
+    if result != []:
+        raise PreflightFailed(f"production CandidateHost canary returned unexpected result: {result!r}")
+    report = host.isolation_report()
+    return {"backend": "container", "runtime": runtime, "image": CONTAINER_IMAGE,
+            "candidate_host_canary": "PASS", "isolation": report}
+
+
+def run(root, orchestrator_root, runtime, require_vault=True, owner_public=None, backend=None):
     problems = []
     source_integrity = {}
+    backend = backend or os.environ.get("OBSERVATORY_BACKEND", "container")
     v = base.check_python()
     if v:
         problems.append(v)
@@ -99,6 +136,15 @@ def run(root, orchestrator_root, runtime, require_vault=True, owner_public=None)
     for name in required_profile:
         if not os.path.isfile(os.path.join(P["profile"], name)):
             problems.append(f"Observatory profile file missing: {name}")
+
+    container_report = {"backend": backend, "candidate_host_canary": "NOT_REQUIRED"}
+    if backend not in ("container", "subprocess"):
+        problems.append(f"unknown Observatory backend: {backend!r}")
+    elif require_vault and backend == "container":
+        try:
+            container_report = _container_probe(root)
+        except PreflightFailed as exc:
+            problems.append(str(exc))
 
     canonical_repo = os.environ.get("OBSERVATORY_CANONICAL_REPO", "")
     cp1_evidence = os.environ.get("OBSERVATORY_CP1_EVIDENCE", "")
@@ -192,6 +238,7 @@ def run(root, orchestrator_root, runtime, require_vault=True, owner_public=None)
         "profile": "national-observatory",
         "python": platform.python_version(),
         "source_integrity": source_integrity,
+        "container_backend": container_report,
         "canonical_target": target_report,
         "cp1_evidence": cp1_evidence or None,
         "prior_cp2": prior_cp2 or None,
