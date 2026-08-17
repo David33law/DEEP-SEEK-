@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Extension of the zero-cost Observatory mock for meta-search and closure roles.
+"""Contract-rich extension of the zero-cost Observatory mock.
 
-The base mock continues to exercise every existing production role. This wrapper adds only the
-responses introduced by ``observatory_meta_search_overlay`` and targeted mechanical-coverage miners.
-It proves control-flow/schema wiring, never architecture quality.
+The base mock continues to exercise the existing production roles. This wrapper adds responses for
+mechanical coverage, meta-search, taxonomy consensus and independent dry-wave closure. It deliberately
+injects one controlled ``other`` claim through G96 so the authoritative proof traverses the real
+taxonomy-adjudication and deferred-normalization path. It proves control flow and schema binding,
+never architecture quality.
 """
 import importlib.util
 import json
@@ -39,8 +41,6 @@ def _targeted_seed(code, index, obligation):
         other, other_cls = obligation["counterpart_axis"], obligation["counterpart_class"]
         genome[axis] = _axis(axis, cls, f"targeted-{code}-{index}")
         genome[other] = _axis(other, other_cls, f"targeted-{code}-{index}")
-    # Make otherwise-identical obligations remain independently classifiable without changing the
-    # required axes. The controlled choice is deterministic and schema-valid.
     pivot = base.GENOME_FIELDS[(index + len(code)) % len(base.GENOME_FIELDS)]
     if not ((obligation.get("axis") == pivot)
             or (obligation.get("counterpart_axis") == pivot)
@@ -103,6 +103,20 @@ def targeted_lineage(prompt):
     }
 
 
+def ontology_lineage(prompt):
+    obj = base.lineage_answer(prompt)
+    # Exercise a real taxonomy challenge. The two independent mock adjudicators below map this
+    # deliberately vague `other` choice to the already-controlled hybrid authority class.
+    first = obj["candidates"][0]
+    first["genome"]["canonical_authority_seat"] = {
+        "class": "other",
+        "detail": (
+            "A rhetorically novel authority seat is proposed without a distinct falsifiable behavior; "
+            "the taxonomy adjudicators must determine whether it is merely the existing hybrid class."),
+    }
+    return obj
+
+
 def meta_critic(prompt, tag):
     return {
         "critic_id": f"META-{tag}",
@@ -116,6 +130,30 @@ def meta_critic(prompt, tag):
         "dynamic_directives": [],
         "taxonomy_observations": [],
         "supports_current_protocol": True,
+    }
+
+
+def taxonomy_adjudicator(prompt):
+    claim = base.context_json(prompt, "taxonomy claim") or {}
+    claim_id = claim.get("claim_id", "0" * 64)
+    raw = str(claim.get("claim") or "")
+    if raw.startswith("other:"):
+        axis = raw.split(":", 1)[1]
+        mapped = "hybrid"
+    else:
+        axis = "canonical_authority_seat"
+        mapped = "hybrid"
+    return {
+        "claim_id": claim_id,
+        "decision": "NON_DISTINCT",
+        "mapped_axis": axis,
+        "mapped_class": mapped,
+        "argument": (
+            "The supplied claim names no behavior outside the existing hybrid controlled class; its "
+            "authority, commit and verification consequences remain fully expressible there."),
+        "falsifier": (
+            "A concrete invariant or executable fault result that cannot be represented by the hybrid "
+            "class would falsify this non-distinction decision and require a signed taxonomy extension."),
     }
 
 
@@ -144,8 +182,13 @@ def answer(prompt):
     role = role_match.group(1).strip() if role_match else "unknown"
     if role == "architecture-search-independent" and base.context_text(prompt, "targeted obligations"):
         return targeted_lineage(prompt)
+    if role == "architecture-search-independent" and re.search(
+            r"lineage\s+G96/ontology-and-taxonomy-challenge", prompt):
+        return ontology_lineage(prompt)
     if role.startswith("novelty-meta-search-critic-"):
         return meta_critic(prompt, role.rsplit("-", 1)[-1])
+    if role.startswith("taxonomy-adjudicator-"):
+        return taxonomy_adjudicator(prompt)
     if role.startswith("novelty-closure-auditor-"):
         return closure_auditor(prompt, role.rsplit("-", 1)[-1])
     return ORIGINAL_ANSWER(prompt)
