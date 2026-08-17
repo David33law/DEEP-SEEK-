@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Final proof entrypoint: extended static protocol proof followed by full v4 E2E."""
+"""Final proof entrypoint: extended static proof followed by hardened full v4 E2E."""
 import json
 import os
 import subprocess
 import sys
 
-import prove_complete_observatory_protocol as base
+import prove_complete_observatory_protocol_hardened as base
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
