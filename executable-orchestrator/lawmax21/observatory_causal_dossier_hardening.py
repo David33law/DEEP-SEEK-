@@ -3,8 +3,9 @@
 The genome-realization report contains the causal receipt hash, but the final public dossier also
 indexes the exact causal campaign bytes directly. This wrapper runs after foundational dossier
 hardening and before the dossier handler is installed. It independently rehashes every mutated source
-and evaluator receipt, checks evaluator-to-source identity, inert controls, auditor obligations and
-load-bearing failures, then adds replication and crown receipts to the evidence index.
+and evaluator receipt, checks evaluator-to-source identity, inert controls, auditor obligations,
+axis-specific failure attribution and load-bearing failures, then adds replication and crown receipts
+to the evidence index.
 """
 from __future__ import annotations
 
@@ -105,17 +106,28 @@ def _verify(ctx, incumbent, label):
             raise RuntimeError(
                 f"supremacy dossier: causal genome {label} inert control failed")
         _verify_execution(ctx, label, row, "negative-control")
+    attributed = 0
     for row in tasks:
+        attribution = row.get("attribution") or {}
         if row.get("auditor_id") not in auditors \
                 or not row.get("axis") \
                 or not row.get("group") \
                 or not row.get("renamed_definitions") \
                 or row.get("causal_failure_observed") is not True \
-                or row.get("observed_candidate_pass") is not False:
+                or row.get("observed_candidate_pass") is not False \
+                or row.get("axis_specific_failure_attributed") is not True \
+                or attribution.get("mode") not in (
+                    "semantic-hard-dimension",
+                    "specialized-failure-signature"):
             raise RuntimeError(
-                f"supremacy dossier: causal genome {label} task did not falsify")
+                f"supremacy dossier: causal genome {label} task did not "
+                "falsify an axis-specific claim")
         _verify_execution(ctx, label, row, "ablation")
-    return genome_path, causal_path, causal
+        attributed += 1
+    if attributed != len(tasks):
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} attribution count drift")
+    return genome_path, causal_path, causal, attributed
 
 
 def install(_ctx, handlers):
@@ -132,7 +144,7 @@ def install(_ctx, handlers):
         existing = {row.get("path") for row in rows}
         receipts = {}
         for label in LABELS:
-            genome_path, causal_path, causal = _verify(
+            genome_path, causal_path, causal, attributed = _verify(
                 context, incumbent, label)
             for evidence_path, evidence_label in (
                     (genome_path, f"genome_realization_{label}"),
@@ -149,6 +161,8 @@ def install(_ctx, handlers):
             receipts[label] = {
                 "status": causal["status"],
                 "tasks_executed": causal["tasks_executed"],
+                "axis_specific_tasks": attributed,
+                "axis_specific_failure_attribution": True,
                 "negative_controls_executed":
                     causal["negative_controls_executed"],
                 "verified_axis_count": causal["verified_axis_count"],
@@ -162,8 +176,12 @@ def install(_ctx, handlers):
         artifact["causal_genome_realization"] = receipts
         artifact.setdefault("search_closure", {})[
             "causal_genome_replication"] = "PASS"
+        artifact.setdefault("search_closure", {})[
+            "axis_specific_causal_replication"] = "PASS"
         artifact.setdefault("crown_summary", {})[
             "causal_genome_crown"] = "PASS"
+        artifact.setdefault("crown_summary", {})[
+            "axis_specific_causal_crown"] = "PASS"
         atomic_write_json(path, artifact)
         return path, artifact
 
