@@ -45,6 +45,13 @@ OBSERVATORY_REQUEST_DEFAULTS = {
     "reasoning_effort": "max",
 }
 OBSERVATORY_DEFAULT_MAX_TOKENS = 384000
+# V4-Pro/MAX calls can legitimately run for minutes. Production therefore waits rather than
+# treating a long inference as a transport failure, and it never automatically re-POSTs an
+# ambiguous request. DeepSeek does not document an idempotency key for /chat/completions; a
+# timeout after the provider accepted a request could otherwise turn one signed budget action
+# into multiple provider charges. Local proof still exercises the same one-attempt path.
+OBSERVATORY_HTTP_TIMEOUT_SECONDS = 1800
+OBSERVATORY_TECHNICAL_RETRIES = 1
 
 
 def _is_local_endpoint(endpoint):
@@ -93,11 +100,13 @@ def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_
     run_key = load_private(run_key_path) if os.path.exists(run_key_path) else generate_private(run_key_path)
     log = EventLog(os.path.join(runtime, "state", "events.jsonl"), signer=run_key)
     ledger = BudgetLedger(os.path.join(runtime, "budget", "ledger.json"), dict(D.budget))
-    transport = HttpTransport(endpoint, model, api_key_env=key_env)
+    transport = HttpTransport(
+        endpoint, model, api_key_env=key_env, timeout=OBSERVATORY_HTTP_TIMEOUT_SECONDS)
     system_prompt = open(PROFILE.master_system_path(root), encoding="utf-8").read()
     client = Client(
         transport, os.path.join(runtime, "raw-api"), ledger, log, system_prompt,
         prices=schedule,
+        max_technical_retries=OBSERVATORY_TECHNICAL_RETRIES,
         request_defaults=OBSERVATORY_REQUEST_DEFAULTS,
         default_max_tokens=OBSERVATORY_DEFAULT_MAX_TOKENS,
     )
