@@ -4,9 +4,9 @@
 The underlying driver retains the readable owner-gate, crash/resume and artifact-verification flow.
 This layer forces the production container backend, requires every final protocol-v5 route in the
 owner-signed census, proves that real-provider runs forbid a finite round cap and treat stagnation as
-search escalation, verifies streaming formal crowns, and independently rechecks source-bound,
-source-diverse and cross-auditor-independent executable-genome qualification, replication and crown
-evidence. It never contacts the real DeepSeek endpoint.
+search escalation, verifies streaming formal crowns, independently rechecks source-bound,
+source-diverse and cross-auditor-independent executable-genome evidence, and verifies the final
+hash-indexed supremacy dossier. It never contacts the real DeepSeek endpoint.
 """
 from __future__ import annotations
 
@@ -21,7 +21,10 @@ GENOME_CONDITIONS = {
     "genome_realization_replication_passed",
     "genome_realization_crown_passed",
 }
-base.EXPECTED_NEW_CONDITIONS.update(GENOME_CONDITIONS)
+DOSSIER_CONDITION = "supremacy_dossier_verified"
+DOSSIER_CLAIM = (
+    "EVIDENCE_SUPPORTED_SUPREMACY_WITHIN_SIGNED_PROTOCOL_AND_TESTED_BOUNDS")
+base.EXPECTED_NEW_CONDITIONS.update(GENOME_CONDITIONS | {DOSSIER_CONDITION})
 base.REQUIRED_PROTOCOL_FILES.update({
     "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md",
     "private-evaluator/evaluator/observatory_formal_arena_v3.py",
@@ -34,6 +37,7 @@ base.REQUIRED_PROTOCOL_FILES.update({
     "executable-orchestrator/lawmax21/observatory_genome_auditor_diversity_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_evidence_binding_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_cross_auditor_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_supremacy_dossier_overlay.py",
     "executable-orchestrator/lawmax21/observatory_setup_v4.py",
     "executable-orchestrator/lawmax21/observatory_preflight_v5.py",
     "executable-orchestrator/tools/mock_observatory_protocol_server.py",
@@ -101,6 +105,65 @@ def _verify_genome_report(path, label, incumbent):
     return report
 
 
+def _verify_dossier(runtime, audit, incumbent, conditions, supremacy):
+    path = os.path.join(
+        runtime, "architecture", "OMEGA-SUPREMACY-DOSSIER.json")
+    if not os.path.isfile(path):
+        raise RuntimeError("deterministic supremacy dossier is missing")
+    dossier = _read(path)
+    if dossier.get("status") != "PASS" or dossier.get("verified") is not True:
+        raise RuntimeError("deterministic supremacy dossier did not pass")
+    if dossier.get("claim_level") != DOSSIER_CLAIM:
+        raise RuntimeError("supremacy dossier uses an unbounded or unsupported claim level")
+    if dossier.get("candidate_id") != incumbent:
+        raise RuntimeError("supremacy dossier is bound to the wrong incumbent")
+    if dossier.get("third_party_endorsement_claimed") is not False:
+        raise RuntimeError("supremacy dossier contains unsupported third-party endorsement")
+    if len(dossier.get("falsifiers") or []) < 3:
+        raise RuntimeError("supremacy dossier is not sufficiently falsifiable")
+    evidence = dossier.get("evidence_index") or []
+    if len(evidence) < 20:
+        raise RuntimeError("supremacy dossier evidence index is unexpectedly small")
+    seen = set()
+    for row in evidence:
+        relative = row.get("path")
+        digest = row.get("sha256")
+        if not isinstance(relative, str) or not relative or relative in seen:
+            raise RuntimeError("supremacy dossier contains missing or duplicate evidence path")
+        seen.add(relative)
+        absolute = os.path.abspath(os.path.join(
+            runtime, *relative.replace("\\", "/").split("/")))
+        runtime_root = os.path.abspath(runtime)
+        if absolute != runtime_root and not absolute.startswith(runtime_root + os.sep):
+            raise RuntimeError("supremacy dossier evidence escapes the runtime")
+        if not os.path.isfile(absolute) or base.sha256_file(absolute) != digest:
+            raise RuntimeError("supremacy dossier evidence hash mismatch: " + relative)
+    protocol = dossier.get("protocol") or {}
+    if protocol.get("version") != "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5" \
+            or len(str(protocol.get("bundle_sha256") or "")) != 64 \
+            or len(str(protocol.get("signed_decisions_sha256") or "")) != 64:
+        raise RuntimeError("supremacy dossier protocol identity is incomplete")
+    search = dossier.get("search_closure") or {}
+    original = search.get("conditions") or {}
+    # The dossier is generated from the complete pre-dossier condition set; its own condition is
+    # added only after the hash-indexed artifact has been persisted.
+    if DOSSIER_CONDITION in original or any(value is not True for value in original.values()):
+        raise RuntimeError("supremacy dossier did not reproduce pre-dossier closure correctly")
+    if conditions.get(DOSSIER_CONDITION) is not True \
+            or supremacy.get(DOSSIER_CONDITION) is not True:
+        raise RuntimeError("terminal proof does not carry the dossier condition")
+    receipt = (audit.get("campaigns") or {}).get("supremacy_dossier") or {}
+    if receipt.get("verified") is not True \
+            or receipt.get("candidate_id") != incumbent \
+            or receipt.get("claim_level") != DOSSIER_CLAIM \
+            or receipt.get("path") != "architecture/OMEGA-SUPREMACY-DOSSIER.json" \
+            or receipt.get("sha256") != base.sha256_file(path):
+        raise RuntimeError("independent audit does not bind the deterministic dossier")
+    if audit.get("supremacy_dossier") != receipt:
+        raise RuntimeError("independent audit carries conflicting dossier receipts")
+    return dossier
+
+
 def _verify(repo, runtime, source_head, preflight, launch):
     verified = _original_verify(repo, runtime, source_head, preflight, launch)
     backend = (preflight.get("container_backend") or {}).get("backend")
@@ -116,7 +179,8 @@ def _verify(repo, runtime, source_head, preflight, launch):
             "bounded_candidate_output_required",
             "terminal_negative_proof_required",
             "unbounded_production_rounds_required",
-            "stagnation_escalates_search_required"):
+            "stagnation_escalates_search_required",
+            "deterministic_supremacy_dossier_required"):
         if mission.get(flag) is not True:
             raise RuntimeError("signed protocol-v5 mission flag missing: " + flag)
     if mission.get("production_max_rounds") != 0:
@@ -164,7 +228,7 @@ def _verify(repo, runtime, source_head, preflight, launch):
     summary = verified["summary"]
     conditions = (summary.get("escalation") or {}).get("conditions") or {}
     supremacy = (summary.get("escalation") or {}).get("supremacy") or {}
-    for condition in GENOME_CONDITIONS:
+    for condition in GENOME_CONDITIONS | {DOSSIER_CONDITION}:
         if conditions.get(condition) is not True \
                 or supremacy.get(condition) is not True:
             raise RuntimeError("terminal proof does not carry condition: " + condition)
@@ -182,11 +246,20 @@ def _verify(repo, runtime, source_head, preflight, launch):
             or campaign.get("axes") != 13:
         raise RuntimeError(
             "independent audit did not reproduce genome-realization closure")
+    dossier = _verify_dossier(runtime, audit, incumbent, conditions, supremacy)
 
     verified["exact_candidate_backend"] = "container"
     verified["unbounded_production_round_policy_verified"] = True
     verified["stagnation_escalation_policy_verified"] = True
     verified["streaming_formal_crown_verified"] = True
+    verified["supremacy_dossier_verified"] = {
+        "path": "architecture/OMEGA-SUPREMACY-DOSSIER.json",
+        "sha256": base.sha256_file(os.path.join(
+            architecture, "OMEGA-SUPREMACY-DOSSIER.json")),
+        "claim_level": dossier["claim_level"],
+        "evidence_items": len(dossier.get("evidence_index") or []),
+        "falsifiers": len(dossier.get("falsifiers") or []),
+    }
     verified["genome_realization_verified"] = {
         label: {
             "genome_sha256": report.get("genome_sha256"),
