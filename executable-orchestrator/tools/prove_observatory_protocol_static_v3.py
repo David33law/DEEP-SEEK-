@@ -5,8 +5,9 @@ This proof is independent of the runtime tournament. It first executes the inher
 proof, then verifies the protocol-v5 additions as one connected, owner-bindable mechanism: strict
 one-file source generation, independently diversified genome auditors, exact source-bound semantic
 and specialized evaluator receipts, executable controlled-genome realization, phase-aware hard
-gates, final overlay order, the canonical localhost provider and the authoritative v5 E2E entrypoint.
-It compiles/imports code but makes no provider call and executes no candidate.
+gates, an unbounded real-provider round policy with stagnation escalation, final overlay order, the
+canonical localhost provider and the authoritative v5 E2E entrypoint. It compiles/imports code but
+makes no provider call and executes no candidate.
 """
 from __future__ import annotations
 
@@ -32,6 +33,8 @@ REQUIRED_MODULES = (
 )
 REQUIRED_FILES = {
     "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md",
+    "executable-orchestrator/orchestrator.py",
+    "executable-orchestrator/lawmax21/observatory_launcher.py",
     "executable-orchestrator/lawmax21/observatory_build_schema_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_auditor_diversity_hardening.py",
     "executable-orchestrator/lawmax21/observatory_semantic_evidence_binding_hardening.py",
@@ -54,6 +57,8 @@ MISSION_FLAGS = {
     "bounded_candidate_output_required",
     "terminal_negative_proof_required",
     "proof_mode_forbidden_in_production",
+    "unbounded_production_rounds_required",
+    "stagnation_escalates_search_required",
 }
 
 
@@ -119,6 +124,13 @@ def main() -> int:
                 "genome_realization_auditors_required", 0)) != 2:
             raise RuntimeError(
                 "protocol-v5 does not require two genome-realization auditors")
+        if protocol.SEARCH_POLICY.get("production_max_rounds") != 0:
+            raise RuntimeError(
+                "owner-signed search policy permits a finite production round cap")
+        if protocol.SEARCH_POLICY.get("stagnation_response") != \
+                "continue-successor-radical-novelty-meta-search":
+            raise RuntimeError(
+                "owner-signed stagnation policy does not escalate search")
         if protocol.CONTRACT_FILES.get(
                 "genome_realization_contract_sha256") != \
                 "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md":
@@ -199,6 +211,26 @@ def main() -> int:
                 or float(genome_dimension.get("hard_minimum", -1)) != 1.0:
             raise RuntimeError(
                 "genome realization is not a hard Pareto gate")
+
+        launcher = _text(
+            "executable-orchestrator/lawmax21/observatory_launcher.py")
+        for token in (
+                "PRODUCTION_MAX_ROUNDS = 0",
+                "args.max_rounds != PRODUCTION_MAX_ROUNDS",
+                "use --max-rounds 0",
+                '"finite_cap_allowed_for_real_provider": False'):
+            if token not in launcher:
+                raise RuntimeError(
+                    "production launcher lacks unbounded-round enforcement: " + token)
+        shared = _text("executable-orchestrator/orchestrator.py")
+        for token in (
+                "if max_rounds > 0 and rs >= max_rounds",
+                "_record_stagnation_escalation",
+                'getattr(ctx, "profile_id", "") == "national-observatory"',
+                "continue-successor-radical-novelty-meta-search"):
+            if token not in shared:
+                raise RuntimeError(
+                    "shared escalation loop lacks non-satisficing policy: " + token)
 
         audit = _text(
             "executable-orchestrator/lawmax21/observatory_audit.py")
@@ -304,6 +336,8 @@ def main() -> int:
             "executable-orchestrator/tools/"
             "prove_complete_observatory_protocol_hardened.py")
         for relative in (
+                "executable-orchestrator/orchestrator.py",
+                "executable-orchestrator/lawmax21/observatory_launcher.py",
                 "executable-orchestrator/lawmax21/"
                 "observatory_genome_realization_overlay.py",
                 "executable-orchestrator/lawmax21/"
@@ -317,6 +351,14 @@ def main() -> int:
             if relative not in hardened:
                 raise RuntimeError(
                     "hardened E2E census omits: " + relative)
+        for token in (
+                "unbounded_production_rounds_required",
+                "stagnation_escalates_search_required",
+                'mission.get("production_max_rounds") != 0',
+                'round_policy.get("unbounded") is not True'):
+            if token not in hardened:
+                raise RuntimeError(
+                    "hardened E2E does not prove round policy: " + token)
 
         stable = _text(
             "executable-orchestrator/tools/run_observatory_proof.py")
@@ -341,6 +383,8 @@ def main() -> int:
             "semantic_source_receipts_bound": True,
             "source_bound_evidence_required": True,
             "auditor_inference_diversity_required": True,
+            "unbounded_production_rounds_bound": True,
+            "stagnation_escalation_bound": True,
             "final_overlay_order_verified": True,
             "canonical_local_provider_verified": True,
             "authoritative_e2e_protocol_v5_verified": True,
