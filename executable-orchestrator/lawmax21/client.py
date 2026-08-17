@@ -1,9 +1,10 @@
 """DeepSeek client. Real HTTP, real usage accounting, honest identity for every request.
 
 The logical id covers the entire identity-bearing request. Budget is reserved before a byte leaves
-the machine and settled only from provider-reported usage. Historical LAWMAX pricing remains
-supported without changing its request identity; currency-explicit profiles freeze their price
-schedule into the identity so a replay can never silently cross billing contracts.
+the machine. Once the provider returns HTTP 200 plus usage, that economic event is settled BEFORE
+local schema validation: a locally rejected answer may still have been charged. A recorded raw
+provider response is never automatically re-sent; crash recovery finalises the recorded bytes.
+Historical LAWMAX pricing/request identity remains supported.
 """
 import json
 import os
@@ -68,13 +69,12 @@ def normalize_prices(prices):
 
 
 class HttpTransport:
-    """The only transport used by --launch."""
-
     def __init__(self, endpoint, model, api_key_env="DEEPSEEK_API_KEY", timeout=180):
         self.endpoint, self.model, self.key_env, self.timeout = endpoint, model, api_key_env, timeout
 
     def describe(self):
-        return {"endpoint": self.endpoint, "model": self.model, "key_env": self.key_env}
+        return {"endpoint": self.endpoint, "model": self.model, "key_env": self.key_env,
+                "timeout_s": self.timeout}
 
     def send(self, body):
         key = os.environ.get(self.key_env)
@@ -145,7 +145,7 @@ def extract_usage(response_obj, prices):
     ct = u.get("completion_tokens")
     if pt is None or ct is None:
         raise ApiError("response carries no usage.prompt_tokens/completion_tokens — "
-                       "cost cannot be accounted, so the call is not admissible")
+                       "provider acceptance cannot be accounted exactly")
     pt, ct = int(pt), int(ct)
 
     hit = u.get("prompt_cache_hit_tokens")
@@ -222,8 +222,6 @@ class Client:
             "ticket": ticket,
             "request": request_body,
         }
-        # Preserve the historical LAWMAX identity byte-shape. New currency-explicit profiles bind
-        # their signed price schedule into identity because a billing contract change is material.
         if not self.legacy_pricing:
             identity["price_schedule"] = self.prices
         return identity
@@ -245,6 +243,59 @@ class Client:
                   + (est_out / 1e6) * self.prices["output_per_mtok"])
         return est_in + est_out, round(amount, 9)
 
+    def _usage_prices(self):
+        return DEFAULT_PRICES if self.legacy_pricing else self.prices
+
+    def _api_call_already_logged(self, lid):
+        if self.log is None:
+            return False
+        return any(e.get("kind") == "api-call"
+                   and (e.get("payload") or {}).get("logical_id") == lid
+                   for e in self.log.events())
+
+    def _log_paid_call_once(self, lid, role, ticket, usage, reason):
+        if self.log is None or self._api_call_already_logged(lid):
+            return
+        self.log.append("api-call", "deepseek-client",
+                        {"logical_id": lid, "role": role, "ticket": ticket,
+                         "model": self.t.model, "endpoint": self.t.endpoint,
+                         "usage": usage},
+                        reason=reason, subject_sha256=lid)
+
+    def _write_meta(self, path, lid, role, ticket, identity, usage, parse_status,
+                    parse_error=None, recovered=False):
+        obj = {"logical_id": lid, "role": role, "ticket": ticket,
+               "utc": utc(), "status": 200, "usage": usage,
+               "identity_sha256": sha256_obj(identity),
+               "provider_accepted": True,
+               "parse_status": parse_status,
+               "recovered_without_resend": bool(recovered)}
+        if parse_error:
+            obj["parse_error"] = str(parse_error)[:12000]
+        atomic_write_json(path, obj)
+
+    def _finalize_recorded_response(self, lid, role, ticket, identity, response_obj,
+                                    response_schema, meta_p):
+        """Finalise already-recorded provider bytes without issuing another HTTP request."""
+        usage = extract_usage(response_obj, self._usage_prices())
+        if self.ledger.is_open(lid):
+            self.ledger.settle(lid, usage["total_tokens"], usage["billing_amount"], usage=usage)
+        elif not self.ledger.is_settled(lid):
+            raise ApiError(
+                f"recorded provider response {lid[:16]}… has neither an open nor settled "
+                "ledger entry — refusing automatic resend; reconcile manually")
+        self._log_paid_call_once(lid, role, ticket, usage,
+                                 "recorded provider response recovered without resend")
+        try:
+            parsed = self._parse(response_obj, response_schema, role)
+        except (StructuredOutputRejected, ApiError) as exc:
+            self._write_meta(meta_p, lid, role, ticket, identity, usage,
+                             "REJECTED", parse_error=exc, recovered=True)
+            raise
+        self._write_meta(meta_p, lid, role, ticket, identity, usage,
+                         "ACCEPTED", recovered=True)
+        return parsed, usage
+
     def call(self, role, ticket, context_package_sha, messages, response_schema=None,
              temperature=0.0, max_tokens=None, line="main"):
         ceiling = self.default_max_tokens if max_tokens is None else int(max_tokens)
@@ -265,38 +316,51 @@ class Client:
             parsed = self._parse(read_json(resp_p), response_schema, role)
             return lid, parsed, True, meta["usage"]
 
+        # Most important crash/rejection rule: if provider bytes already exist, NEVER resend.
+        # Finalise their accounting and re-validate those exact bytes under today's schema.
+        if os.path.exists(resp_p):
+            response_obj = read_json(resp_p)
+            parsed, usage = self._finalize_recorded_response(
+                lid, role, ticket, identity, response_obj, response_schema, meta_p)
+            return lid, parsed, True, usage
+
         est_tokens, est_money = self._estimate(identity)
         self.ledger.reserve(lid, role, est_tokens, est_money, line=line)
         atomic_write_json(req_p, {"logical_id": lid, "utc": utc(), "identity": identity})
 
+        # Before any provider response exists, a transport failure can release the reservation.
         try:
             status, raw_text = self._send_with_retries(body)
-            try:
-                response_obj = json.loads(raw_text)
-            except json.JSONDecodeError:
-                response_obj = {"_non_json_body": raw_text}
-            atomic_write_json(resp_p, response_obj)
-            if status != 200:
-                raise ApiError(f"HTTP {status}: {json.dumps(response_obj)[:400]}")
-            # Pass the original pricing contract shape for legacy readers; explicit profiles use
-            # the normalized signed table directly.
-            usage_prices = DEFAULT_PRICES if self.legacy_pricing else self.prices
-            usage = extract_usage(response_obj, usage_prices)
         except BaseException:
             self.ledger.release(lid)
             raise
 
-        parsed = self._parse(response_obj, response_schema, role)
-        atomic_write_json(meta_p, {"logical_id": lid, "role": role, "ticket": ticket,
-                                   "utc": utc(), "status": status, "usage": usage,
-                                   "identity_sha256": sha256_obj(identity)})
+        try:
+            response_obj = json.loads(raw_text)
+        except json.JSONDecodeError:
+            response_obj = {"_non_json_body": raw_text}
+        atomic_write_json(resp_p, response_obj)
+
+        if status != 200:
+            self.ledger.release(lid)
+            raise ApiError(f"HTTP {status}: {json.dumps(response_obj)[:400]}")
+
+        # HTTP 200 is economically load-bearing. If usage is malformed we deliberately leave the
+        # reservation open and the raw response on disk; subsequent calls see resp_p and REFUSE
+        # to resend. Human/recovery tooling can then reconcile without inventing a second charge.
+        usage = extract_usage(response_obj, self._usage_prices())
         self.ledger.settle(lid, usage["total_tokens"], usage["billing_amount"], usage=usage)
-        if self.log is not None:
-            self.log.append("api-call", "deepseek-client",
-                            {"logical_id": lid, "role": role, "ticket": ticket,
-                             "model": self.t.model, "endpoint": self.t.endpoint,
-                             "usage": usage},
-                            reason="paid call settled", subject_sha256=lid)
+        self._log_paid_call_once(lid, role, ticket, usage,
+                                 "provider accepted paid call; settlement precedes local schema validation")
+
+        try:
+            parsed = self._parse(response_obj, response_schema, role)
+        except (StructuredOutputRejected, ApiError) as exc:
+            self._write_meta(meta_p, lid, role, ticket, identity, usage,
+                             "REJECTED", parse_error=exc)
+            raise
+
+        self._write_meta(meta_p, lid, role, ticket, identity, usage, "ACCEPTED")
         return lid, parsed, False, usage
 
     def _send_with_retries(self, body):
