@@ -11,13 +11,10 @@ from . import (observatory_meta_hardening_overlay, observatory_meta_search_overl
                observatory_novelty_overlay, observatory_taxonomy_completion_overlay)
 
 
-# Six fixed miners × six seeds. No structurally new, nonduplicate seed is deferred merely to economize
-# provider calls; only failed construction remains backlog. Meta/coverage miners likewise construct
-# every genuinely unseen controlled genome they produce.
-observatory_novelty_overlay.NOVELTY_BUILD_LIMIT = (
-    len(observatory_novelty_overlay.NOVELTY_METHODS)
-    * observatory_novelty_overlay.NOVELTY_SEEDS_PER_METHOD
-)
+# The limit is a corruption/denial-of-service sanity bound, not an economy policy. Every genuinely
+# unseen nonduplicate seed produced by the bounded schemas (fixed miners + carried backlog) enters
+# construction in the same wave unless the count itself demonstrates malformed/unbounded state.
+observatory_novelty_overlay.NOVELTY_BUILD_LIMIT = 100_000
 
 
 def install(ctx, handlers):
@@ -81,7 +78,7 @@ def install(ctx, handlers):
                 "open_backlog": supremacy.get("novelty_open_backlog", 0),
                 "unresolved": supremacy.get("novelty_unresolved", 0),
                 "genome_saturated": supremacy.get("genome_saturated", False),
-                "fixed_miner_build_limit": observatory_novelty_overlay.NOVELTY_BUILD_LIMIT,
+                "novelty_build_sanity_limit": observatory_novelty_overlay.NOVELTY_BUILD_LIMIT,
                 "economy_deferral_allowed": False,
                 "failed_dynamic_builds_retry": True,
                 "auditor_fact_reproduction_required": True,
