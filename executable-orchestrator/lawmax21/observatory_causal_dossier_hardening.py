@@ -1,11 +1,10 @@
 """Bind replication/crown causal genome-ablation receipts into the deterministic dossier.
 
 The genome-realization report contains the causal receipt hash, but the final public dossier also
-indexes the exact causal campaign bytes directly. This wrapper runs after foundational dossier
-hardening and before the dossier handler is installed. It independently rehashes every mutated source
-and evaluator receipt, checks evaluator-to-source identity, inert controls, auditor obligations,
-axis-specific failure attribution and load-bearing failures, then adds replication and crown receipts
-to the evidence index.
+indexes the exact causal campaign bytes directly. This wrapper independently rehashes every mutated
+source and evaluator receipt, checks evaluator-to-source identity, inert controls, auditor obligations,
+failure-scoped axis attribution, cited-definition semantics and load-bearing failures, then adds
+replication and crown receipts to the evidence index.
 """
 from __future__ import annotations
 
@@ -47,6 +46,25 @@ def _verify_execution(ctx, label, row, kind):
         raise RuntimeError(
             f"supremacy dossier: causal genome {label} {kind} evaluator "
             "is not bound to the exact mutated source bytes")
+
+
+def _attribution_valid(attribution):
+    if attribution.get("whole_receipt_searched") is not False \
+            or not attribution.get("definition_vocabulary_sha256_inputs"):
+        return False
+    source_support = attribution.get("source_semantic_support") is True
+    removed_named = attribution.get("removed_definition_named") is True
+    mode = attribution.get("mode")
+    if mode == "semantic-hard-dimension":
+        return bool(
+            attribution.get("matched_dimensions")
+            or (removed_named and source_support))
+    if mode == "specialized-failure-signature":
+        return bool(
+            attribution.get("matched_axis_failure_tokens")
+            or attribution.get("matched_group_path_tokens")
+            or (removed_named and source_support))
+    return False
 
 
 def _verify(ctx, incumbent, label):
@@ -116,12 +134,10 @@ def _verify(ctx, incumbent, label):
                 or row.get("causal_failure_observed") is not True \
                 or row.get("observed_candidate_pass") is not False \
                 or row.get("axis_specific_failure_attributed") is not True \
-                or attribution.get("mode") not in (
-                    "semantic-hard-dimension",
-                    "specialized-failure-signature"):
+                or not _attribution_valid(attribution):
             raise RuntimeError(
                 f"supremacy dossier: causal genome {label} task did not "
-                "falsify an axis-specific claim")
+                "falsify an axis-specific, definition-grounded claim")
         _verify_execution(ctx, label, row, "ablation")
         attributed += 1
     if attributed != len(tasks):
@@ -163,6 +179,8 @@ def install(_ctx, handlers):
                 "tasks_executed": causal["tasks_executed"],
                 "axis_specific_tasks": attributed,
                 "axis_specific_failure_attribution": True,
+                "cited_definition_semantics_checked": True,
+                "whole_receipt_searched": False,
                 "negative_controls_executed":
                     causal["negative_controls_executed"],
                 "verified_axis_count": causal["verified_axis_count"],
