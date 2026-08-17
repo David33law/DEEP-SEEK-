@@ -1,13 +1,14 @@
 """Profile-specific independent audit for the National Legal Observatory.
 
-The active novelty and meta-search overlays are installed here because this is the final profile
-layer: they must wrap the complete crown search while remaining inside the same signed state machine
-and the final independent audit.
+The active novelty, meta-search and hardening overlays are installed here because this is the final
+profile layer: they must wrap the complete crown search while remaining inside the same signed state
+machine and the final independent audit.
 """
 
 from .canonical import atomic_write_json
 from .handlers import A, tree_hash
-from . import observatory_meta_search_overlay, observatory_novelty_overlay
+from . import (observatory_meta_hardening_overlay, observatory_meta_search_overlay,
+               observatory_novelty_overlay)
 
 
 # Six fixed miners × six seeds. No structurally new, nonduplicate seed is deferred merely to economize
@@ -20,9 +21,10 @@ observatory_novelty_overlay.NOVELTY_BUILD_LIMIT = (
 
 
 def install(ctx, handlers):
-    """Install active novelty, meta-search closure, then the currency-explicit audit."""
+    """Install active novelty, meta-search, hardening, then the currency-explicit audit."""
     out = observatory_novelty_overlay.install(ctx, handlers)
     out = observatory_meta_search_overlay.install(ctx, out)
+    out = observatory_meta_hardening_overlay.install(ctx, out)
 
     def independent_audit(_machine):
         ok, n, why = ctx.log.verify()
@@ -49,6 +51,7 @@ def install(ctx, handlers):
             "active_novelty_saturation": {
                 "contract": supremacy.get("novelty_contract"),
                 "meta_search_contract": supremacy.get("meta_search_contract"),
+                "meta_search_hardening": "observatory_meta_hardening_overlay.py",
                 "waves": supremacy.get("novelty_waves", 0),
                 "dry_waves": supremacy.get("genome_dry_waves", 0),
                 "known_controlled_genomes": supremacy.get("known_genomes", 0),
@@ -73,6 +76,9 @@ def install(ctx, handlers):
                 "genome_saturated": supremacy.get("genome_saturated", False),
                 "fixed_miner_build_limit": observatory_novelty_overlay.NOVELTY_BUILD_LIMIT,
                 "economy_deferral_allowed": False,
+                "failed_dynamic_builds_retry": True,
+                "auditor_fact_reproduction_required": True,
+                "model_blocking_flag_not_authoritative": True,
             },
         })
         return p
