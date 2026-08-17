@@ -66,7 +66,10 @@ def answer(prompt):
     return ORIGINAL_ANSWER(prompt)
 
 
+# The active HTTP Handler is defined in the original mock module. The meta wrapper already replaced
+# that module's global answer once; replace it again here so distributed roles reach this extension.
 base.answer = answer
+base.base.answer = answer
 
 
 if __name__ == "__main__":
