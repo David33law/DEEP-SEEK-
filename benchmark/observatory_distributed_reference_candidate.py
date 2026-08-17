@@ -10,6 +10,7 @@ import tempfile
 
 REPLICATION_MODEL = "single_primary_read_replicas"
 COMMIT_MODEL = "single_writer_sequence"
+PARTITION_WRITE_POLICY = "reject_without_quorum"
 CHANNELS = ["human", "api", "linked_data", "eli", "public_sector", "ai"]
 
 
@@ -72,9 +73,11 @@ class Cluster:
                 "order": [],
                 "partitions": [self.node_ids],
                 "crashed": [],
+                "faulty": [],
                 "generation": 0,
             }
             self._persist()
+        self.state.setdefault("faulty", [])
         self.heal()
 
     def _persist(self):
@@ -96,7 +99,8 @@ class Cluster:
         }
 
     def _sync_node(self, node_id):
-        if node_id in self.state.get("crashed", []):
+        if node_id in self.state.get("crashed", []) \
+                or node_id in self.state.get("faulty", []):
             return
         _atomic(self._node_path(node_id), self._snapshot())
 
@@ -111,7 +115,8 @@ class Cluster:
 
     def _safe_group(self, node_id):
         active = [x for x in self._group(node_id)
-                  if x not in self.state.get("crashed", [])]
+                  if x not in self.state.get("crashed", [])
+                  and x not in self.state.get("faulty", [])]
         return active if len(active) >= self._quorum() else []
 
     def submit(self, node_id, event):
@@ -120,6 +125,8 @@ class Cluster:
             raise ValueError("unknown node")
         if node_id in self.state.get("crashed", []):
             return {"accepted": False, "pending": False, "reason": "node-crashed"}
+        if node_id in self.state.get("faulty", []):
+            return {"accepted": False, "pending": False, "reason": "node-excluded-faulty"}
         safe = self._safe_group(node_id)
         if not safe:
             return {"accepted": False, "pending": True,
@@ -175,6 +182,9 @@ class Cluster:
             if node_id in self.state.get("crashed", []):
                 roots[node_id] = "CRASHED"
                 continue
+            if node_id in self.state.get("faulty", []):
+                roots[node_id] = "FAULTY"
+                continue
             path = self._node_path(node_id)
             try:
                 snapshot = _read(path)
@@ -187,12 +197,19 @@ class Cluster:
     def integrity(self):
         canonical = self._canonical_root()
         nodes = {}
+        healthy = 0
         ok = True
         for node_id, root in self.roots().items():
-            node_ok = root in (canonical, "CRASHED")
-            nodes[node_id] = {"ok": node_ok, "root": root}
+            excluded = root in ("CRASHED", "FAULTY")
+            node_ok = root == canonical or excluded
+            nodes[node_id] = {"ok": node_ok, "root": root, "excluded": excluded}
             ok = ok and node_ok
-        return {"ok": ok, "canonical_root": canonical, "nodes": nodes}
+            if root == canonical:
+                healthy += 1
+        ok = ok and healthy >= self._quorum()
+        return {"ok": ok, "canonical_root": canonical, "nodes": nodes,
+                "healthy_nodes": healthy, "quorum": self._quorum(),
+                "unresolved_count": 0}
 
     def crash(self, node_id):
         node_id = str(node_id)
@@ -212,10 +229,31 @@ class Cluster:
         return {"ok": True, "node_id": node_id,
                 "root": self._canonical_root()}
 
+    def inject_fault(self, node_id, fault):
+        node_id = str(node_id)
+        if fault != "equivocate_root":
+            return {"ok": False, "reason": "unsupported-fault"}
+        faulty = set(self.state.get("faulty", []))
+        faulty.add(node_id)
+        self.state["faulty"] = sorted(faulty)
+        self._persist()
+        # The persisted node snapshot is deliberately made inconsistent. The canonical cluster state
+        # remains unchanged and the faulty node is excluded from acknowledgements/publication.
+        _atomic(self._node_path(node_id), {
+            "events": {}, "order": [], "root": "EQUIVOCATED",
+            "generation": self.state["generation"],
+        })
+        return {"ok": True, "node_id": node_id, "fault": fault,
+                "excluded": True}
+
     def recover(self, node_id):
         node_id = str(node_id)
         if node_id in self.state.get("crashed", []):
             return {"ok": False, "reason": "node-crashed"}
+        faulty = set(self.state.get("faulty", []))
+        faulty.discard(node_id)
+        self.state["faulty"] = sorted(faulty)
+        self._persist()
         self._sync_node(node_id)
         return {"ok": True, "node_id": node_id,
                 "root": self._canonical_root()}
@@ -229,6 +267,7 @@ class Cluster:
         return {
             "replication_model": REPLICATION_MODEL,
             "commit_model": COMMIT_MODEL,
+            "partition_write_policy": PARTITION_WRITE_POLICY,
             "node_authority_files": {
                 node_id: [f"nodes/{node_id}.json"] for node_id in self.node_ids
             },
