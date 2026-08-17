@@ -17,6 +17,7 @@ EXTRA_MODULES = [
     "lawmax21.observatory_evaluator_routing_hardening",
     "lawmax21.observatory_build_schema_hardening",
     "lawmax21.observatory_genome_realization_overlay",
+    "lawmax21.observatory_genome_auditor_diversity_hardening",
     "lawmax21.observatory_genome_evidence_binding_hardening",
 ]
 EXTRA_FILES = {
@@ -26,6 +27,7 @@ EXTRA_FILES = {
     "executable-orchestrator/lawmax21/observatory_formal_streaming_routing.py",
     "executable-orchestrator/lawmax21/observatory_build_schema_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_realization_overlay.py",
+    "executable-orchestrator/lawmax21/observatory_genome_auditor_diversity_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_evidence_binding_hardening.py",
     "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md",
     "executable-orchestrator/tools/mock_observatory_genome_server.py",
@@ -51,6 +53,7 @@ def main():
             "executable-orchestrator/lawmax21/observatory_audit.py")
         ordered = [
             "observatory_build_schema_hardening.install",
+            "observatory_genome_auditor_diversity_hardening.install",
             "observatory_shared_corpus_hardening.install",
             "observatory_evaluator_routing_hardening.install",
             "observatory_formal_streaming_routing.install",
@@ -78,6 +81,9 @@ def main():
         evidence_binding = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_genome_evidence_binding_hardening.py")
+        auditor_diversity = _text(
+            "executable-orchestrator/lawmax21/"
+            "observatory_genome_auditor_diversity_hardening.py")
         phase = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_phase_gate_hardening.py")
@@ -91,18 +97,26 @@ def main():
             raise RuntimeError(
                 "production formal routing does not use streaming v3")
         if "candidate_sha256" not in routing \
-                or "candidate_sha256" not in evaluator_routing:
+                or "candidate_sha256" not in evaluator_routing \
+                or "atomic_write_json" not in routing \
+                or "atomic_write_json" not in evaluator_routing:
             raise RuntimeError(
-                "specialized evaluator reports are not source-hash-bound")
+                "specialized evaluator receipts are not persistently source-bound")
         if "genome_realization_qualification" not in phase:
             raise RuntimeError(
                 "genome realization hard minimum is not phase-aware")
         if "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5" not in protocol:
             raise RuntimeError("protocol-v5 binding is absent")
         if "no passing source-bound evidence" not in evidence_binding \
-                or "candidate_sha256" not in evidence_binding:
+                or "candidate_sha256" not in evidence_binding \
+                or "MIN_UNIQUE_DEFINITION_CITATIONS = 8" not in evidence_binding:
             raise RuntimeError(
-                "genome evidence hardening does not reject stale reports")
+                "genome evidence hardening does not reject stale/generic reports")
+        if "invariant-to-code perspective" not in auditor_diversity \
+                or "counterexample/removal perspective" not in auditor_diversity \
+                or '"temperature": 0.35' not in auditor_diversity:
+            raise RuntimeError(
+                "genome auditors are not independently diversified")
         build_schema = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_build_schema_hardening.py")
@@ -118,9 +132,10 @@ def main():
             "mock_observatory_genome_server.py")
         if "genome-realization-auditor-" not in mock \
                 or "definitions" not in mock \
-                or "PERSISTED EVIDENCE CATALOG" not in mock:
+                or "PERSISTED EVIDENCE CATALOG" not in mock \
+                or "auditor_offset" not in mock:
             raise RuntimeError(
-                "final local provider does not exercise genome realization")
+                "final local provider does not exercise diversified genome realization")
         report.update({
             "status": "PASS",
             "final_static_extension": "PASS",
@@ -131,6 +146,7 @@ def main():
             "strict_build_schema_verified": True,
             "genome_realization_routing_verified": True,
             "genome_evidence_source_binding_verified": True,
+            "genome_auditor_diversity_verified": True,
             "protocol_v5_verified": True})
     except Exception as exc:
         report["status"] = "FAIL"
