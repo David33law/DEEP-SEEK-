@@ -43,15 +43,19 @@ NOVELTY_METHODS = [
 PROTOCOL_FILES = [
     "run_observatory.py",
     "setup_observatory.py",
+    "profiles/national-observatory/NOVELTY-SEARCH-CONTRACT.md",
     "executable-orchestrator/orchestrator.py",
     "executable-orchestrator/lawmax21/observatory_roles.py",
     "executable-orchestrator/lawmax21/observatory_runtime.py",
     "executable-orchestrator/lawmax21/observatory_supremacy_overlay.py",
     "executable-orchestrator/lawmax21/observatory_crown_overlay.py",
     "executable-orchestrator/lawmax21/observatory_novelty_overlay.py",
+    "executable-orchestrator/lawmax21/observatory_meta_search_overlay.py",
     "executable-orchestrator/lawmax21/observatory_escalation.py",
     "executable-orchestrator/lawmax21/observatory_audit.py",
     "private-evaluator/evaluator/observatory_systems_arena.py",
+    "executable-orchestrator/tools/mock_observatory_server.py",
+    "executable-orchestrator/tools/mock_observatory_meta_server.py",
     "executable-orchestrator/tools/run_observatory_proof.py",
     "executable-orchestrator/tools/prove_active_novelty_saturation.py",
 ]
@@ -101,7 +105,13 @@ def mission_binding():
         "public_supremacy_case_required": True,
         "durable_systems_arena_required": True,
         "active_novelty_saturation_required": True,
+        "meta_search_required": True,
+        "mechanical_genome_coverage_required": True,
+        "independent_closure_auditors_required": True,
         "novelty_dry_waves_required": 3,
+        "meta_search_critics_required": 2,
+        "closure_auditors_required": 2,
+        "critical_pair_breadth_required": 3,
         "novelty_methods": list(NOVELTY_METHODS),
         "publication_channels": ["human", "api", "linked_data", "eli", "public_sector", "ai"],
         "runner_head": git_value("rev-parse", "HEAD"),
@@ -148,8 +158,9 @@ def decisions(budget_usd, tokens, calls, days):
         "D11_CHALLENGER_RESERVE": {"decided": True, "value": {
             "fraction": 0.35,
             "critic_contexts": (
-                "successor, radical, recombination, simplification and six CP2-direct-blind "
-                "active novelty miners have independent role contexts")}},
+                "successor, radical, recombination, simplification, six CP2-direct-blind active "
+                "novelty miners, two meta-search critics and two closure auditors have independent "
+                "role contexts")}},
     }
 
 
@@ -206,6 +217,7 @@ def main(argv=None):
     print("· frozen V4-Pro USD provider price schedule into D01")
     print("· bound exact runner HEAD/tree and research protocol bundle into owner-signed D09")
     print("· bound Charter/System/Pareto/Evaluator/Supremacy/Systems/Novelty hashes into owner-signed D09")
+    print("· bound active meta-search, mechanical coverage and independent closure into D09")
 
     visible = os.path.join(ROOT, "benchmark", "observatory-visible-suite.json")
     observatory_harness.build_visible_suite(visible)
@@ -259,7 +271,8 @@ def main(argv=None):
     print("provider pricing: V4-Pro hit=$0.003625/M miss=$0.435/M output=$0.87/M")
     print("mission: zero silent legally-material loss + canonical human/API/linked-data/ELI/public-sector/AI publication")
     print("supremacy: search forest + controlled genomes + falsification + recombination + lower-bound/public case required")
-    print("novelty: six active CP2-direct-blind miners + empty backlog + three consecutive dry waves required")
+    print("novelty: six active CP2-direct-blind miners + mechanical class/pair coverage + empty backlog + three dry waves")
+    print("meta-search: two protocol critics + dynamic directives + two independent closure auditors per wave")
     print("durability: independent crash/corruption/restart/large-rebuild systems arena required")
     print("No DeepSeek/API call was made.")
     return 0
