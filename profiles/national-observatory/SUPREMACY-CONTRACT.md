@@ -1,4 +1,4 @@
-# NATIONAL LEGAL OBSERVATORY — SUPREMACY CONTRACT v3
+# NATIONAL LEGAL OBSERVATORY — SUPREMACY CONTRACT v4
 
 ## 1. Immutable objective
 
@@ -44,6 +44,8 @@ Architecture-family diversity is measured by load-bearing structure, never by na
 
 Candidates may declare additional structural axes. Two named families that differ on fewer than two load-bearing genome axes are one structural family for design-space accounting unless executable evidence demonstrates otherwise. Canonical design-space identity is derived from the ordered controlled class vector; explanatory wording does not create novelty.
 
+A declared class is not credited merely because it appears in a prompt, constant, comment or manifest. Every axis must be bound by two independently prompted auditors to actual AST definitions, frozen invariant IDs and passing executable reports for the exact current source bytes. At least four per-axis definition maps must differ between the two auditors. Generic entrypoint reuse, stale reports, invented symbols and unverified paths fail the architecture.
+
 ## 6. Search-forest obligation
 
 Before the v0 architecture gate, the protocol must create multiple independent search lineages. Each lineage must generate several mutually incompatible architecture seeds, record assumptions and failure modes, reject alternatives explicitly and nominate finalists. Additional anti-attractor lineages must search while one common architectural assumption is forbidden or inverted.
@@ -53,6 +55,8 @@ The purpose is not to force novelty for novelty's sake. If independent searches 
 ## 7. Complete-blueprint preservation
 
 A finalist blueprint is atomic design input. Its trusted boundary, all mechanisms, genome, falsifiable predictions, stated limitations and provenance must survive explorer -> formalizer -> builder -> evaluator handoff under content hashes. No builder may receive only the family name, first mechanism or a lossy summary and still claim to implement the architecture.
+
+Every executable builder response is a closed one-file artifact for the requested interface. Arbitrary filenames, hidden companion files, unknown response fields and unbounded output are forbidden.
 
 ## 8. Formalization before implementation
 
@@ -71,7 +75,13 @@ Every finalist must be converted into an explicit architecture formalization con
 
 The implementation builder receives both the complete blueprint and this formalization. Independent fidelity critics compare the resulting implementation against invariant IDs; executable graders remain authoritative for behavior.
 
-## 9. Two proof arenas
+## 9. Independent implementation search
+
+One implementation trajectory cannot establish that an architecture itself is weak or strong. Every architecture must be instantiated through multiple independently prompted semantic implementations, distinct distributed implementations, distinct scale implementations, two bounded formal models and two interoperability implementations.
+
+The protocol must require source-level diversity, architecture-preserving revisions based only on aggregate diagnostics, and independent replication without revision. Hidden cases are never disclosed to builders or revisers.
+
+## 10. Proof arenas
 
 No in-memory semantic prototype can by itself establish national architecture supremacy.
 
@@ -79,25 +89,42 @@ No in-memory semantic prototype can by itself establish national architecture su
 Tests identity, evidence admission, bitemporality, normative effects, jurisprudence-version linkage, doctrine isolation, provenance, unknown/conflict handling, deterministic replay, publication consistency and extension semantics under hidden adversarial scenarios.
 
 ### Arena B — durable systems
-Must separately test persistence and operational substrate claims: crash/restart, torn-write resistance, corruption detection/recovery, duplicate delivery, concurrent ingestion, deterministic rebuild, upgrade/rollback, long history, large replay, projection rebuild/latency and the declared partition/replication strategy. Claims not executable in either arena remain explicitly unproven and block a supremacy claim when load-bearing.
+Tests local persistence and recovery: crash/restart, torn-write boundaries, corruption detection/recovery, duplicate delivery, concurrent ingestion, deterministic rebuild, upgrade/rollback, long history, large replay and projection rebuild.
 
-## 10. Falsification factory
+### Arena C — distributed failure model
+Tests the declared commit and replication classes under five-node majority/minority partitions, below-quorum operation, node/process crashes, corruption, heal/catch-up, independent rebuild, publication-root convergence and conditional Byzantine equivocation.
+
+### Arena D — national-scale workload
+Tests deterministic large-history ingestion, partition balance, checkpoint recovery, independent rebuild, throughput, p95 latency, bytes/event and one-root publication on qualification, replication and million-event crown workloads.
+
+### Arena E — bounded machine-checked models
+Two pure transition models must survive hidden exhaustive finite traces and agree on a streaming behavioral digest covering identity, evidence conflict, bitemporality, normative effect, partition, crash/recovery, rule evolution and publication.
+
+### Arena F — legal interoperability
+Two independent implementations must preserve one canonical root and consistent work/expression/manifestation, ELI/ELI-impact, ECLI, Akoma Ntoso, LegalRuleML and PROV-shaped projections under hidden randomized bundles.
+
+### Arena G — cross-model consistency
+The selected semantic kernel, both formal models and both interoperability implementations must agree on the same hidden legal histories. Independent arena success with contradictory legal behavior is a failure.
+
+Every evaluator receipt used as evidence must persist the exact candidate source hash. Filename coincidence, current in-memory state and narrative references are not evidence.
+
+## 11. Falsification factory
 
 Survivors must be attacked by independent destroyers. Attack classes include source gaps, late discoveries, conflicting authoritative bytes, malformed documents, extraction hallucinations, identity collisions, retroactive commencement, long amendment chains, correction/corrigendum chains, repeal/revival, codification and renumbering, ambiguous jurisprudence anchors, doctrine contamination, projection corruption, stale publication, crash boundaries, clock disagreement, duplicate/reordered delivery, schema/rule evolution, connector compromise, state corruption and clean-machine rebuild.
 
 A surviving design is stronger because attacks failed to falsify it, not because its author described it persuasively.
 
-## 11. Recombination laboratory
+## 12. Recombination laboratory
 
 Load-bearing mechanisms from non-dominated candidates must be available to recombination search. A named winner is not final while a compatible composition of stronger parts could dominate it. Recombination must preserve proof obligations and may not hide increased trusted-kernel complexity.
 
-## 12. Lower bounds and impossibility analysis
+## 13. Lower bounds and impossibility analysis
 
 The protocol must distinguish a bad implementation from an unattainable requirement. Independent lower-bound analysis must name information-theoretic, distributed-systems, legal-evidence and governance limits where applicable, and identify what additional evidence or assumption would be required to cross them.
 
 "Unknown source no actor knows exists" cannot be turned into proven omniscience. "One canonical truth" does not excuse pretending distributed consistency has no failure model. Identity ambiguity cannot always be guessed away. Honest impossibility statements strengthen rather than weaken the final architecture.
 
-## 13. Active novelty, meta-search and design-space saturation
+## 14. Active novelty, meta-search and design-space saturation
 
 The binding operational definition is `NOVELTY-SEARCH-CONTRACT.md`.
 
@@ -109,6 +136,7 @@ COMMITTED is forbidden merely because:
 - money/time was exhausted;
 - every known family name was attempted;
 - existing challengers repeated old controlled genomes;
+- a scalar score stagnated;
 - a model or owner called a result state of the art.
 
 Every candidate saturation wave must actively execute all six CP2-direct-blind novelty methods: assumption inversion, morphological-gap search, cross-domain structural transfer, surgical genome mutation, trusted-boundary recutting and ontology/taxonomy challenge.
@@ -123,26 +151,53 @@ A wave is dry only if the complete fixed/meta/closure portfolio ran, direct CP2 
 
 Three consecutive complete dry waves are mandatory. Any new genome, dynamic directive, protocol improvement, coverage gap, taxonomy claim, backlog, unresolved build, missing critic/auditor or CP2-direct leak resets the count.
 
-A supremacy terminal additionally requires that radical and anti-attractor challengers failed; recombinations failed to dominate; simplification could not match the incumbent with less trusted complexity; both proof arenas passed; independent destroyers found no surviving blocking defect; lower-bound analysis has no unresolved attainable improvement; and the final holdout/audit remain clean.
+Production uses an unbounded round policy. A finite round cap is refused for the real provider. Scalar stagnation triggers wider successor, radical, simplification, novelty, taxonomy and meta-search; it does not stop the experiment. A separately reported budget or wall-clock interruption may end only in `BEST_DISCOVERED_SO_FAR`.
 
-If resources or external constraints stop the search before those conditions close, the only valid label is BEST_DISCOVERED_SO_FAR.
+A supremacy terminal additionally requires that radical and anti-attractor challengers failed; recombinations failed to dominate; simplification could not match the incumbent with less trusted complexity; all proof arenas passed; independent destroyers found no surviving blocking defect; lower-bound analysis has no unresolved attainable improvement; executable genome realization passed qualification, replication and crown; and the final holdout/audit remain clean.
 
-## 14. Public supremacy case
+## 15. Authoritative public-prior-art challenge
 
-The final architecture must produce a public, falsifiable engineering dossier answering:
+After the independent executable frontier exists, three critics must test it against the owner-signed public prior-art corpus. Every listed source is assessed exactly once by each critic. A constructible gap creates a complete challenger that enters all ordinary proof arenas. A protocol/evaluator gap blocks the terminal until the signed harness is revised. A `SATISFIED` disposition requires persisted evidence whose hash and exact candidate source identity are independently reproduced.
+
+The corpus is a falsification instrument, not an architecture template and not evidence of endorsement by any standards body or author.
+
+## 16. Deterministic supremacy dossier
+
+The model-assisted public case is not authoritative for its own citations. Before `COMMITTED`, a deterministic trusted overlay must build `OMEGA-SUPREMACY-DOSSIER.json` from persisted runtime bytes.
+
+The dossier must:
+
+1. bind the owner-signed protocol version, bundle hash, runner HEAD/tree and decisions hash;
+2. bind the incumbent genome, blueprint, formalization and semantic source hashes;
+3. enumerate the complete measured frontier, including rejected and dominated candidates and their dimension vectors;
+4. hash the search forest, proposals, implementation search, holdout, HESA selection, lower bounds, destroyers, prior-art closure, migration plan and model-assisted public case;
+5. hash all durable, distributed, scale, formal, interoperability, cross-model and executable-genome crown reports;
+6. hash the final three dry novelty/meta-search waves and relevant owner approvals;
+7. reproduce every pre-dossier terminal condition, verify no untried family or axiom violation remains and expose all proof boundaries;
+8. carry at least three falsifiers that would reopen the tournament;
+9. state the claim only as `EVIDENCE_SUPPORTED_SUPREMACY_WITHIN_SIGNED_PROTOCOL_AND_TESTED_BOUNDS`;
+10. state explicitly that no Elon Musk, xAI, SpaceX, standards-body or author endorsement is claimed.
+
+Every evidence-index entry must exist under the runtime boundary and carry a SHA-256. The dossier hash is recorded in the independent audit and becomes an explicit terminal condition. Removing or falsifying the dossier must make `COMMITTED` unreachable.
+
+## 17. Public explanation
+
+The final architecture must answer:
 
 1. What exactly is the architecture and its trusted core?
 2. Which materially different structural families were searched, built and killed?
 3. What evidence made the surviving mechanisms load-bearing?
 4. Which radical alternatives and recombinations lost, and on what measurements?
 5. Which failure modes were injected and survived?
-6. Which claims are proved by semantic execution, durable-systems execution, formal argument or external evidence?
+6. Which claims are proved by semantic execution, durable/distributed/scale execution, bounded formal exploration or external evidence?
 7. Which limitations are fundamental lower bounds rather than unfinished engineering?
 8. Why would a first-principles frontier-engineering team rationally choose this architecture over the strongest measured alternatives?
 9. What future observation would falsify the supremacy claim?
 
-The dossier must never assert that Elon Musk, xAI, SpaceX or any other third party actually endorses the architecture unless independent evidence of that endorsement exists.
+Narrative explanation may summarize the deterministic dossier, but may not replace, contradict or inflate it.
 
-## 15. Definition of success
+## 18. Definition of success
 
-The desired output is not "an architecture that sounds supreme". It is the strongest evidence-supported architecture the protocol can construct after systematically trying to defeat both the architecture and the search process that produced it, together with an auditable explanation of why every known attainable higher direction failed.
+The desired output is not "an architecture that sounds supreme". It is the strongest evidence-supported architecture the signed protocol can construct after systematically trying to defeat both the architecture and the search process that produced it, together with a deterministic, hash-indexed and falsifiable explanation of why every known attainable higher direction failed.
+
+The claim is intentionally conditional and reopenable. A new constructible family, stronger counterexample, protocol improvement, evaluator gap or violated assumption reopens the tournament.
