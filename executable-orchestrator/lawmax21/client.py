@@ -2,7 +2,8 @@
 
 The logical id covers the entire identity-bearing request. Budget is reserved before a byte leaves
 the machine and settled only from provider-reported usage. Historical LAWMAX pricing remains
-supported, while currency-explicit profiles can freeze cache-hit/cache-miss/output price schedules.
+supported without changing its request identity; currency-explicit profiles freeze their price
+schedule into the identity so a replay can never silently cross billing contracts.
 """
 import json
 import os
@@ -22,13 +23,17 @@ class StructuredOutputRejected(Exception):
     pass
 
 
-# Historical LAWMAX contract. New provider profiles should pass a signed, currency-explicit table.
 DEFAULT_PRICES = {"input_eur_per_mtok": 0.55, "output_eur_per_mtok": 2.19}
+
+
+def _is_legacy_price_table(prices):
+    p = prices or {}
+    return "input_eur_per_mtok" in p or "output_eur_per_mtok" in p
 
 
 def normalize_prices(prices):
     p = dict(prices or DEFAULT_PRICES)
-    if "input_eur_per_mtok" in p or "output_eur_per_mtok" in p:
+    if _is_legacy_price_table(p):
         if "input_eur_per_mtok" not in p or "output_eur_per_mtok" not in p:
             raise ValueError("legacy price table requires both input_eur_per_mtok and output_eur_per_mtok")
         return {
@@ -92,7 +97,6 @@ class HttpTransport:
 
 
 def extract_content(response_obj):
-    """Pull the assistant final answer out of a chat-completion envelope."""
     try:
         choice = response_obj["choices"][0]
     except (KeyError, IndexError, TypeError):
@@ -109,7 +113,6 @@ def extract_content(response_obj):
 
 
 def extract_json_object(text):
-    """Exactly one JSON object is expected. Fenced blocks are tolerated; ambiguity is not."""
     s = text.strip()
     if s.startswith("```"):
         s = s.split("\n", 1)[1] if "\n" in s else s
@@ -134,7 +137,9 @@ def extract_json_object(text):
 
 
 def extract_usage(response_obj, prices):
-    p = normalize_prices(prices)
+    raw_prices = dict(prices or DEFAULT_PRICES)
+    legacy = _is_legacy_price_table(raw_prices)
+    p = normalize_prices(raw_prices)
     u = response_obj.get("usage") or {}
     pt = u.get("prompt_tokens")
     ct = u.get("completion_tokens")
@@ -146,9 +151,6 @@ def extract_usage(response_obj, prices):
     hit = u.get("prompt_cache_hit_tokens")
     miss = u.get("prompt_cache_miss_tokens")
     if hit is None or miss is None:
-        # Historical response shape used by old LAWMAX mocks/clients. It is acceptable only
-        # for a price table that does not distinguish hit from miss. A V4 production schedule
-        # requires the provider's explicit split so the ledger cannot guess its bill.
         nested = (u.get("prompt_tokens_details") or {}).get("cached_tokens")
         if p["require_cache_split"]:
             raise ApiError("provider usage omitted prompt_cache_hit_tokens/prompt_cache_miss_tokens — "
@@ -169,12 +171,13 @@ def extract_usage(response_obj, prices):
         "total_tokens": int(u.get("total_tokens", pt + ct)),
         "prompt_cache_hit_tokens": hit,
         "prompt_cache_miss_tokens": miss,
+        "cached_tokens": hit,
         "reasoning_tokens": int((u.get("completion_tokens_details") or {}).get("reasoning_tokens", 0) or 0),
         "billing_currency": p["currency"],
         "billing_amount": round(amount, 9),
     }
-    if p["currency"] == "EUR":
-        usage["eur"] = usage["billing_amount"]  # historical readers remain byte-compatible in meaning
+    if legacy:
+        usage["eur"] = usage["billing_amount"]
     return usage
 
 
@@ -188,7 +191,9 @@ class Client:
         self.log = log
         self.system_prompt = system_prompt
         self.system_sha = sha256_bytes(system_prompt.encode("utf-8"))
-        self.prices = normalize_prices(prices or DEFAULT_PRICES)
+        raw_prices = dict(DEFAULT_PRICES if prices is None else prices)
+        self.legacy_pricing = _is_legacy_price_table(raw_prices)
+        self.prices = normalize_prices(raw_prices)
         self.max_technical_retries = max_technical_retries
         self.tpc = estimate_tokens_per_char
         self.request_defaults = dict(request_defaults or {})
@@ -206,9 +211,8 @@ class Client:
         os.makedirs(os.path.join(self.raw, "responses"), exist_ok=True)
         os.makedirs(os.path.join(self.raw, "meta"), exist_ok=True)
 
-    # ------------------------------------------------------------- identity
     def identity(self, role, ticket, context_package_sha, request_body):
-        return {
+        identity = {
             "protocol_version": PROTOCOL_VERSION,
             "endpoint": self.t.endpoint,
             "model": self.t.model,
@@ -216,9 +220,13 @@ class Client:
             "context_package_sha256": context_package_sha,
             "role": role,
             "ticket": ticket,
-            "price_schedule": self.prices,
             "request": request_body,
         }
+        # Preserve the historical LAWMAX identity byte-shape. New currency-explicit profiles bind
+        # their signed price schedule into identity because a billing contract change is material.
+        if not self.legacy_pricing:
+            identity["price_schedule"] = self.prices
+        return identity
 
     @staticmethod
     def logical_id(identity):
@@ -233,16 +241,12 @@ class Client:
         chars = len(canonical_bytes(identity)) + len(self.system_prompt)
         est_in = int(chars * self.tpc)
         est_out = int((identity.get("request") or {}).get("max_tokens") or 4096)
-        # Worst-case pre-call reservation: every estimated input token is a cache MISS and the
-        # model may consume the full declared output ceiling. Actual billing is settled later.
         amount = ((est_in / 1e6) * self.prices["input_cache_miss_per_mtok"]
                   + (est_out / 1e6) * self.prices["output_per_mtok"])
         return est_in + est_out, round(amount, 9)
 
-    # ----------------------------------------------------------------- call
     def call(self, role, ticket, context_package_sha, messages, response_schema=None,
              temperature=0.0, max_tokens=None, line="main"):
-        """Returns (logical_id, parsed_object_or_text, replayed: bool, usage)."""
         ceiling = self.default_max_tokens if max_tokens is None else int(max_tokens)
         if ceiling <= 0:
             raise ValueError("max_tokens must be positive")
@@ -263,7 +267,6 @@ class Client:
 
         est_tokens, est_money = self._estimate(identity)
         self.ledger.reserve(lid, role, est_tokens, est_money, line=line)
-
         atomic_write_json(req_p, {"logical_id": lid, "utc": utc(), "identity": identity})
 
         try:
@@ -275,7 +278,10 @@ class Client:
             atomic_write_json(resp_p, response_obj)
             if status != 200:
                 raise ApiError(f"HTTP {status}: {json.dumps(response_obj)[:400]}")
-            usage = extract_usage(response_obj, self.prices)
+            # Pass the original pricing contract shape for legacy readers; explicit profiles use
+            # the normalized signed table directly.
+            usage_prices = DEFAULT_PRICES if self.legacy_pricing else self.prices
+            usage = extract_usage(response_obj, usage_prices)
         except BaseException:
             self.ledger.release(lid)
             raise
