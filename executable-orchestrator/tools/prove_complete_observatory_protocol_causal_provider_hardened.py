@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Route the authoritative causal E2E through the complete genome-aware localhost provider.
+"""Route the authoritative causal E2E through the causal-aware localhost provider.
 
-The readable core proof starts ``mock_observatory_protocol_server.py``. Genome realization and causal
-ablation require the final extension chain in ``mock_observatory_genome_server.py``. This wrapper
-rewrites only that one localhost-provider command and passes every evaluator, Git and owner-signature
-subprocess through unchanged. Real-provider endpoints are never affected.
+The readable core proof starts ``mock_observatory_protocol_server.py``. Causal genome realization
+requires the final extension chain in ``mock_observatory_causal_server.py``, which itself imports the
+full genome-aware provider and permits only hidden-scenario-exercised reference citations. This
+wrapper rewrites only that one localhost-provider command and passes every evaluator, Git and owner-
+signature subprocess through unchanged. Real-provider endpoints are never affected.
 """
 from __future__ import annotations
 
@@ -15,8 +16,11 @@ import prove_complete_observatory_protocol_causal_hardened as base
 PROVIDER_ROUTING_FILE = (
     "executable-orchestrator/tools/"
     "prove_complete_observatory_protocol_causal_provider_hardened.py")
-base.CAUSAL_FILES.add(PROVIDER_ROUTING_FILE)
-base.CORE.REQUIRED_PROTOCOL_FILES.add(PROVIDER_ROUTING_FILE)
+CAUSAL_PROVIDER_FILE = (
+    "executable-orchestrator/tools/mock_observatory_causal_server.py")
+for relative in (PROVIDER_ROUTING_FILE, CAUSAL_PROVIDER_FILE):
+    base.CAUSAL_FILES.add(relative)
+    base.CORE.REQUIRED_PROTOCOL_FILES.add(relative)
 _ORIGINAL_POPEN = base.CORE.subprocess.Popen
 
 
@@ -28,7 +32,7 @@ def _genome_provider_popen(command, *args, **kwargs):
                     "mock_observatory_protocol_server.py":
                 values[index] = os.path.join(
                     os.path.dirname(str(value)),
-                    "mock_observatory_genome_server.py")
+                    "mock_observatory_causal_server.py")
                 break
         command = values
     return _ORIGINAL_POPEN(command, *args, **kwargs)
