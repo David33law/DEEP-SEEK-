@@ -1,14 +1,15 @@
 """Profile-specific independent audit for the National Legal Observatory.
 
-The active novelty, meta-search, hardening, taxonomy-completion and search-integrity overlays are
-installed here because this is the final profile layer: they must wrap the complete crown search
-while remaining inside the same signed state machine and final independent audit.
+Prior-art falsification, active novelty, meta-search, hardening, taxonomy completion and
+search-integrity are installed here because this is the final profile layer. They wrap the complete
+crown search while remaining inside the same signed state machine and final independent audit.
 """
 
 from .canonical import atomic_write_json
 from .handlers import A, tree_hash
 from . import (observatory_meta_hardening_overlay, observatory_meta_search_overlay,
-               observatory_novelty_overlay, observatory_search_integrity_overlay,
+               observatory_novelty_overlay, observatory_prior_art_overlay,
+               observatory_search_integrity_overlay,
                observatory_taxonomy_completion_overlay)
 
 
@@ -18,8 +19,9 @@ observatory_novelty_overlay.NOVELTY_BUILD_LIMIT = 100_000
 
 
 def install(ctx, handlers):
-    """Install novelty → meta → hardening → taxonomy → search integrity → audit."""
-    out = observatory_novelty_overlay.install(ctx, handlers)
+    """Install prior art → novelty → meta → hardening → taxonomy → integrity → audit."""
+    out = observatory_prior_art_overlay.install(ctx, handlers)
+    out = observatory_novelty_overlay.install(ctx, out)
     out = observatory_meta_search_overlay.install(ctx, out)
     out = observatory_meta_hardening_overlay.install(ctx, out)
     out = observatory_taxonomy_completion_overlay.install(ctx, out)
@@ -46,6 +48,22 @@ def install(ctx, handlers):
                 "endpoint": ctx.client.t.endpoint,
                 "model": ctx.client.t.model,
                 "price_schedule": dict(ctx.client.prices),
+            },
+            "authoritative_prior_art_challenge": {
+                "manifest": "PUBLIC-PRIOR-ART-MANIFEST.json",
+                "contract": "PRIOR-ART-CHALLENGE-CONTRACT.md",
+                "manifest_sha256": supremacy.get("prior_art_manifest_sha256"),
+                "waves": supremacy.get("prior_art_waves", 0),
+                "sources": supremacy.get("prior_art_sources", 0),
+                "challengers": supremacy.get("prior_art_challengers", 0),
+                "blockers": supremacy.get("prior_art_blockers", 0),
+                "all_sources_assessed": supremacy.get(
+                    "prior_art_all_sources_assessed", False),
+                "challengers_measured": supremacy.get(
+                    "prior_art_challengers_measured", False),
+                "no_blockers": supremacy.get("prior_art_no_blockers", False),
+                "opened_only_after_independent_frontier": True,
+                "third_party_endorsement_inferred": False,
             },
             "active_novelty_saturation": {
                 "contract": supremacy.get("novelty_contract"),
