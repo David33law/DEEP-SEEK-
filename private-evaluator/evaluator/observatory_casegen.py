@@ -12,9 +12,11 @@ DIMENSIONS = (
     "source_coverage", "change_detection_recall", "temporal_reconstruction_accuracy",
     "canonical_identity_accuracy", "normative_effect_accuracy",
     "jurisprudence_temporal_link_accuracy", "doctrine_epistemic_separation",
-    "provenance_completeness", "replay_determinism", "recovery_success",
-    "honest_unknown_rate",
+    "provenance_completeness", "publication_projection_consistency",
+    "replay_determinism", "recovery_success", "honest_unknown_rate",
 )
+
+PUBLICATION_CHANNELS = ["human", "api", "linked_data", "eli", "public_sector", "ai"]
 
 
 def _d(d):
@@ -59,7 +61,7 @@ def make_scenario(seed, scenario_id=None):
     revive_eff = base_day + timedelta(days=90)
     repeal_pub = base_day + timedelta(days=100)
     repeal_eff = base_day + timedelta(days=110)
-    judgment_day = base_day + timedelta(days=45)  # after amendment, before correction was known
+    judgment_day = base_day + timedelta(days=45)
 
     base = {
         "source_id": base_id, "kind": "LEGISLATION", "canonical_id": provision,
@@ -116,12 +118,11 @@ def make_scenario(seed, scenario_id=None):
     before_amend = base_eff + timedelta(days=3)
     after_amend = amend_eff + timedelta(days=3)
     after_corr_legal = corr_eff + timedelta(days=3)
+    published_knowledge = corr_pub + timedelta(days=1)
     suspended_day = suspend_eff + timedelta(days=2)
     revived_day = revive_eff + timedelta(days=2)
     repealed_day = repeal_eff + timedelta(days=2)
 
-    # Each step carries expected facts and dimension credits. The evaluator compares subsets:
-    # candidates may return richer data but cannot omit or contradict these load-bearing facts.
     steps = [
         {"m": "ingest", "a": {"source": base},
          "expect": {"accepted": True, "canonical_id": provision, "evidence_id": base_id, "deduplicated": False},
@@ -133,7 +134,7 @@ def make_scenario(seed, scenario_id=None):
          "expect": {"accepted": True, "target_id": provision, "change_type": "AMENDMENT"},
          "dims": ["source_coverage", "change_detection_recall", "normative_effect_accuracy"]},
         {"m": "state_at", "a": {"query": {"canonical_id": provision, "legal_time": _d(before_amend),
-                                                 "knowledge_time": _d(corr_pub + timedelta(days=1))}},
+                                                 "knowledge_time": _d(published_knowledge)}},
          "expect": {"canonical_id": provision, "status": "ACTIVE", "text": text_a},
          "contains": {"evidence_chain": [base_id]},
          "dims": ["temporal_reconstruction_accuracy", "normative_effect_accuracy", "provenance_completeness"]},
@@ -150,58 +151,63 @@ def make_scenario(seed, scenario_id=None):
          "expect": {"canonical_id": provision, "status": "ACTIVE", "text": text_b},
          "dims": ["temporal_reconstruction_accuracy"]},
         {"m": "state_at", "a": {"query": {"canonical_id": provision, "legal_time": _d(after_corr_legal),
-                                                 "knowledge_time": _d(corr_pub + timedelta(days=1))}},
+                                                 "knowledge_time": _d(published_knowledge)}},
          "expect": {"canonical_id": provision, "status": "ACTIVE", "text": text_c},
          "contains": {"evidence_chain": [base_id, amend_id, correction_id]},
          "dims": ["temporal_reconstruction_accuracy", "normative_effect_accuracy", "provenance_completeness"]},
         {"m": "link_jurisprudence", "a": {"decision": judgment},
          "expect": {"decision_id": judgment_id},
          "link": {"canonical_id": provision, "version_evidence_id": amend_id},
-         "dims": ["jurisprudence_temporal_link_accuracy"]},
+         "dims": ["source_coverage", "jurisprudence_temporal_link_accuracy"]},
         {"m": "attach_doctrine", "a": {"document": doctrine},
          "expect": {"doctrine_id": doctrine_id, "epistemic_type": "DOCTRINE", "changes_binding_state": False},
-         "dims": ["doctrine_epistemic_separation"]},
+         "dims": ["source_coverage", "doctrine_epistemic_separation"]},
         {"m": "apply_change", "a": {"event": suspension},
          "expect": {"accepted": True, "target_id": provision, "change_type": "SUSPENSION"},
-         "dims": ["change_detection_recall", "normative_effect_accuracy"]},
+         "dims": ["source_coverage", "change_detection_recall", "normative_effect_accuracy"]},
         {"m": "state_at", "a": {"query": {"canonical_id": provision, "legal_time": _d(suspended_day),
                                                  "knowledge_time": _d(suspend_pub + timedelta(days=1))}},
          "expect": {"canonical_id": provision, "status": "SUSPENDED", "text": text_c},
          "dims": ["temporal_reconstruction_accuracy", "normative_effect_accuracy"]},
         {"m": "apply_change", "a": {"event": revival},
          "expect": {"accepted": True, "target_id": provision, "change_type": "REVIVAL"},
-         "dims": ["change_detection_recall", "normative_effect_accuracy"]},
+         "dims": ["source_coverage", "change_detection_recall", "normative_effect_accuracy"]},
         {"m": "state_at", "a": {"query": {"canonical_id": provision, "legal_time": _d(revived_day),
                                                  "knowledge_time": _d(revive_pub + timedelta(days=1))}},
          "expect": {"canonical_id": provision, "status": "ACTIVE", "text": text_c},
          "dims": ["temporal_reconstruction_accuracy", "normative_effect_accuracy"]},
         {"m": "apply_change", "a": {"event": repeal},
          "expect": {"accepted": True, "target_id": provision, "change_type": "REPEAL"},
-         "dims": ["change_detection_recall", "normative_effect_accuracy"]},
+         "dims": ["source_coverage", "change_detection_recall", "normative_effect_accuracy"]},
         {"m": "state_at", "a": {"query": {"canonical_id": provision, "legal_time": _d(repealed_day),
                                                  "knowledge_time": _d(repeal_pub + timedelta(days=1))}},
          "expect": {"canonical_id": provision, "status": "REPEALED", "text": text_c},
          "dims": ["temporal_reconstruction_accuracy", "normative_effect_accuracy"]},
         {"m": "provenance", "a": {"query": {"canonical_id": provision,
                                                     "legal_time": _d(after_corr_legal),
-                                                    "knowledge_time": _d(corr_pub + timedelta(days=1))}},
+                                                    "knowledge_time": _d(published_knowledge)}},
          "expect": {"canonical_id": provision, "complete": True},
          "contains": {"evidence_chain": [base_id, amend_id, correction_id]},
          "dims": ["provenance_completeness"]},
         {"m": "publish", "a": {"query": {"canonical_id": provision,
                                                  "legal_time": _d(after_corr_legal),
-                                                 "knowledge_time": _d(corr_pub + timedelta(days=1))}},
+                                                 "knowledge_time": _d(published_knowledge)}},
          "expect": {"canonical_id": provision, "status": "ACTIVE", "text": text_c},
          "contains": {"evidence_chain": [base_id, amend_id, correction_id]},
-         "dims": ["provenance_completeness", "temporal_reconstruction_accuracy"]},
+         "projection_required": {"canonical_id": provision, "status": "ACTIVE",
+                                 "legal_time": _d(after_corr_legal),
+                                 "knowledge_time": _d(published_knowledge),
+                                 "channels": PUBLICATION_CHANNELS},
+         "dims": ["provenance_completeness", "temporal_reconstruction_accuracy",
+                  "publication_projection_consistency"]},
         {"m": "ingest", "a": {"source": conflict},
          "expect": {"accepted": False, "canonical_id": provision},
          "nonempty": ["unresolved"],
-         "dims": ["canonical_identity_accuracy", "honest_unknown_rate"]},
+         "dims": ["source_coverage", "change_detection_recall",
+                  "canonical_identity_accuracy", "honest_unknown_rate"]},
     ]
 
     replay_events = [base, duplicate, amendment, correction, suspension, revival, repeal, doctrine, judgment]
-    # Two identical pure replays; the grader requires identical roots and object counts.
     steps.extend([
         {"m": "replay", "a": {"events": replay_events}, "pair": "replay-A",
          "dims": ["replay_determinism", "recovery_success"]},
@@ -218,6 +224,7 @@ def make_scenario(seed, scenario_id=None):
             "source_ids": [base_id, dup_id, amend_id, correction_id, suspension_id,
                            revival_id, repeal_id, judgment_id, doctrine_id, conflict_id],
             "expected_replay_pair": ["replay-A", "replay-B"],
+            "publication_channels": list(PUBLICATION_CHANNELS),
         },
     }
 
@@ -230,6 +237,8 @@ def public_schema_hint():
                                 "attach_doctrine", "provenance", "replay", "publish"],
         "state_at_status": ["ACTIVE", "SUSPENDED", "REPEALED", "UNKNOWN", "CONFLICT"],
         "time_dimensions": ["legal_time", "knowledge_time"],
+        "publication_channels": list(PUBLICATION_CHANNELS),
+        "completeness_rule": "every injected legally material item must be detected/admitted or explicitly unresolved; silent omission fails",
     }
 
 
