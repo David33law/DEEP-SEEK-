@@ -23,9 +23,33 @@ def install(_ctx, handlers):
                 "genome_causal_ablation_replication_controls", 0),
             "causal_crown_negative_controls": summary.get(
                 "genome_causal_ablation_crown_controls", 0),
+            "axis_specific_attribution_required": summary.get(
+                "genome_axis_specific_attribution_required", False),
+            "axis_specific_replication_passed": summary.get(
+                "genome_axis_specific_replication_passed", False),
+            "axis_specific_crown_passed": summary.get(
+                "genome_axis_specific_crown_passed", False),
+            "axis_specific_replication_tasks": summary.get(
+                "genome_axis_specific_replication_tasks", 0),
+            "axis_specific_replication_attributed": summary.get(
+                "genome_axis_specific_replication_attributed", 0),
+            "axis_specific_crown_tasks": summary.get(
+                "genome_axis_specific_crown_tasks", 0),
+            "axis_specific_crown_attributed": summary.get(
+                "genome_axis_specific_crown_attributed", 0),
             "causal_definition_set_ablation": True,
             "inert_mutation_controls_required": True,
         })
+        all_axis_specific = bool(
+            controlled["axis_specific_attribution_required"] is True
+            and controlled["axis_specific_replication_passed"] is True
+            and controlled["axis_specific_crown_passed"] is True
+            and int(controlled["axis_specific_replication_tasks"]) > 0
+            and int(controlled["axis_specific_crown_tasks"]) > 0
+            and int(controlled["axis_specific_replication_tasks"])
+            == int(controlled["axis_specific_replication_attributed"])
+            and int(controlled["axis_specific_crown_tasks"])
+            == int(controlled["axis_specific_crown_attributed"]))
         result["causal_genome_ablation"] = {
             "replication_passed": controlled["causal_replication"],
             "crown_passed": controlled["causal_crown"],
@@ -35,6 +59,13 @@ def install(_ctx, handlers):
                 controlled["causal_replication_negative_controls"],
             "crown_negative_controls":
                 controlled["causal_crown_negative_controls"],
+            "axis_specific_attribution_required": controlled[
+                "axis_specific_attribution_required"],
+            "all_tasks_axis_specifically_attributed": all_axis_specific,
+            "replication_axis_specific_tasks": controlled[
+                "axis_specific_replication_attributed"],
+            "crown_axis_specific_tasks": controlled[
+                "axis_specific_crown_attributed"],
             "infrastructure_failure_counts_as_causal_failure": False,
             "exact_mutated_source_receipts_required": True,
         }
