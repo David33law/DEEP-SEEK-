@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 """Zero-cost end-to-end proof for the National Legal Observatory profile.
 
-Runs in a disposable Git clone. Uses the shipped setup/preflight/runner/evaluator and a localhost
-DeepSeek-shape provider. Drives owner gates with a temporary owner key, injects a crash, resumes
-from the signed log, and requires COMMITTED plus CP1-reuse / prior-CP2-quarantine evidence.
-
-On Windows the disposable workspace is intentionally rooted close to the drive root. The canonical
-corpus contains legitimate deep paths; putting candidate worktrees under the user's long %TEMP%
-path needlessly consumes the Win32/Git path budget before a single repository-relative byte is
-materialised.
+Runs in a disposable Git clone against a localhost DeepSeek-shape provider. It proves the shared
+signed state machine, owner gates, crash/resume, CP1 reuse, prior-CP2 quarantine, max V4-Pro request
+policy, and the same currency-explicit provider billing seat used by production.
 """
 import argparse
 import json
@@ -25,6 +20,15 @@ ORCH = os.path.dirname(HERE)
 ROOT = os.path.dirname(ORCH)
 PORT = 8732
 RUN_ID = "OBS-PROOF-0001"
+MODEL = "deepseek-v4-pro"
+EXPECTED_PRICE = {
+    "currency": "USD",
+    "input_cache_hit_per_mtok": 0.003625,
+    "input_cache_miss_per_mtok": 0.435,
+    "output_per_mtok": 0.87,
+    "require_cache_split": True,
+    "model": MODEL,
+}
 
 
 def git_argv(*args):
@@ -67,12 +71,6 @@ def write_json(path, obj):
 
 
 def short_temp_workspace():
-    """Allocate an intentionally short disposable root on Windows.
-
-    This is not a relaxation of any verifier. It preserves the exact repository bytes while
-    removing accidental host-path depth from candidate worktrees. The parent can be overridden
-    with OBSERVATORY_PROOF_TMP_ROOT when a different local drive is desired.
-    """
     if os.name != "nt":
         return tempfile.mkdtemp(prefix="observatory-proof-")
     parent = os.environ.get("OBSERVATORY_PROOF_TMP_ROOT")
@@ -85,24 +83,27 @@ def short_temp_workspace():
 
 
 def clone_disposable(dest):
-    # Prove the exact committed source, not an uncommitted working-tree variant.
+    # The disposable clone, not the caller's mutable working tree, is what is proven. Still refuse
+    # drift in proof/control sources so the launcher itself cannot be silently different from HEAD.
     r = sh(git_argv("-C", ROOT, "status", "--porcelain", "--untracked-files=all", "--",
                     "profiles/national-observatory", "run_observatory.py", "setup_observatory.py",
                     "executable-orchestrator/lawmax21", "private-evaluator/evaluator",
-                    "benchmark/observatory_reference_candidate.py"))
-    if r.returncode != 0 or r.stdout.strip():
+                    "benchmark/observatory_reference_candidate.py",
+                    "executable-orchestrator/tools/run_observatory_proof.py",
+                    "executable-orchestrator/tools/mock_observatory_server.py"))
+    if r.returncode != 0 or (r.stdout or "").strip():
         raise RuntimeError("source checkout has uncommitted proof/Observatory code; refusing disposable proof\n"
-                           + r.stdout[:3000])
+                           + (r.stdout or "")[:3000])
     head = sh(git_argv("-C", ROOT, "rev-parse", "HEAD"))
     if head.returncode != 0:
-        raise RuntimeError(head.stderr)
-    head = head.stdout.strip()
+        raise RuntimeError(head.stderr or "git rev-parse failed")
+    head = (head.stdout or "").strip()
     r = sh(git_argv("clone", "--no-hardlinks", "--quiet", ROOT, dest))
     if r.returncode != 0:
-        raise RuntimeError("disposable clone failed: " + r.stderr)
+        raise RuntimeError("disposable clone failed: " + (r.stderr or ""))
     r = sh(git_argv("-C", dest, "checkout", "--quiet", "--detach", head))
     if r.returncode != 0:
-        raise RuntimeError("disposable checkout failed: " + r.stderr)
+        raise RuntimeError("disposable checkout failed: " + (r.stderr or ""))
     return head
 
 
@@ -126,7 +127,7 @@ def drive_launch(dest, target, cp1, prior, runtime, owner_key, endpoint):
     signer = os.path.join(dest, "executable-orchestrator", "tools", "owner_sign.py")
     env = {"DEEPSEEK_API_KEY": "proof-token-not-a-real-key",
            "PYTHONDONTWRITEBYTECODE": "1"}
-    args = ["--launch", "--run-id", RUN_ID, "--endpoint", endpoint, "--model", "observatory-proof-model",
+    args = ["--launch", "--run-id", RUN_ID, "--endpoint", endpoint, "--model", MODEL,
             "--backend", "subprocess", "--canonical-repo", target,
             "--cp1-evidence", cp1, "--prior-cp2", prior,
             "--runtime", runtime, "--max-rounds", "4", "--crash-after", "6"]
@@ -135,14 +136,15 @@ def drive_launch(dest, target, cp1, prior, runtime, owner_key, endpoint):
     for attempt in range(30):
         r = py(runner, *args, env=env, cwd=dest)
         transcript.append({"attempt": attempt, "rc": r.returncode,
-                           "stdout_tail": r.stdout[-1800:], "stderr_tail": r.stderr[-1800:]})
+                           "stdout_tail": (r.stdout or "")[-1800:],
+                           "stderr_tail": (r.stderr or "")[-1800:]})
         if r.returncode == 10:
             info = read_json(os.path.join(runtime, "gates", "AWAITING-OWNER.json"))
             s = py(signer, "--key", owner_key, "--gate", info["awaiting"], "--run-id", RUN_ID,
                    "--subject", info["subject"], "--decision", "APPROVE",
                    "--out", info["approval_expected_at"], cwd=dest)
             if s.returncode != 0:
-                raise RuntimeError("proof owner gate signing failed: " + s.stdout + s.stderr)
+                raise RuntimeError("proof owner gate signing failed: " + (s.stdout or "") + (s.stderr or ""))
             gates.append(info["awaiting"])
             args = to_resume(args, drop_crash=True)
             crash_pending = False
@@ -161,6 +163,49 @@ def drive_launch(dest, target, cp1, prior, runtime, owner_key, endpoint):
             "crashed_and_resumed": crashed_and_resumed}
 
 
+def assert_price_schedule(schedule):
+    for key, expected in EXPECTED_PRICE.items():
+        if schedule.get(key) != expected:
+            raise RuntimeError(f"signed/provider price schedule mismatch for {key}: "
+                               f"{schedule.get(key)!r} != {expected!r}")
+
+
+def verify_currency_accounting(runtime, summary, audit):
+    budget = summary.get("budget") or {}
+    limits = budget.get("limits") or {}
+    spent = budget.get("spent") or {}
+    if budget.get("currency") != "USD" or limits.get("currency") != "USD":
+        raise RuntimeError("Observatory budget is not currency-explicit USD")
+    if "amount" not in limits or "amount" not in spent:
+        raise RuntimeError("Observatory budget did not use generic monetary amount seat")
+    if "eur" in limits or "eur" in spent:
+        raise RuntimeError("legacy EUR monetary seat leaked into Observatory budget")
+    assert_price_schedule(limits.get("price_schedule") or {})
+    if not audit.get("budget_within_ceiling") or audit.get("currency") != "USD":
+        raise RuntimeError("independent audit did not certify USD budget ceiling")
+    assert_price_schedule((audit.get("provider") or {}).get("price_schedule") or {})
+
+    ledger = read_json(os.path.join(runtime, "budget", "ledger.json"))
+    entries = ledger.get("entries") or []
+    if not entries:
+        raise RuntimeError("currency proof found no settled model-call ledger entries")
+    for i, entry in enumerate(entries):
+        usage = entry.get("usage") or {}
+        if entry.get("currency") != "USD" or usage.get("billing_currency") != "USD":
+            raise RuntimeError(f"ledger entry {i} has wrong billing currency")
+        hit = usage.get("prompt_cache_hit_tokens")
+        miss = usage.get("prompt_cache_miss_tokens")
+        prompt = usage.get("prompt_tokens")
+        if hit is None or miss is None or prompt is None or int(hit) + int(miss) != int(prompt):
+            raise RuntimeError(f"ledger entry {i} lacks exact V4 cache hit/miss accounting")
+        if "billing_amount" not in usage or float(usage["billing_amount"]) < 0:
+            raise RuntimeError(f"ledger entry {i} lacks nonnegative provider billing amount")
+    return {"currency": "USD", "settled_calls_checked": len(entries),
+            "spent_amount": spent["amount"],
+            "cache_split_verified_every_call": True,
+            "signed_price_schedule_verified": True}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--canonical-repo", required=True,
@@ -177,7 +222,7 @@ def main(argv=None):
     dest = os.path.join(temp, "r")
     runtime = os.path.join(temp, "rt")
     mock = None
-    result = {"proof": "national-observatory-zero-cost-e2e-v1", "paid_api_calls": 0,
+    result = {"proof": "national-observatory-zero-cost-e2e-v2", "paid_api_calls": 0,
               "workspace": temp, "runtime": runtime,
               "path_budget": {"workspace_chars": len(temp), "runtime_chars": len(runtime),
                               "windows_longpaths_git": os.name == "nt"}}
@@ -186,17 +231,21 @@ def main(argv=None):
         result["source_head"] = source_head
 
         setup = py(os.path.join(dest, "setup_observatory.py"), "--run-id", RUN_ID,
-                   "--budget-eur", "25", "--tokens", "10000000", "--calls", "3000", "--days", "3",
+                   "--budget-usd", "25", "--tokens", "10000000", "--calls", "3000", "--days", "3",
                    "--qualification", "3", "--replication", "2", "--holdout", "2", cwd=dest)
-        result["setup"] = {"rc": setup.returncode, "tail": (setup.stdout + setup.stderr)[-2500:]}
+        result["setup"] = {"rc": setup.returncode, "tail": ((setup.stdout or "") + (setup.stderr or ""))[-2500:]}
         if setup.returncode != 0:
             raise RuntimeError("setup_observatory failed\n" + result["setup"]["tail"])
 
         owner_key = os.path.join(dest, "private-evaluator", "owner-held-secrets", "OWNER.key")
+        endpoint = f"http://127.0.0.1:{PORT}/chat/completions"
+        # Preflight is local/subprocess here because container readiness is a separate production
+        # proof. The signed owner budget/model contract is nevertheless the exact production one.
         pre = py(os.path.join(dest, "run_observatory.py"), "--preflight", "--run-id", RUN_ID,
+                 "--endpoint", endpoint, "--model", MODEL, "--backend", "subprocess",
                  "--runtime", runtime, "--canonical-repo", target,
                  "--cp1-evidence", cp1, "--prior-cp2", prior, cwd=dest)
-        result["preflight"] = {"rc": pre.returncode, "tail": (pre.stdout + pre.stderr)[-2500:]}
+        result["preflight"] = {"rc": pre.returncode, "tail": ((pre.stdout or "") + (pre.stderr or ""))[-3500:]}
         if pre.returncode != 0:
             raise RuntimeError("Observatory preflight failed\n" + result["preflight"]["tail"])
 
@@ -205,8 +254,7 @@ def main(argv=None):
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if not wait_port(PORT):
             out, err = mock.communicate(timeout=2)
-            raise RuntimeError("Observatory mock server did not start\n" + out + err)
-        endpoint = f"http://127.0.0.1:{PORT}/chat/completions"
+            raise RuntimeError("Observatory mock server did not start\n" + (out or "") + (err or ""))
 
         run = drive_launch(dest, target, cp1, prior, runtime, owner_key, endpoint)
         result["launch"] = run
@@ -225,6 +273,17 @@ def main(argv=None):
         if int(spent.get("calls", 0)) <= 0:
             raise RuntimeError("mock HTTP path recorded zero model calls")
 
+        # Observatory terminal proof must be semantically clean: no inherited LAWMAX consciousness
+        # or integration-credit placeholders may survive in the profile artifact.
+        escalation = summary.get("escalation") or {}
+        conditions = escalation.get("conditions") or {}
+        forbidden_terminal = {"consciousness", "integration_attested",
+                              "integration_credited_candidate", "credited_layers"}
+        leaked = sorted(forbidden_terminal & set(escalation))
+        if leaked or "consciousness_real" in conditions:
+            raise RuntimeError(f"legacy LAWMAX terminal semantics leaked into Observatory proof: "
+                               f"fields={leaked}, consciousness_real={'consciousness_real' in conditions}")
+
         reality = read_json(os.path.join(runtime, "reality", "REPOSITORY-REALITY-MODEL.json"))
         history = read_json(os.path.join(runtime, "reality", "HISTORICAL-EXPERIMENT-MAP.json"))
         proposals = read_json(os.path.join(runtime, "architecture", "proposals.json"))
@@ -241,8 +300,9 @@ def main(argv=None):
         if not audit.get("immutable_package_unchanged") or audit.get("hidden_disclosed_to_builder"):
             raise RuntimeError("independent audit failed immutable/hidden invariants")
         result["independent_audit"] = audit
+        result["currency_accounting"] = verify_currency_accounting(runtime, summary, audit)
         result["status"] = "PASS"
-    except Exception as exc:  # one terminal failure, never trailing PASS
+    except Exception as exc:
         result["status"] = "FAIL"
         result["reason"] = str(exc)
     finally:
