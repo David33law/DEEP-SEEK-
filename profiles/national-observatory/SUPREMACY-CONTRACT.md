@@ -1,4 +1,4 @@
-# NATIONAL LEGAL OBSERVATORY — SUPREMACY CONTRACT v2
+# NATIONAL LEGAL OBSERVATORY — SUPREMACY CONTRACT v3
 
 ## 1. Immutable objective
 
@@ -97,7 +97,7 @@ The protocol must distinguish a bad implementation from an unattainable requirem
 
 "Unknown source no actor knows exists" cannot be turned into proven omniscience. "One canonical truth" does not excuse pretending distributed consistency has no failure model. Identity ambiguity cannot always be guessed away. Honest impossibility statements strengthen rather than weaken the final architecture.
 
-## 13. Active design-space saturation
+## 13. Active novelty, meta-search and design-space saturation
 
 The binding operational definition is `NOVELTY-SEARCH-CONTRACT.md`.
 
@@ -113,7 +113,15 @@ COMMITTED is forbidden merely because:
 
 Every candidate saturation wave must actively execute all six CP2-direct-blind novelty methods: assumption inversion, morphological-gap search, cross-domain structural transfer, surgical genome mutation, trusted-boundary recutting and ontology/taxonomy challenge.
 
-A wave is not dry unless all six methods completed, no unseen controlled genome appeared, no new genome was admitted, no deferred genome remains, no constructibility question is unresolved and no direct prior-CP2 content was exposed. Three consecutive genuinely dry waves are mandatory. Any new genome, backlog, unresolved build or missing method resets the count.
+The search process itself must then be attacked by two independent meta-search critics. They inspect blind lineage coverage, controlled-taxonomy adequacy, selection and deduplication, blueprint expansion, formalization, implementation diversity, semantic and durable evaluators, challenger/recombination/simplification logic and the stopping conditions. A feasible search-only improvement must become a persisted dynamic CP2-direct-blind directive and be executed. A required code, evaluator or taxonomy change remains a blocking owner-signed protocol revision; it is not silently ignored.
+
+Mechanical coverage is mandatory. Every non-`other` controlled class must appear in valid search evidence. For each critical pair — authority/state derivation, authority/commit, commit/replication, trusted core/provenance, temporal/effect and publication/governance — every class on either side must be explored with at least three distinct counterpart classes. Every gap creates a targeted miner and makes the wave non-dry.
+
+Two independent closure auditors must inspect the complete persisted wave after all fixed miners, dynamic directives, construction attempts and coverage repair. They cannot override mechanical failure. Their support is necessary but never sufficient by itself.
+
+A wave is dry only if the complete fixed/meta/closure portfolio ran, direct CP2 content remained hidden, no unseen controlled genome appeared, no genome was admitted, all selected genomes were constructed or explicitly resolved, backlog and unresolved counts are zero, class and pair coverage are complete, no taxonomy extension remains open and no attainable protocol improvement remains.
+
+Three consecutive complete dry waves are mandatory. Any new genome, dynamic directive, protocol improvement, coverage gap, taxonomy claim, backlog, unresolved build, missing critic/auditor or CP2-direct leak resets the count.
 
 A supremacy terminal additionally requires that radical and anti-attractor challengers failed; recombinations failed to dominate; simplification could not match the incumbent with less trusted complexity; both proof arenas passed; independent destroyers found no surviving blocking defect; lower-bound analysis has no unresolved attainable improvement; and the final holdout/audit remain clean.
 
@@ -137,4 +145,4 @@ The dossier must never assert that Elon Musk, xAI, SpaceX or any other third par
 
 ## 15. Definition of success
 
-The desired output is not "an architecture that sounds supreme". It is the strongest evidence-supported architecture the protocol can construct after systematically trying to defeat it, together with an auditable explanation of why every known attainable higher direction failed.
+The desired output is not "an architecture that sounds supreme". It is the strongest evidence-supported architecture the protocol can construct after systematically trying to defeat both the architecture and the search process that produced it, together with an auditable explanation of why every known attainable higher direction failed.
