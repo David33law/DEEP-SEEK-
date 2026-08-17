@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import os
 
-PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-3"
+PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-4"
 PROOF_MODE_ENV = "OBSERVATORY_ZERO_COST_PROOF"
 PUBLICATION_CHANNELS = ["human", "api", "linked_data", "eli", "public_sector", "ai"]
 REQUIRED_NOVELTY_METHODS = [
@@ -18,7 +18,6 @@ REQUIRED_NOVELTY_METHODS = [
     "G93-cross-domain-structural-transfer", "G94-surgical-genome-mutation",
     "G95-trusted-boundary-recut", "G96-ontology-and-taxonomy-challenge",
 ]
-
 MISSION_FLAGS = {
     "all_twelve_layers_required": True,
     "no_silent_legally_material_loss": True,
@@ -30,15 +29,16 @@ MISSION_FLAGS = {
     "national_scale_arena_required": True,
     "machine_checked_models_required": True,
     "legal_interoperability_required": True,
+    "cross_model_consistency_required": True,
     "authoritative_prior_art_challenge_required": True,
     "active_novelty_saturation_required": True,
     "meta_search_required": True,
     "mechanical_genome_coverage_required": True,
     "independent_closure_auditors_required": True,
     "implementation_diversity_required": True,
+    "bounded_candidate_output_required": True,
     "proof_mode_forbidden_in_production": True,
 }
-
 SEARCH_POLICY = {
     "novelty_dry_waves_required": 3,
     "meta_search_critics_required": 2,
@@ -51,7 +51,6 @@ SEARCH_POLICY = {
     "formal_models_required": 2,
     "interoperability_implementations_required": 2,
 }
-
 PRODUCTION_WORKLOADS = {
     "distributed": {"qualification": 5000, "replication": 10000, "crown": 50000},
     "scale": {"qualification": 100000, "replication": 250000, "crown": 1000000,
@@ -59,9 +58,9 @@ PRODUCTION_WORKLOADS = {
     "formal": {"qualification_depth": 3, "replication_depth": 4, "crown_depth": 5},
     "interoperability": {"qualification_cases": 24, "replication_cases": 48,
                          "crown_cases": 96},
+    "cross_model": {"qualification_histories": 4, "replication_histories": 8,
+                    "crown_histories": 16},
 }
-
-# Same handlers and schemas, reduced deterministic workloads for the local zero-cost control proof.
 PROOF_WORKLOADS = {
     "distributed": {"qualification": 300, "replication": 600, "crown": 1200},
     "scale": {"qualification": 2000, "replication": 4000, "crown": 8000,
@@ -69,8 +68,9 @@ PROOF_WORKLOADS = {
     "formal": {"qualification_depth": 2, "replication_depth": 2, "crown_depth": 3},
     "interoperability": {"qualification_cases": 4, "replication_cases": 6,
                          "crown_cases": 8},
+    "cross_model": {"qualification_histories": 1, "replication_histories": 2,
+                    "crown_histories": 3},
 }
-
 CONTRACT_FILES = {
     "charter_sha256": "profiles/national-observatory/OBJECTIVE-CHARTER.md",
     "master_system_sha256": "profiles/national-observatory/MASTER-SYSTEM-PROMPT.md",
@@ -82,12 +82,12 @@ CONTRACT_FILES = {
     "scale_contract_sha256": "profiles/national-observatory/SCALE-SYSTEMS-CONTRACT.md",
     "formal_model_contract_sha256": "profiles/national-observatory/FORMAL-MODEL-CONTRACT.md",
     "interoperability_contract_sha256": "profiles/national-observatory/INTEROPERABILITY-CONTRACT.md",
+    "cross_model_contract_sha256": "profiles/national-observatory/CROSS-MODEL-CONSISTENCY-CONTRACT.md",
     "novelty_search_contract_sha256": "profiles/national-observatory/NOVELTY-SEARCH-CONTRACT.md",
     "prior_art_contract_sha256": "profiles/national-observatory/PRIOR-ART-CHALLENGE-CONTRACT.md",
     "prior_art_manifest_sha256": "profiles/national-observatory/PUBLIC-PRIOR-ART-MANIFEST.json",
     "architecture_protocol_sha256": "profiles/national-observatory/ARCHITECTURE-DISCOVERY-PROTOCOL.md",
 }
-
 EXPLICIT_FILES = {
     "run_observatory.py", "setup_observatory.py",
     "executable-orchestrator/orchestrator.py",
@@ -95,11 +95,8 @@ EXPLICIT_FILES = {
     "executable-orchestrator/tools/make_manifest.py",
     "executable-orchestrator/tools/owner_sign.py",
 }
-SCAN_ROOTS = (
-    "profiles/national-observatory",
-    "executable-orchestrator/lawmax21",
-    "private-evaluator/evaluator",
-)
+SCAN_ROOTS = ("profiles/national-observatory", "executable-orchestrator/lawmax21",
+              "private-evaluator/evaluator")
 SCAN_PREFIXES = (
     ("benchmark", "observatory_"),
     ("executable-orchestrator/tools", "mock_observatory"),
@@ -154,8 +151,8 @@ def protocol_files(root):
             if os.path.isfile(absolute) and name.startswith(prefix) and _eligible(absolute):
                 files.add(relative_root + "/" + name)
     ordered = sorted(files)
-    missing = [rel for rel in ordered
-               if not os.path.isfile(os.path.join(root, *rel.split("/")))]
+    missing = [relative for relative in ordered
+               if not os.path.isfile(os.path.join(root, *relative.split("/")))]
     if missing:
         raise RuntimeError("research protocol files missing: " + ", ".join(missing))
     return ordered
@@ -165,8 +162,7 @@ def protocol_bundle_sha256(root):
     digest = hashlib.sha256()
     for relative in protocol_files(root):
         digest.update(relative.encode("utf-8")); digest.update(b"\0")
-        digest.update(bytes.fromhex(file_sha256(
-            os.path.join(root, *relative.split("/")))))
+        digest.update(bytes.fromhex(file_sha256(os.path.join(root, *relative.split("/")))))
     return digest.hexdigest()
 
 
@@ -176,20 +172,17 @@ def contract_hashes(root):
 
 
 def mission_binding(root, git_value):
-    mission = {
-        "protocol_version": PROTOCOL_VERSION,
-        "target": "National Legal Observatory — canonical Greek legal information infrastructure",
-        **MISSION_FLAGS, **SEARCH_POLICY,
-        "novelty_methods": list(REQUIRED_NOVELTY_METHODS),
-        "publication_channels": list(PUBLICATION_CHANNELS),
-        "production_workloads": PRODUCTION_WORKLOADS,
-        "runner_head": git_value("rev-parse", "HEAD"),
-        "runner_tree": git_value("rev-parse", "HEAD^{tree}"),
-        "research_protocol_files": protocol_files(root),
-        "research_protocol_bundle_sha256": protocol_bundle_sha256(root),
-    }
-    mission.update(contract_hashes(root))
-    return mission
+    mission = {"protocol_version": PROTOCOL_VERSION,
+               "target": "National Legal Observatory — canonical Greek legal information infrastructure",
+               **MISSION_FLAGS, **SEARCH_POLICY,
+               "novelty_methods": list(REQUIRED_NOVELTY_METHODS),
+               "publication_channels": list(PUBLICATION_CHANNELS),
+               "production_workloads": PRODUCTION_WORKLOADS,
+               "runner_head": git_value("rev-parse", "HEAD"),
+               "runner_tree": git_value("rev-parse", "HEAD^{tree}"),
+               "research_protocol_files": protocol_files(root),
+               "research_protocol_bundle_sha256": protocol_bundle_sha256(root)}
+    mission.update(contract_hashes(root)); return mission
 
 
 def validate_mission(root, mission, git_value):
@@ -198,9 +191,7 @@ def validate_mission(root, mission, git_value):
     extra = sorted(set(mission) - set(expected))
     if missing or extra:
         detail = []
-        if missing:
-            detail.append("mismatched: " + ", ".join(missing))
-        if extra:
-            detail.append("unexpected: " + ", ".join(extra))
+        if missing: detail.append("mismatched: " + ", ".join(missing))
+        if extra: detail.append("unexpected: " + ", ".join(extra))
         raise RuntimeError("signed Observatory mission drift — " + "; ".join(detail))
     return expected
