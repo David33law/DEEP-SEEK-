@@ -50,6 +50,7 @@ CAUSAL_STATIC_GATES = (
     "inert_negative_controls_required",
     "exact_mutated_source_receipts_required",
     "causal_dossier_direct_indexing_required",
+    "genome_aware_local_provider_verified",
     "authoritative_causal_e2e_verified",
 )
 
