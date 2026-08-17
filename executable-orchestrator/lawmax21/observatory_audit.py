@@ -1,14 +1,14 @@
 """Profile-specific independent audit for the National Legal Observatory.
 
-The active novelty, meta-search and hardening overlays are installed here because this is the final
-profile layer: they must wrap the complete crown search while remaining inside the same signed state
-machine and the final independent audit.
+The active novelty, meta-search, hardening and taxonomy-completion overlays are installed here
+because this is the final profile layer: they must wrap the complete crown search while remaining
+inside the same signed state machine and the final independent audit.
 """
 
 from .canonical import atomic_write_json
 from .handlers import A, tree_hash
 from . import (observatory_meta_hardening_overlay, observatory_meta_search_overlay,
-               observatory_novelty_overlay)
+               observatory_novelty_overlay, observatory_taxonomy_completion_overlay)
 
 
 # Six fixed miners × six seeds. No structurally new, nonduplicate seed is deferred merely to economize
@@ -21,10 +21,11 @@ observatory_novelty_overlay.NOVELTY_BUILD_LIMIT = (
 
 
 def install(ctx, handlers):
-    """Install active novelty, meta-search, hardening, then the currency-explicit audit."""
+    """Install novelty → meta-search → hardening → taxonomy completion → audit."""
     out = observatory_novelty_overlay.install(ctx, handlers)
     out = observatory_meta_search_overlay.install(ctx, out)
     out = observatory_meta_hardening_overlay.install(ctx, out)
+    out = observatory_taxonomy_completion_overlay.install(ctx, out)
 
     def independent_audit(_machine):
         ok, n, why = ctx.log.verify()
@@ -52,11 +53,17 @@ def install(ctx, handlers):
                 "contract": supremacy.get("novelty_contract"),
                 "meta_search_contract": supremacy.get("meta_search_contract"),
                 "meta_search_hardening": "observatory_meta_hardening_overlay.py",
+                "taxonomy_completion": "observatory_taxonomy_completion_overlay.py",
                 "waves": supremacy.get("novelty_waves", 0),
                 "dry_waves": supremacy.get("genome_dry_waves", 0),
                 "known_controlled_genomes": supremacy.get("known_genomes", 0),
                 "methods_expected": supremacy.get("novelty_methods_expected", []),
                 "methods_complete": supremacy.get("novelty_methods_complete", False),
+                "meta_search_closed": supremacy.get("meta_search_closed", False),
+                "mechanical_coverage_closed": supremacy.get(
+                    "mechanical_coverage_closed", False),
+                "independent_closure_closed": supremacy.get(
+                    "independent_closure_closed", False),
                 "meta_search_critics_complete": supremacy.get(
                     "meta_search_critics_complete", False),
                 "closure_auditors_complete": supremacy.get(
@@ -79,6 +86,8 @@ def install(ctx, handlers):
                 "failed_dynamic_builds_retry": True,
                 "auditor_fact_reproduction_required": True,
                 "model_blocking_flag_not_authoritative": True,
+                "taxonomy_consensus_required": 2,
+                "post_resolution_refomalization_required": True,
             },
         })
         return p
