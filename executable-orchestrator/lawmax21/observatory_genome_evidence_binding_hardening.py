@@ -1,13 +1,15 @@
 """Require every genome-realization evidence citation to bind exact current source bytes.
 
-The auditor may cite only passing reports whose recorded candidate SHA-256 matches the current source
-census. Generic manifests, stale pre-selection reports and failed revisions are removed before the
-prompt. A declaration also fails when all thirteen architecture axes collapse onto a handful of
+The auditor may cite only passing reports whose persisted ``candidate_sha256`` matches the current
+source census. Generic manifests, stale pre-selection reports and failed revisions are removed before
+the prompt. A declaration also fails when all thirteen architecture axes collapse onto a handful of
 generic entrypoints: each auditor must expose a mechanically diverse definition map.
 """
+import os
 from collections import Counter
 
 from . import observatory_genome_realization_overlay as genome
+from .canonical import read_json
 
 
 _REQUIRED = {
@@ -32,6 +34,20 @@ def _expected(census):
     }
 
 
+def _persisted_receipt(context, relative):
+    path = os.path.abspath(os.path.join(
+        context.runtime, *str(relative).replace("\\", "/").split("/")))
+    runtime = os.path.abspath(context.runtime)
+    if path != runtime and not path.startswith(runtime + os.sep):
+        raise RuntimeError(
+            "genome-realization evidence path escapes the runtime boundary")
+    if not os.path.isfile(path):
+        raise RuntimeError(
+            "genome-realization evidence file disappeared: " + str(relative))
+    parsed = read_json(path)
+    return parsed if isinstance(parsed, dict) else {}
+
+
 def install(_ctx, handlers):
     if getattr(genome, "_evidence_binding_hardening_installed", False):
         return dict(handlers)
@@ -43,17 +59,25 @@ def install(_ctx, handlers):
         census = genome._source_census(context, candidate_id)
         expected = _expected(census)
         filtered = {}
-        for path, row in catalog.items():
+        for relative, original_row in catalog.items():
+            row = dict(original_row)
             group = row.get("group")
             if group not in expected:
                 continue
-            if row.get("status") not in ("PASS", "OK"):
+            receipt = _persisted_receipt(context, relative)
+            # The persisted report is the authority. Values copied by an earlier catalog pass are
+            # intentionally ignored so an in-memory mutation cannot manufacture a source binding.
+            row["status"] = receipt.get("status")
+            row["passed"] = receipt.get("passed")
+            row["candidate_sha256"] = receipt.get("candidate_sha256")
+            row["candidate_path"] = receipt.get("candidate_path")
+            if row["status"] not in ("PASS", "OK"):
                 continue
-            if row.get("passed", True) is not True:
+            if row["passed"] is False:
                 continue
-            if row.get("candidate_sha256") not in expected[group]:
+            if row["candidate_sha256"] not in expected[group]:
                 continue
-            filtered[path] = row
+            filtered[relative] = row
         present = {row.get("group") for row in filtered.values()}
         missing = sorted(_REQUIRED - present)
         if missing:
@@ -80,7 +104,7 @@ def install(_ctx, handlers):
                 evidence_row = evidence[reference]
                 group = evidence_row.get("group")
                 if evidence_row.get("status") not in ("PASS", "OK") \
-                        or evidence_row.get("passed", True) is not True:
+                        or evidence_row.get("passed") is False:
                     raise RuntimeError(
                         f"{candidate_id}/{axis}: cited evidence is not passing")
                 if evidence_row.get("candidate_sha256") not in expected[group]:
