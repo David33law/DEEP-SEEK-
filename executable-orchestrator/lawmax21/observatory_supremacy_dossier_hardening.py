@@ -23,6 +23,7 @@ def _add(ctx, path, label, rows, parsed, require_pass=False):
             + row["path"])
     rows.append(row)
     parsed[label] = obj
+    return row, obj
 
 
 def install(_ctx, handlers):
@@ -51,12 +52,14 @@ def install(_ctx, handlers):
              "cp1_reuse_coverage", rows, parsed)
         _add(context, A(context, "candidates", "arena.json"),
              "candidate_arena", rows, parsed)
-        _add(context, A(context, "gates", "v0_subject.json"),
-             "owner_v0_subject", rows, parsed)
-        _add(context, A(context, "architecture", "target_v1_evidence_revised.json"),
-             "owner_v1_subject", rows, parsed)
-        _add(context, A(context, "architecture", "migration_plan.json"),
-             "owner_migration_subject", rows, parsed)
+        v0_row, _ = _add(context, A(context, "gates", "v0_subject.json"),
+                         "owner_v0_subject", rows, parsed)
+        v1_row, _ = _add(
+            context, A(context, "architecture", "target_v1_evidence_revised.json"),
+            "owner_v1_subject", rows, parsed)
+        migration_row, _ = _add(
+            context, A(context, "architecture", "migration_plan.json"),
+            "owner_migration_subject", rows, parsed)
         _add(context, A(context, "budget", "ledger.json"),
              "provider_budget_ledger", rows, parsed)
         _add(context, A(context, "state", "events.jsonl"),
@@ -90,26 +93,30 @@ def install(_ctx, handlers):
             raise RuntimeError("supremacy dossier: provider ledger is malformed")
 
         expected_gate_subjects = {
-            "GATE-ARCH-V0": rows[-5]["sha256"],
-            "GATE-ARCH-V1": rows[-4]["sha256"],
-            "GATE-MIGRATION": rows[-3]["sha256"],
+            "GATE-ARCH-V0": v0_row["sha256"],
+            "GATE-ARCH-V1": v1_row["sha256"],
+            "GATE-MIGRATION": migration_row["sha256"],
         }
-        # Approval files are already in the original evidence index. Reopen them and prove that the
-        # persisted signed approval subject hashes match the exact subject bytes indexed above.
+        # Approval files are already in the original evidence index. Reopen their signed envelopes
+        # and prove the payload subject hashes match the exact indexed subject bytes above.
         approvals = {}
         for gate, expected_subject in expected_gate_subjects.items():
             approval_path = A(context, "gates", f"{gate}.approval.json")
             approval = read_json(approval_path)
-            observed = (approval.get("subject_sha256")
-                        or approval.get("subject")
-                        or approval.get("subject_hash"))
-            if observed != expected_subject:
+            payload = approval.get("payload") or {}
+            observed = payload.get("subject_sha256")
+            if payload.get("gate") != gate \
+                    or payload.get("run_id") != context.run_id \
+                    or payload.get("decision") != "APPROVE" \
+                    or observed != expected_subject:
                 raise RuntimeError(
-                    f"supremacy dossier: {gate} approval is not bound to its indexed subject")
+                    f"supremacy dossier: {gate} signed approval is not bound to its indexed subject")
             approvals[gate] = {
                 "approval_path": os.path.relpath(
                     approval_path, context.runtime).replace("\\", "/"),
                 "subject_sha256": expected_subject,
+                "decision": payload.get("decision"),
+                "signer_key_id": payload.get("signer_key_id"),
             }
 
         artifact["evidence_index"] = rows
