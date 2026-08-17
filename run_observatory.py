@@ -2,8 +2,8 @@
 """National Legal Observatory launcher over the shared LAWMAX v2.3 control plane.
 
 This file does not implement a second state machine. It injects profile paths, semantics,
-provider policy, currency-explicit accounting and Observatory/supremacy/crown handlers into the
-existing signed control loop.
+provider policy, currency-explicit accounting and Observatory/supremacy/crown/novelty handlers into
+the existing signed control loop.
 """
 import argparse
 import importlib.util
@@ -16,6 +16,15 @@ ORCH = os.path.join(ROOT, "executable-orchestrator")
 sys.path.insert(0, ORCH)
 OFFICIAL_DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions"
 PRODUCTION_MODEL = "deepseek-v4-pro"
+
+REQUIRED_NOVELTY_METHODS = [
+    "G91-assumption-inversion",
+    "G92-morphological-gap-search",
+    "G93-cross-domain-structural-transfer",
+    "G94-surgical-genome-mutation",
+    "G95-trusted-boundary-recut",
+    "G96-ontology-and-taxonomy-challenge",
+]
 
 
 def _load_base_orchestrator():
@@ -102,11 +111,18 @@ def _validate_signed_mission(D, root):
         "no_first_answer_privilege",
         "public_supremacy_case_required",
         "durable_systems_arena_required",
+        "active_novelty_saturation_required",
     )
     missing_flags = [k for k in required_true if mission.get(k) is not True]
     if missing_flags:
         raise observatory_preflight.PreflightFailed(
             "signed D09 does not bind the supremacy mission flags: " + ", ".join(missing_flags))
+    if int(mission.get("novelty_dry_waves_required", 0)) != 3:
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 must require exactly three consecutive active novelty dry waves")
+    if list(mission.get("novelty_methods") or []) != REQUIRED_NOVELTY_METHODS:
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 novelty-miner portfolio does not match the production protocol")
     if not REQUIRED_PUBLICATION_CHANNELS.issubset(set(mission.get("publication_channels") or [])):
         raise observatory_preflight.PreflightFailed(
             "signed D09 does not bind all required national publication channels")
@@ -119,6 +135,8 @@ def _validate_signed_mission(D, root):
         "evaluator_contract_sha256": sha256_file(os.path.join(profile, "EVALUATOR-CONTRACT.md")),
         "supremacy_contract_sha256": sha256_file(os.path.join(profile, "SUPREMACY-CONTRACT.md")),
         "systems_contract_sha256": sha256_file(os.path.join(profile, "SYSTEMS-CONTRACT.md")),
+        "novelty_search_contract_sha256": sha256_file(
+            os.path.join(profile, "NOVELTY-SEARCH-CONTRACT.md")),
     }
     drift = [k for k, v in expected.items() if mission.get(k) != v]
     if drift:
