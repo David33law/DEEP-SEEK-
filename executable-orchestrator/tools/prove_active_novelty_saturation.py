@@ -61,6 +61,7 @@ def _load_base_proof():
 def _run_base_proof(args):
     module = _load_base_proof()
     original_popen = module.subprocess.Popen
+    original_verify = module.verify_supremacy_artifacts
 
     def patched_popen(argv, *pargs, **kwargs):
         command = list(argv) if isinstance(argv, (list, tuple)) else argv
@@ -74,7 +75,20 @@ def _run_base_proof(args):
             command[1] = replacement
         return original_popen(command, *pargs, **kwargs)
 
+    def patched_verify(runtime, summary, run):
+        # OBS-Ω74 moved the authoritative crown report from the historical systems-arena-* name to
+        # systems-crown-*. Preserve the old proof reader without weakening evidence: copy only the
+        # already-produced immutable JSON report inside the disposable proof runtime.
+        escalation = summary.get("escalation") or {}
+        incumbent = escalation.get("incumbent")
+        legacy = os.path.join(runtime, "reports", f"systems-arena-{incumbent}.json")
+        crown = os.path.join(runtime, "reports", f"systems-crown-{incumbent}.json")
+        if incumbent and not os.path.exists(legacy) and os.path.exists(crown):
+            shutil.copyfile(crown, legacy)
+        return original_verify(runtime, summary, run)
+
     module.subprocess.Popen = patched_popen
+    module.verify_supremacy_artifacts = patched_verify
     try:
         return module.main([
             "--canonical-repo", os.path.abspath(args.canonical_repo),
@@ -84,6 +98,7 @@ def _run_base_proof(args):
         ])
     finally:
         module.subprocess.Popen = original_popen
+        module.verify_supremacy_artifacts = original_verify
 
 
 def _meta_artifact(runtime, round_no):
