@@ -13,6 +13,8 @@ import sys
 ROOT = os.path.dirname(os.path.abspath(__file__))
 ORCH = os.path.join(ROOT, "executable-orchestrator")
 sys.path.insert(0, ORCH)
+OFFICIAL_DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions"
+PRODUCTION_MODEL = "deepseek-v4-pro"
 
 
 def _load_base_orchestrator():
@@ -38,17 +40,21 @@ from lawmax21 import states as states_module  # noqa: E402
 PROFILE = profiles.resolve("national-observatory")
 _ORIGINAL_COMMITTED_SEMANTIC = install_state_semantics(states_module)
 
-# Provider policy for the real Observatory experiment. The shared Client records these fields
-# inside the logical request identity, so a crash/resume/cache replay can never silently reuse a
-# response produced under a weaker reasoning policy.
+# Provider policy for the real Observatory experiment. These fields are part of the logical
+# request identity, so crash/resume/cache replay cannot silently reuse a weaker-policy answer.
 OBSERVATORY_REQUEST_DEFAULTS = {
     "thinking": {"type": "enabled"},
     "reasoning_effort": "max",
 }
-# DeepSeek V4-Pro currently exposes a 384K maximum output window. This profile deliberately
-# leaves the entire documented ceiling available: truncation, not cost minimisation, is the
-# unacceptable failure mode for whole-system architecture and executable-candidate responses.
+# DeepSeek V4-Pro currently exposes a 384K maximum output window. The profile leaves the complete
+# documented ceiling available; the budget ledger reserves against this ceiling before each call.
 OBSERVATORY_DEFAULT_MAX_TOKENS = 384000
+
+
+def _is_local_endpoint(endpoint):
+    e = (endpoint or "").lower()
+    return (e.startswith("http://127.0.0.1:") or e.startswith("http://localhost:")
+            or e.startswith("https://127.0.0.1:") or e.startswith("https://localhost:"))
 
 
 def observatory_paths(root, runtime):
@@ -112,12 +118,11 @@ def main(argv=None):
     ap.add_argument("--runtime", default=os.environ.get("OBSERVATORY_RUNTIME",
                                                         os.path.join(ROOT, "runtime-observatory")))
     ap.add_argument("--run-id", default=os.environ.get("OBSERVATORY_RUN_ID", "OBS-RUN-0001"))
-    ap.add_argument("--endpoint", default=os.environ.get("DEEPSEEK_ENDPOINT",
-                                                         "https://api.deepseek.com/chat/completions"))
-    ap.add_argument("--model", default=os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro"))
+    ap.add_argument("--endpoint", default=os.environ.get("DEEPSEEK_ENDPOINT", OFFICIAL_DEEPSEEK_ENDPOINT))
+    ap.add_argument("--model", default=os.environ.get("DEEPSEEK_MODEL", PRODUCTION_MODEL))
     ap.add_argument("--key-env", default="DEEPSEEK_API_KEY")
     ap.add_argument("--backend", choices=("subprocess", "container"), default="container",
-                    help="real untrusted-model runs should use container; subprocess is for proof/development")
+                    help="production requires container; subprocess is accepted only for localhost proof/development")
     ap.add_argument("--canonical-repo", default=os.environ.get("OBSERVATORY_CANONICAL_REPO"))
     ap.add_argument("--cp1-evidence", default=os.environ.get("OBSERVATORY_CP1_EVIDENCE"))
     ap.add_argument("--prior-cp2", default=os.environ.get("OBSERVATORY_PRIOR_CP2"))
@@ -125,6 +130,19 @@ def main(argv=None):
     ap.add_argument("--crash-after", type=int, default=None)
     a = ap.parse_args(argv)
 
+    local_endpoint = _is_local_endpoint(a.endpoint)
+    if not local_endpoint:
+        if a.endpoint.rstrip("/") != OFFICIAL_DEEPSEEK_ENDPOINT:
+            print("production launch refused: endpoint must be the official DeepSeek ChatCompletions endpoint")
+            return base.EXIT_PREFLIGHT
+        if a.model != PRODUCTION_MODEL:
+            print(f"production launch refused: model must be {PRODUCTION_MODEL}")
+            return base.EXIT_PREFLIGHT
+        if a.backend != "container":
+            print("production launch refused: non-local Observatory runs require container isolation")
+            return base.EXIT_PREFLIGHT
+
+    os.environ["OBSERVATORY_BACKEND"] = a.backend
     if a.canonical_repo:
         os.environ["OBSERVATORY_CANONICAL_REPO"] = os.path.abspath(a.canonical_repo)
     if a.cp1_evidence:
@@ -137,8 +155,8 @@ def main(argv=None):
         try:
             pub_path = P["owner_pub"]
             pub = load_public(pub_path) if os.path.exists(pub_path) else None
-            report = observatory_preflight.run(ROOT, ORCH, a.runtime, require_vault=True,
-                                               owner_public=pub)
+            report = observatory_preflight.run(
+                ROOT, ORCH, a.runtime, require_vault=True, owner_public=pub, backend=a.backend)
         except observatory_preflight.PreflightFailed as exc:
             print(str(exc))
             return base.EXIT_PREFLIGHT
@@ -150,6 +168,9 @@ def main(argv=None):
                                         ("--prior-cp2", a.prior_cp2)) if not value]
     if missing:
         print("launch refused: missing " + ", ".join(missing))
+        return base.EXIT_PREFLIGHT
+    if not local_endpoint and not os.environ.get(a.key_env):
+        print(f"production launch refused: {a.key_env} is not set")
         return base.EXIT_PREFLIGHT
 
     try:
