@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compatibility entrypoint: novelty closure is proved only by the complete protocol-v4 proof."""
+"""Compatibility entrypoint: novelty closure is proved only by the complete protocol-v5 proof."""
 import sys
 from prove_complete_observatory_protocol_v2 import main
 
