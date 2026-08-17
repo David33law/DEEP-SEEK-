@@ -4,9 +4,9 @@
 The static phase proves that all protocol-v5 mechanisms are connected to the signed mission and final
 proof path, including exact semantic source receipts, independently diversified and citation-map-
 independent genome auditors, the unbounded real-provider round policy with stagnation escalation,
-the deterministic hash-indexed supremacy dossier and the canonical localhost provider. Only after
-that receipt passes does the hardened disposable-clone Docker E2E execute. Neither phase contacts the
-real DeepSeek endpoint.
+the foundational deterministic hash-indexed supremacy dossier and the canonical localhost provider.
+Only after that receipt passes does the hardened disposable-clone Docker E2E execute. Neither phase
+contacts the real DeepSeek endpoint.
 """
 from __future__ import annotations
 
@@ -34,6 +34,7 @@ STATIC_BOOLEAN_GATES = (
     "unbounded_production_rounds_bound",
     "stagnation_escalation_bound",
     "deterministic_supremacy_dossier_bound",
+    "dossier_foundation_evidence_bound",
     "final_overlay_order_verified",
     "canonical_local_provider_verified",
     "authoritative_e2e_protocol_v5_verified",
