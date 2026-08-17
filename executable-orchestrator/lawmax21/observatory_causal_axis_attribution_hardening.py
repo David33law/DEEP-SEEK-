@@ -3,11 +3,13 @@
 A central function can be load-bearing while saying little about the specific controlled class for
 which an auditor cited it. This hardening wraps each causal task and requires the mutated evaluator
 receipt to expose either the exact removed definition or a failed hard dimension/test family relevant
-to the claimed axis and artifact group. An unrelated crash cannot prove an axis.
+to the claimed axis and artifact group. An unrelated crash cannot prove an axis. Replication and
+crown attribution counts are reproduced from persisted campaign files in the terminal summary.
 """
 from __future__ import annotations
 
 import json
+from types import MethodType
 
 from . import observatory_genome_causal_ablation_hardening as causal
 from .canonical import read_json
@@ -163,13 +165,36 @@ def _attribution(context, task, result):
     }
 
 
-def install(_ctx, handlers):
+def _campaign_state(context, report):
+    receipt = (report or {}).get("causal_ablation_evidence") or {}
+    relative = receipt.get("path")
+    if not relative:
+        return {"passed": False, "tasks": 0, "attributed": 0}
+    try:
+        campaign = read_json(causal._runtime_path(context, relative))
+    except Exception:
+        return {"passed": False, "tasks": 0, "attributed": 0}
+    tasks = campaign.get("tasks") or []
+    attributed = sum(
+        1 for task in tasks
+        if task.get("axis_specific_failure_attributed") is True
+        and task.get("causal_failure_observed") is True)
+    passed = bool(
+        campaign.get("status") == "PASS"
+        and campaign.get("passed") is True
+        and tasks
+        and attributed == len(tasks))
+    return {"passed": passed, "tasks": len(tasks), "attributed": attributed}
+
+
+def install(ctx, handlers):
     if getattr(causal, "_axis_attribution_hardening_installed", False):
         return dict(handlers)
-    original = causal._run_task
+    original_task = causal._run_task
+    original_summary = ctx.esc.supremacy_summary
 
     def run_task(context, candidate_id, label, task):
-        result = original(context, candidate_id, label, task)
+        result = original_task(context, candidate_id, label, task)
         if result.get("causal_failure_observed") is not True:
             result["axis_specific_failure_attributed"] = False
             result["attribution"] = {
@@ -185,6 +210,27 @@ def install(_ctx, handlers):
             result["causal_failure_observed"] = False
         return result
 
+    def summary(self):
+        result = original_summary()
+        incumbent = self.s.get("incumbent")
+        scores = (ctx.scores.get(incumbent) or {}) if incumbent else {}
+        replication = _campaign_state(
+            ctx, scores.get("genome_realization_replication") or {})
+        crown = _campaign_state(
+            ctx, scores.get("genome_realization_crown") or {})
+        result.update({
+            "genome_axis_specific_attribution_required": True,
+            "genome_axis_specific_replication_passed": replication["passed"],
+            "genome_axis_specific_crown_passed": crown["passed"],
+            "genome_axis_specific_replication_tasks": replication["tasks"],
+            "genome_axis_specific_replication_attributed":
+                replication["attributed"],
+            "genome_axis_specific_crown_tasks": crown["tasks"],
+            "genome_axis_specific_crown_attributed": crown["attributed"],
+        })
+        return result
+
     causal._run_task = run_task
+    ctx.esc.supremacy_summary = MethodType(summary, ctx.esc)
     causal._axis_attribution_hardening_installed = True
     return dict(handlers)
