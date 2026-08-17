@@ -3,7 +3,7 @@
 
 Runs the complete portable-owner protocol-v5 static proof, then verifies that causal source ablation
 is bound to the owner-signed mission, explicit terminal conditions, final overlay order, independent
-audit, hard Pareto gate, deterministic dossier, genome-aware localhost provider and authoritative
+audit, hard Pareto gate, deterministic dossier, causal-aware localhost provider and authoritative
 Docker E2E path. No provider call, candidate execution or owner mutation occurs here.
 """
 from __future__ import annotations
@@ -34,6 +34,7 @@ REQUIRED_FILES = {
     "executable-orchestrator/lawmax21/observatory_genome_causal_ablation_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_audit_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_dossier_hardening.py",
+    "executable-orchestrator/tools/mock_observatory_causal_server.py",
     "executable-orchestrator/tools/prove_observatory_protocol_static_v5.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_causal_hardened.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_causal_provider_hardened.py",
@@ -203,10 +204,18 @@ def main():
         _require(provider, (
             "_genome_provider_popen",
             "mock_observatory_protocol_server.py",
-            "mock_observatory_genome_server.py",
+            "mock_observatory_causal_server.py",
             "CORE.subprocess.Popen",
             "Real-provider endpoints are never affected"),
-            "genome-aware local-provider route")
+            "causal-aware local-provider route")
+        causal_provider = _text(
+            "executable-orchestrator/tools/mock_observatory_causal_server.py")
+        _require(causal_provider, (
+            "mock_observatory_genome_server.py",
+            "governance_evolution_model",
+            "apply_change",
+            "hidden semantic scenario"),
+            "causal-aware local provider")
         final_entry = _text(
             "executable-orchestrator/tools/"
             "prove_complete_observatory_protocol_v5.py")
@@ -237,6 +246,7 @@ def main():
             "causal_dossier_direct_indexing_required": True,
             "causal_genome_ablation_bound": True,
             "genome_aware_local_provider_verified": True,
+            "causal_aware_local_provider_verified": True,
             "authoritative_causal_e2e_verified": True,
             "inherited_static_report_sha256":
                 _sha256(PREVIOUS_REPORT),
