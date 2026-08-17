@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Authoritative protocol-v5 proof with causal controlled-genome realization.
+"""Authoritative protocol-v5 proof with axis-attributed causal genome realization.
 
-Runs portable-owner static closure, causal static closure and then the causal-hardened production-
+Runs portable-owner static closure, causal static closure and then the axis-hardened production-
 container E2E proof through the complete causal-aware localhost provider. The E2E still uses the real
 runner/state-machine/API shape, performs crash/resume and every owner gate, and makes zero real
 provider calls.
@@ -13,7 +13,7 @@ import os
 import subprocess
 import sys
 
-import prove_complete_observatory_protocol_causal_provider_hardened as e2e
+import prove_complete_observatory_protocol_axis_hardened as e2e
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -47,6 +47,7 @@ INHERITED_STATIC_GATES = (
 CAUSAL_STATIC_GATES = (
     "causal_genome_ablation_bound",
     "auditor_specific_definition_set_ablation",
+    "axis_specific_causal_attribution_verified",
     "inert_negative_controls_required",
     "exact_mutated_source_receipts_required",
     "infrastructure_failure_exclusion_verified",
@@ -127,6 +128,7 @@ def main(argv=None):
         report["authoritative_entrypoint"] = (
             "prove_complete_observatory_protocol_v5.py")
         report["causal_genome_ablation_bound"] = True
+        report["axis_specific_causal_attribution_bound"] = True
         report["causal_aware_local_provider_used"] = True
         report["infrastructure_failure_cannot_earn_causal_credit"] = True
         with open(E2E_REPORT, "w", encoding="utf-8") as handle:
