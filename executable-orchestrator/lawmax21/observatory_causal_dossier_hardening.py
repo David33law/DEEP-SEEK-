@@ -1,9 +1,10 @@
 """Bind replication/crown causal genome-ablation receipts into the deterministic dossier.
 
-The genome-realization report contains the causal receipt hash, but the final public dossier should
-also index the exact causal campaign bytes directly. This wrapper runs after the foundational dossier
-hardening and before the dossier handler is installed. It verifies every mutated-source campaign,
-negative control and nested hash, then adds both replication and crown receipts to the evidence index.
+The genome-realization report contains the causal receipt hash, but the final public dossier also
+indexes the exact causal campaign bytes directly. This wrapper runs after foundational dossier
+hardening and before the dossier handler is installed. It independently rehashes every mutated source
+and evaluator receipt, checks evaluator-to-source identity, inert controls, auditor obligations and
+load-bearing failures, then adds replication and crown receipts to the evidence index.
 """
 from __future__ import annotations
 
@@ -27,13 +28,36 @@ def _inside_runtime(ctx, relative):
     return path
 
 
+def _verify_execution(ctx, label, row, kind):
+    source_path = _inside_runtime(ctx, row.get("source_path"))
+    evidence_path = _inside_runtime(
+        ctx, row.get("evaluator_receipt_path"))
+    if not os.path.isfile(source_path) \
+            or sha256_file(source_path) != row.get("source_sha256"):
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} {kind} source hash drift")
+    if not os.path.isfile(evidence_path) \
+            or sha256_file(evidence_path) != row.get(
+                "evaluator_receipt_sha256"):
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} {kind} evaluator hash drift")
+    evaluator = read_json(evidence_path)
+    if evaluator.get("candidate_sha256") != row.get("source_sha256"):
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} {kind} evaluator "
+            "is not bound to the exact mutated source bytes")
+
+
 def _verify(ctx, incumbent, label):
     genome_path = A(
         ctx, "architecture",
         f"genome-realization-{label}-{incumbent}.json")
     genome_report = read_json(genome_path)
     receipt = genome_report.get("causal_ablation_evidence") or {}
-    if genome_report.get("causal_ablation_passed") is not True \
+    if genome_report.get("status") != "PASS" \
+            or genome_report.get("passed") is not True \
+            or genome_report.get("causal_ablation_required") is not True \
+            or genome_report.get("causal_ablation_passed") is not True \
             or receipt.get("negative_controls_passed") is not True \
             or int(receipt.get("verified_axis_count", 0)) != 13 \
             or int(receipt.get("tasks_executed", 0)) < 1 \
@@ -58,6 +82,16 @@ def _verify(ctx, incumbent, label):
             or int(causal.get("verified_axis_count", 0)) != 13:
         raise RuntimeError(
             f"supremacy dossier: causal genome {label} campaign did not pass")
+    auditors = causal.get("auditor_ids") or []
+    if len(auditors) != 2 or len(set(auditors)) != 2:
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} auditor set is invalid")
+    if int(causal.get(
+            "verified_auditor_axis_group_obligations", 0)) != int(
+                causal.get("required_auditor_axis_group_obligations", -1)):
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} obligations remain open")
+
     controls = causal.get("controls") or []
     tasks = causal.get("tasks") or []
     if len(controls) != int(causal.get("negative_controls_executed", 0)) \
@@ -66,26 +100,21 @@ def _verify(ctx, incumbent, label):
             f"supremacy dossier: causal genome {label} count mismatch")
     for row in controls:
         if row.get("control_passed") is not True \
-                or row.get("observed_candidate_pass") is not True:
+                or row.get("observed_candidate_pass") is not True \
+                or row.get("inert_definition_renamed") is not True:
             raise RuntimeError(
                 f"supremacy dossier: causal genome {label} inert control failed")
+        _verify_execution(ctx, label, row, "negative-control")
     for row in tasks:
-        if row.get("causal_failure_observed") is not True \
+        if row.get("auditor_id") not in auditors \
+                or not row.get("axis") \
+                or not row.get("group") \
+                or not row.get("renamed_definitions") \
+                or row.get("causal_failure_observed") is not True \
                 or row.get("observed_candidate_pass") is not False:
             raise RuntimeError(
                 f"supremacy dossier: causal genome {label} task did not falsify")
-        source_path = _inside_runtime(ctx, row.get("source_path"))
-        evidence_path = _inside_runtime(
-            ctx, row.get("evaluator_receipt_path"))
-        if not os.path.isfile(source_path) \
-                or sha256_file(source_path) != row.get("source_sha256"):
-            raise RuntimeError(
-                f"supremacy dossier: causal genome {label} mutant hash drift")
-        if not os.path.isfile(evidence_path) \
-                or sha256_file(evidence_path) != row.get(
-                    "evaluator_receipt_sha256"):
-            raise RuntimeError(
-                f"supremacy dossier: causal genome {label} evaluator hash drift")
+        _verify_execution(ctx, label, row, "ablation")
     return genome_path, causal_path, causal
 
 
@@ -123,6 +152,8 @@ def install(_ctx, handlers):
                 "negative_controls_executed":
                     causal["negative_controls_executed"],
                 "verified_axis_count": causal["verified_axis_count"],
+                "verified_auditor_axis_group_obligations": causal[
+                    "verified_auditor_axis_group_obligations"],
                 "evidence_path": os.path.relpath(
                     causal_path, context.runtime).replace("\\", "/"),
                 "evidence_sha256": sha256_file(causal_path),
