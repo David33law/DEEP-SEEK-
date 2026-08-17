@@ -39,6 +39,8 @@ def install(_ctx, handlers):
                 "genome_axis_specific_crown_attributed", 0),
             "definition_semantics_required": summary.get(
                 "genome_definition_semantic_attribution_required", False),
+            "axis_behavioral_failure_required": summary.get(
+                "genome_axis_behavioral_failure_required", False),
             "definition_semantics_replication_checked": summary.get(
                 "genome_definition_semantic_replication_checked", False),
             "definition_semantics_crown_checked": summary.get(
@@ -47,10 +49,14 @@ def install(_ctx, handlers):
                 "genome_definition_semantic_replication_tasks", 0),
             "definition_semantics_replication_failure_scoped": summary.get(
                 "genome_definition_semantic_replication_failure_scoped", 0),
+            "definition_semantics_replication_behavioral": summary.get(
+                "genome_definition_semantic_replication_behavioral", 0),
             "definition_semantics_crown_tasks": summary.get(
                 "genome_definition_semantic_crown_tasks", 0),
             "definition_semantics_crown_failure_scoped": summary.get(
                 "genome_definition_semantic_crown_failure_scoped", 0),
+            "definition_semantics_crown_behavioral": summary.get(
+                "genome_definition_semantic_crown_behavioral", 0),
             "causal_definition_set_ablation": True,
             "inert_mutation_controls_required": True,
         })
@@ -66,6 +72,7 @@ def install(_ctx, handlers):
             == int(controlled["axis_specific_crown_attributed"]))
         all_definition_semantics = bool(
             controlled["definition_semantics_required"] is True
+            and controlled["axis_behavioral_failure_required"] is True
             and controlled["definition_semantics_replication_checked"] is True
             and controlled["definition_semantics_crown_checked"] is True
             and int(controlled["definition_semantics_replication_tasks"]) > 0
@@ -73,9 +80,13 @@ def install(_ctx, handlers):
             and int(controlled["definition_semantics_replication_tasks"])
             == int(controlled[
                 "definition_semantics_replication_failure_scoped"])
+            == int(controlled[
+                "definition_semantics_replication_behavioral"])
             and int(controlled["definition_semantics_crown_tasks"])
             == int(controlled[
-                "definition_semantics_crown_failure_scoped"]))
+                "definition_semantics_crown_failure_scoped"])
+            == int(controlled[
+                "definition_semantics_crown_behavioral"]))
         result["causal_genome_ablation"] = {
             "replication_passed": controlled["causal_replication"],
             "crown_passed": controlled["causal_crown"],
@@ -94,12 +105,22 @@ def install(_ctx, handlers):
                 "axis_specific_crown_attributed"],
             "cited_definition_semantics_required": controlled[
                 "definition_semantics_required"],
+            "axis_specific_behavioral_failure_required": controlled[
+                "axis_behavioral_failure_required"],
             "all_tasks_definition_semantics_checked":
+                all_definition_semantics,
+            "all_tasks_axis_behaviorally_falsified":
                 all_definition_semantics,
             "replication_definition_semantics_tasks": controlled[
                 "definition_semantics_replication_failure_scoped"],
             "crown_definition_semantics_tasks": controlled[
                 "definition_semantics_crown_failure_scoped"],
+            "replication_axis_behavioral_failures": controlled[
+                "definition_semantics_replication_behavioral"],
+            "crown_axis_behavioral_failures": controlled[
+                "definition_semantics_crown_behavioral"],
+            "removed_definition_name_is_sufficient": False,
+            "group_failure_path_is_sufficient": False,
             "whole_success_receipt_searched": False,
             "infrastructure_failure_counts_as_causal_failure": False,
             "exact_mutated_source_receipts_required": True,
