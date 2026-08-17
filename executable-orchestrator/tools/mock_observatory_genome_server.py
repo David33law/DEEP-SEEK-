@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Final zero-cost provider for protocol v5, including executable genome realization.
+"""Final zero-cost provider for protocol v5 causal genome realization.
 
-The response uses only AST definitions, INV-* IDs and persisted evidence paths actually supplied by
-the production runner. The trusted validator independently reproduces every citation, so invented
-symbols, stale evidence or generic one-entrypoint mappings make the proof fail. This calibrates
-control flow, not architecture quality.
+The provider may cite only AST definitions, INV-* IDs and exact-source passing evidence supplied by
+the production runner. Auditor A and B use different artifacts/perspectives and different preferred
+load-bearing definitions. The trusted validators still reproduce every citation, enforce definition
+diversity and independently run causal ablations plus inert controls. This calibrates control flow;
+it never proves architecture quality.
 """
+from __future__ import annotations
+
 import importlib.util
 import os
 import re
+from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BASE_PATH = os.path.join(HERE, "mock_observatory_protocol_server.py")
@@ -39,13 +43,112 @@ REQUIRED = {
     "governance_evolution_model": ("semantic", "formal"),
     "scaling_partition_model": ("scale",),
 }
-ARTIFACT = {
-    "semantic": "semantic",
-    "formal": "formal_A",
-    "interoperability": "interoperability_A",
-    "distributed": "distributed",
-    "scale": "scale",
-    "systems": "systems",
+
+# Auditors use the two independently generated formal and interoperability programs rather than
+# merely choosing different function names inside one file.
+ARTIFACT_BY_AUDITOR = {
+    "A": {
+        "semantic": "semantic", "formal": "formal_A",
+        "interoperability": "interoperability_A",
+        "distributed": "distributed", "scale": "scale", "systems": "systems"},
+    "B": {
+        "semantic": "semantic", "formal": "formal_B",
+        "interoperability": "interoperability_B",
+        "distributed": "distributed", "scale": "scale", "systems": "systems"},
+}
+
+# Ordered candidates are functions/classes known to be called by the corresponding signed reference
+# arena. The chooser verifies the definition is actually present in the supplied AST census and
+# limits reuse to four axes, so a stale name or generic entrypoint cannot pass.
+PREFERRED = {
+    "semantic": {
+        "canonical_authority_seat": {
+            "A": ("replay", "_state"), "B": ("_state", "replay")},
+        "evidence_primitive": {
+            "A": ("ingest", "_semantic_key"),
+            "B": ("_semantic_key", "ingest")},
+        "identity_model": {
+            "A": ("state_at", "link_jurisprudence", "_state"),
+            "B": ("link_jurisprudence", "state_at", "_state")},
+        "state_derivation_model": {
+            "A": ("_state", "replay"), "B": ("replay", "_state")},
+        "temporal_model": {
+            "A": ("_applicable", "_time_le", "_state"),
+            "B": ("_time_le", "_applicable", "_state")},
+        "normative_effect_model": {
+            "A": ("apply_change", "_state"),
+            "B": ("_state", "apply_change")},
+        "provenance_proof_model": {
+            "A": ("provenance", "_state"),
+            "B": ("_state", "provenance")},
+        "publication_topology": {
+            "A": ("publish", "_state"), "B": ("_state", "publish")},
+        "governance_evolution_model": {
+            "A": ("register_change_handler", "apply_change"),
+            "B": ("apply_change", "register_change_handler")},
+    },
+    "formal": {
+        "canonical_authority_seat": {
+            "A": ("state_root", "_authority_view"),
+            "B": ("_authority_view", "state_root")},
+        "evidence_primitive": {
+            "A": ("initial_state", "transition"),
+            "B": ("transition", "initial_state")},
+        "identity_model": {
+            "A": ("query", "transition"), "B": ("transition", "query")},
+        "state_derivation_model": {
+            "A": ("state_root", "transition"),
+            "B": ("transition", "state_root")},
+        "temporal_model": {
+            "A": ("query", "transition"), "B": ("transition", "query")},
+        "normative_effect_model": {
+            "A": ("query", "transition"), "B": ("transition", "query")},
+        "consistency_commit_model": {
+            "A": ("transition", "state_root"),
+            "B": ("state_root", "transition")},
+        "replication_distribution_model": {
+            "A": ("model_manifest", "transition"),
+            "B": ("transition", "model_manifest")},
+        "trusted_core_topology": {
+            "A": ("_authority_view", "model_manifest", "transition"),
+            "B": ("model_manifest", "transition", "_authority_view")},
+        "governance_evolution_model": {
+            "A": ("transition", "model_manifest"),
+            "B": ("model_manifest", "transition")},
+    },
+    "interoperability": {
+        "identity_model": {
+            "A": ("_common", "project"), "B": ("project", "_common")},
+        "temporal_model": {
+            "A": ("_common", "_eli", "_lrml"),
+            "B": ("_eli", "_lrml", "_common")},
+        "normative_effect_model": {
+            "A": ("_impacts", "_eli", "_akn", "_lrml"),
+            "B": ("_lrml", "_akn", "_eli", "_impacts")},
+        "provenance_proof_model": {
+            "A": ("_prov", "project"), "B": ("project", "_prov")},
+        "publication_topology": {
+            "A": ("project", "_linked", "_eli"),
+            "B": ("_linked", "_eli", "project")},
+    },
+    "distributed": {
+        "consistency_commit_model": {
+            "A": ("submit", "_safe_group", "_quorum", "_persist"),
+            "B": ("_safe_group", "submit", "_quorum", "_persist")},
+        "replication_distribution_model": {
+            "A": ("heal", "_sync_node", "roots", "integrity"),
+            "B": ("_sync_node", "heal", "integrity", "roots")},
+    },
+    "scale": {
+        "scaling_partition_model": {
+            "A": ("ingest_batch", "_partition_index", "partition_roots"),
+            "B": ("_partition_index", "partition_roots", "ingest_batch")},
+    },
+    "systems": {
+        "trusted_core_topology": {
+            "A": ("open_system", "DurableSystem", "_open_with_recovery"),
+            "B": ("DurableSystem", "_open_with_recovery", "open_system")},
+    },
 }
 
 
@@ -64,8 +167,7 @@ def _context(prompt, label):
 def _candidate_id(prompt):
     match = re.search(
         r"OBS-GENOME-REALIZATION-[A-Za-z0-9_.-]+-[AB]::"
-        r"([A-Za-z0-9_.:-]+)",
-        prompt)
+        r"([A-Za-z0-9_.:-]+)", prompt)
     if not match:
         match = re.search(
             r"GENOME-REALIZATION[^\n]*::([A-Za-z0-9_.:-]+)", prompt)
@@ -97,18 +199,28 @@ def _definitions(census, artifact):
     if not values:
         raise RuntimeError(
             "genome-realization mock has no AST definition for " + artifact)
-    preferred = [
-        value for value in values
-        if value.startswith((
-            "open_", "state", "query", "project", "publish", "ingest",
-            "transition", "recover", "integrity", "apply", "replay",
-            "manifest", "commit", "append", "read", "write"))]
-    return list(dict.fromkeys(preferred + values))
+    return list(dict.fromkeys(values))
 
 
-def _definition(census, artifact, index):
-    definitions = _definitions(census, artifact)
-    return definitions[index % len(definitions)]
+def _choose_definition(census, artifact, group, axis, auditor, usage):
+    available = _definitions(census, artifact)
+    preferred = list((
+        PREFERRED.get(group, {}).get(axis, {}).get(auditor, ())))
+    candidates = [value for value in preferred if value in available]
+    if not candidates:
+        # Fail closed in production would be appropriate. The local provider also fails loudly when
+        # a signed reference interface changes, rather than inventing a plausible generic citation.
+        raise RuntimeError(
+            f"genome-realization mock has no known load-bearing definition for "
+            f"{auditor}/{axis}/{group}/{artifact}; available={available[:40]}")
+    below_limit = [
+        value for value in candidates
+        if usage[(artifact, value)] < 4]
+    pool = below_limit or candidates
+    selected = min(
+        pool, key=lambda value: (usage[(artifact, value)], candidates.index(value)))
+    usage[(artifact, selected)] += 1
+    return selected
 
 
 def _evidence_by_group(catalog):
@@ -136,7 +248,11 @@ def realization_answer(prompt, role):
         _context(prompt, "PERSISTED EVIDENCE CATALOG") or [])
     invariant_ids = _invariants(formalization)
     candidate_id = _candidate_id(prompt)
-    auditor_offset = 0 if role.endswith("-A") else 3
+    auditor = role.rsplit("-", 1)[-1]
+    if auditor not in ARTIFACT_BY_AUDITOR:
+        raise RuntimeError("unknown genome auditor profile: " + auditor)
+    auditor_offset = 0 if auditor == "A" else 3
+    usage = Counter()
     reviews = []
     for index, axis in enumerate(AXES):
         value = genome.get(axis) or {}
@@ -148,10 +264,10 @@ def realization_answer(prompt, role):
         citations = []
         evidence_refs = []
         seen_citations = set()
-        for group_index, group in enumerate(REQUIRED[axis]):
-            artifact = ARTIFACT[group]
-            symbol = _definition(
-                census, artifact, index + group_index + auditor_offset)
+        for group in REQUIRED[axis]:
+            artifact = ARTIFACT_BY_AUDITOR[auditor][group]
+            symbol = _choose_definition(
+                census, artifact, group, axis, auditor, usage)
             key = (artifact, symbol)
             if key not in seen_citations:
                 seen_citations.add(key)
@@ -160,8 +276,8 @@ def realization_answer(prompt, role):
                     "symbol": symbol,
                     "reason": (
                         f"The persisted {artifact} AST definition {symbol} "
-                        f"is the executable citation supplied for controlled "
-                        f"axis {axis} in the zero-cost control proof.")})
+                        f"is invoked by the signed {group} evaluator and is "
+                        f"the causal citation for controlled axis {axis}. ")})
             paths = evidence.get(group) or []
             if not paths:
                 raise RuntimeError(
@@ -179,25 +295,27 @@ def realization_answer(prompt, role):
                 invariant_ids[(index + auditor_offset) % len(invariant_ids)]],
             "evidence_refs": evidence_refs,
             "removal_failure": (
-                f"Removing the cited definitions or measured evidence "
-                f"would leave {axis}={controlled_class} without the "
-                "source/evidence groups required by the trusted validator."),
+                f"Renaming the complete cited definition set while leaving "
+                f"its call sites intact must make the signed evaluator for "
+                f"{axis}={controlled_class} fail; an inert-definition control "
+                "must continue to pass."),
             "falsifier": (
-                f"A missing AST definition, unknown invariant, absent "
-                f"evidence hash or executable report inconsistent with "
-                f"{axis}={controlled_class} falsifies this claim."),
+                f"A passing source-bound mutant, failing inert control, "
+                f"missing definition, stale evidence hash or executable "
+                f"report inconsistent with {axis}={controlled_class} "
+                "falsifies this realization claim."),
             "blockers": []})
     return {
-        "auditor_id": "GENOME-MOCK-" + role.rsplit("-", 1)[-1],
+        "auditor_id": "GENOME-MOCK-" + auditor,
         "candidate_id": candidate_id,
         "axis_reviews": reviews,
         "overall_pass": True,
         "architecture_level_blockers": [],
         "summary": (
-            "Every controlled axis is bound only to diversified definitions, "
-            "formalization invariants and grouped persisted evidence "
-            "supplied by the production runner; the trusted validator "
-            "rechecks every citation and rejects generic collapse.")}
+            "Every controlled axis is bound to an auditor-specific known "
+            "load-bearing AST definition, a formalization invariant and an "
+            "exact-source passing evidence receipt. The trusted harness "
+            "rechecks citations and performs independent causal ablation.")}
 
 
 def answer(prompt):
