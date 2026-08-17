@@ -1,0 +1,1 @@
+"""Final owner ceremony wrapper."""
