@@ -188,8 +188,7 @@ def _verify_dossier(repo, runtime, audit, incumbent, conditions, supremacy,
         runtime, evidence, "GATE-ARCH-V0", "gates/v0_subject.json",
         bindings.get("GATE-ARCH-V0") or {})
     _verify_gate_binding(
-        runtime, evidence, "GATE-ARCH-V1",
-        "architecture/target_v1_evidence_revised.json",
+        runtime, evidence, "GATE-ARCH-V1", "gates/v1_subject.json",
         bindings.get("GATE-ARCH-V1") or {})
     _verify_gate_binding(
         runtime, evidence, "GATE-MIGRATION", "architecture/migration_plan.json",
