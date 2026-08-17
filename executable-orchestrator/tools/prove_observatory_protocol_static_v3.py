@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Final zero-provider-call static closure proof for Observatory protocol v5.
 
-This proof is independent of the runtime tournament. It first executes the inherited complete static
-proof, then verifies the protocol-v5 additions as one connected, owner-bindable mechanism: strict
-one-file source generation, independently diversified and citation-map-independent genome auditors,
-exact source-bound semantic and specialized evaluator receipts, executable controlled-genome
-realization, phase-aware hard gates, an unbounded real-provider round policy with stagnation
-escalation, final overlay order, the canonical localhost provider and the authoritative v5 E2E
-entrypoint. It compiles/imports code but makes no provider call and executes no candidate.
+The inherited proof compiles and imports the broad protocol census. This final layer verifies the
+remaining load-bearing topology as one owner-bindable mechanism: strict one-file builders, exact
+source-bound evaluator receipts, two independently prompted and citation-map-independent genome
+auditors, executable controlled-genome realization, an unbounded real-provider search policy with
+stagnation escalation, a deterministic hash-indexed supremacy dossier, the canonical localhost
+provider, and the authoritative static->Docker-E2E entrypoint. No provider call or candidate execution
+occurs here.
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ import prove_observatory_protocol_static_v2 as previous
 ROOT = previous.ROOT
 REPORT = os.path.join(ROOT, "proof", "observatory-protocol-static-v5.json")
 PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5"
+DOSSIER_KEY = "supremacy_dossier_verified"
 
 REQUIRED_MODULES = (
     "lawmax21.observatory_build_schema_hardening",
@@ -29,11 +30,13 @@ REQUIRED_MODULES = (
     "lawmax21.observatory_genome_realization_overlay",
     "lawmax21.observatory_genome_evidence_binding_hardening",
     "lawmax21.observatory_genome_cross_auditor_hardening",
+    "lawmax21.observatory_supremacy_dossier_overlay",
     "lawmax21.observatory_phase_gate_hardening",
     "lawmax21.observatory_preflight_v5",
 )
 REQUIRED_FILES = {
     "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md",
+    "profiles/national-observatory/SUPREMACY-CONTRACT.md",
     "executable-orchestrator/orchestrator.py",
     "executable-orchestrator/lawmax21/observatory_launcher.py",
     "executable-orchestrator/lawmax21/observatory_build_schema_hardening.py",
@@ -42,6 +45,7 @@ REQUIRED_FILES = {
     "executable-orchestrator/lawmax21/observatory_genome_realization_overlay.py",
     "executable-orchestrator/lawmax21/observatory_genome_evidence_binding_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_cross_auditor_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_supremacy_dossier_overlay.py",
     "executable-orchestrator/tools/mock_observatory_protocol_server.py",
     "executable-orchestrator/tools/prove_observatory_protocol_static_v3.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol.py",
@@ -55,12 +59,26 @@ GENOME_CONDITIONS = {
 }
 MISSION_FLAGS = {
     "executable_genome_realization_required",
+    "deterministic_supremacy_dossier_required",
     "strict_executable_source_schema_required",
     "bounded_candidate_output_required",
     "terminal_negative_proof_required",
     "proof_mode_forbidden_in_production",
     "unbounded_production_rounds_required",
     "stagnation_escalates_search_required",
+}
+STATIC_GATES = {
+    "strict_one_file_build_schema": True,
+    "semantic_source_receipts_bound": True,
+    "source_bound_evidence_required": True,
+    "auditor_inference_diversity_required": True,
+    "cross_auditor_citation_independence_required": True,
+    "unbounded_production_rounds_bound": True,
+    "stagnation_escalation_bound": True,
+    "deterministic_supremacy_dossier_bound": True,
+    "final_overlay_order_verified": True,
+    "canonical_local_provider_verified": True,
+    "authoritative_e2e_protocol_v5_verified": True,
 }
 
 
@@ -73,17 +91,21 @@ def _text(relative: str) -> str:
         return handle.read()
 
 
-def _ordered(text: str, tokens: list[str], label: str) -> None:
+def _require_tokens(text: str, tokens: tuple[str, ...], label: str) -> None:
+    missing = [token for token in tokens if token not in text]
+    if missing:
+        raise RuntimeError(label + " lacks: " + ", ".join(missing))
+
+
+def _ordered(text: str, tokens: tuple[str, ...], label: str) -> None:
     positions = []
     for token in tokens:
         try:
             positions.append(text.index(token))
         except ValueError as exc:
-            raise RuntimeError(
-                f"{label}: missing integration token {token}") from exc
+            raise RuntimeError(f"{label}: missing {token}") from exc
     if positions != sorted(positions):
-        raise RuntimeError(
-            f"{label}: integration order is not fail-closed")
+        raise RuntimeError(label + ": install order drifted")
 
 
 def main() -> int:
@@ -94,10 +116,8 @@ def main() -> int:
         "status": "FAIL",
     }
     try:
-        prior_code = previous.main()
-        if prior_code != 0:
-            raise RuntimeError(
-                "the inherited complete static proof did not pass")
+        if previous.main() != 0:
+            raise RuntimeError("inherited complete static proof failed")
 
         from lawmax21 import observatory_protocol as protocol
         from lawmax21 import observatory_build_schema_hardening as build_schema
@@ -105,6 +125,7 @@ def main() -> int:
         from lawmax21 import observatory_genome_evidence_binding_hardening as evidence_binding
         from lawmax21 import observatory_genome_auditor_diversity_hardening as auditor_diversity
         from lawmax21 import observatory_genome_cross_auditor_hardening as cross_auditor
+        from lawmax21 import observatory_supremacy_dossier_overlay as dossier
         from lawmax21 import observatory_semantic_evidence_binding_hardening as semantic_binding
         from lawmax21 import observatory_phase_gate_hardening as phase
         from lawmax21 import observatory_preflight_v2 as preflight_core
@@ -120,127 +141,92 @@ def main() -> int:
             flag for flag in MISSION_FLAGS
             if protocol.MISSION_FLAGS.get(flag) is not True)
         if missing_flags:
-            raise RuntimeError(
-                "protocol-v5 mission flags missing: "
-                + ", ".join(missing_flags))
-        if int(protocol.SEARCH_POLICY.get(
-                "genome_realization_auditors_required", 0)) != 2:
-            raise RuntimeError(
-                "protocol-v5 does not require two genome-realization auditors")
+            raise RuntimeError("mission flags missing: " + ", ".join(missing_flags))
         if protocol.SEARCH_POLICY.get("production_max_rounds") != 0:
-            raise RuntimeError(
-                "owner-signed search policy permits a finite production round cap")
+            raise RuntimeError("finite production round cap remains owner-permitted")
         if protocol.SEARCH_POLICY.get("stagnation_response") != \
                 "continue-successor-radical-novelty-meta-search":
-            raise RuntimeError(
-                "owner-signed stagnation policy does not escalate search")
+            raise RuntimeError("stagnation does not widen search")
+        if int(protocol.SEARCH_POLICY.get(
+                "genome_realization_auditors_required", 0)) != 2:
+            raise RuntimeError("two genome-realization auditors are not required")
         if protocol.CONTRACT_FILES.get(
                 "genome_realization_contract_sha256") != \
                 "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md":
-            raise RuntimeError(
-                "genome-realization contract is not owner-hash-bound")
+            raise RuntimeError("genome contract is not owner-hash-bound")
 
         protocol_files = set(protocol.protocol_files(ROOT))
         missing_files = sorted(REQUIRED_FILES - protocol_files)
         if missing_files:
-            raise RuntimeError(
-                "protocol census omitted: " + ", ".join(missing_files))
+            raise RuntimeError("protocol census omitted: " + ", ".join(missing_files))
         for relative in REQUIRED_FILES:
             if not os.path.isfile(_path(relative)):
-                raise RuntimeError(
-                    "required protocol-v5 file is absent: " + relative)
+                raise RuntimeError("required file absent: " + relative)
 
-        schema = build_schema.BUILD_SCHEMA
-        files_schema = schema["properties"]["files"]
-        if schema.get("additionalProperties") is not False \
+        files_schema = build_schema.BUILD_SCHEMA["properties"]["files"]
+        allowed = set(files_schema["items"]["properties"]["path"]["enum"])
+        if build_schema.BUILD_SCHEMA.get("additionalProperties") is not False \
                 or files_schema.get("minItems") != 1 \
-                or files_schema.get("maxItems") != 1:
-            raise RuntimeError(
-                "executable-source schema is not a closed one-file boundary")
-        allowed = set(
-            files_schema["items"]["properties"]["path"]["enum"])
-        expected_allowed = {
-            "candidate.py", "systems_candidate.py",
-            "distributed_candidate.py", "scale_candidate.py",
-            "formal_candidate.py", "interoperability_candidate.py"}
-        if allowed != expected_allowed:
-            raise RuntimeError(
-                "executable-source path surface drifted")
+                or files_schema.get("maxItems") != 1 \
+                or allowed != {
+                    "candidate.py", "systems_candidate.py",
+                    "distributed_candidate.py", "scale_candidate.py",
+                    "formal_candidate.py", "interoperability_candidate.py"}:
+            raise RuntimeError("executable-source boundary is not closed one-file output")
 
         if tuple(genome.AUDITORS) != ("A", "B") \
-                or len(genome.oroles.GENOME_FIELDS) != 13:
-            raise RuntimeError(
-                "genome realization is not a two-auditor thirteen-axis campaign")
-        if set(genome.SUPREMACY_KEYS) != GENOME_CONDITIONS:
-            raise RuntimeError(
-                "genome-realization terminal conditions drifted")
+                or len(genome.oroles.GENOME_FIELDS) != 13 \
+                or set(genome.SUPREMACY_KEYS) != GENOME_CONDITIONS:
+            raise RuntimeError("genome realization topology drifted")
         if set(auditor_diversity.PROFILES) != {
                 "genome-realization-auditor-A",
-                "genome-realization-auditor-B"}:
-            raise RuntimeError(
-                "independent genome-auditor profiles drifted")
-        if auditor_diversity.PROFILES[
-                "genome-realization-auditor-A"]["temperature"] != 0.0 \
+                "genome-realization-auditor-B"} \
+                or auditor_diversity.PROFILES[
+                    "genome-realization-auditor-A"]["temperature"] != 0.0 \
                 or auditor_diversity.PROFILES[
                     "genome-realization-auditor-B"]["temperature"] != 0.35:
-            raise RuntimeError(
-                "genome auditors no longer use distinct inference profiles")
+            raise RuntimeError("genome auditors are not inference-diverse")
         if cross_auditor.MIN_DIFFERING_AXIS_MAPS != 4:
-            raise RuntimeError(
-                "cross-auditor citation-map independence threshold drifted")
-        if not callable(getattr(semantic_binding, "install", None)):
-            raise RuntimeError(
-                "semantic source-binding hardening is not installable")
-        if not callable(getattr(evidence_binding, "install", None)):
-            raise RuntimeError(
-                "source-bound genome evidence hardening is not installable")
-
-        downstream = phase._DOWNSTREAM
-        if downstream.get("genome_realization_qualification") != {
+            raise RuntimeError("cross-auditor map independence threshold drifted")
+        if dossier.SUPREMACY_KEY != DOSSIER_KEY \
+                or dossier.CLAIM_LEVEL != \
+                "EVIDENCE_SUPPORTED_SUPREMACY_WITHIN_SIGNED_PROTOCOL_AND_TESTED_BOUNDS":
+            raise RuntimeError("deterministic dossier claim/condition drifted")
+        if not callable(semantic_binding.install) or not callable(evidence_binding.install):
+            raise RuntimeError("source-binding hardening is not installable")
+        if phase._DOWNSTREAM.get("genome_realization_qualification") != {
                 "genome_realization_survival"}:
-            raise RuntimeError(
-                "genome-realization hard minimum is not phase-aware")
+            raise RuntimeError("genome hard minimum is not phase-aware")
+        importlib.import_module("lawmax21.observatory_preflight_v5")
         if "genome_realization_survival" not in preflight_core.REQUIRED_DIMENSIONS:
-            importlib.import_module("lawmax21.observatory_preflight_v5")
-        if "genome_realization_survival" not in preflight_core.REQUIRED_DIMENSIONS:
-            raise RuntimeError(
-                "preflight does not require genome_realization_survival")
+            raise RuntimeError("preflight omits genome realization hard dimension")
 
         with open(_path(
                 "profiles/national-observatory/PARETO-DIMENSIONS.json"),
                 encoding="utf-8") as handle:
-            pareto = json.load(handle)
-        dimensions = {row.get("id"): row for row in pareto}
-        genome_dimension = dimensions.get(
-            "genome_realization_survival") or {}
+            dimensions = {row["id"]: row for row in json.load(handle)}
+        genome_dimension = dimensions.get("genome_realization_survival") or {}
         if genome_dimension.get("direction") != "higher" \
                 or float(genome_dimension.get("hard_minimum", -1)) != 1.0:
-            raise RuntimeError(
-                "genome realization is not a hard Pareto gate")
+            raise RuntimeError("genome realization is not a hard Pareto gate")
 
-        launcher = _text(
-            "executable-orchestrator/lawmax21/observatory_launcher.py")
-        for token in (
-                "PRODUCTION_MAX_ROUNDS = 0",
-                "args.max_rounds != PRODUCTION_MAX_ROUNDS",
-                "use --max-rounds 0",
-                '"finite_cap_allowed_for_real_provider": False'):
-            if token not in launcher:
-                raise RuntimeError(
-                    "production launcher lacks unbounded-round enforcement: " + token)
+        launcher = _text("executable-orchestrator/lawmax21/observatory_launcher.py")
+        _require_tokens(launcher, (
+            "PRODUCTION_MAX_ROUNDS = 0",
+            "args.max_rounds != PRODUCTION_MAX_ROUNDS",
+            "use --max-rounds 0",
+            '"finite_cap_allowed_for_real_provider": False'),
+            "production launcher")
         shared = _text("executable-orchestrator/orchestrator.py")
-        for token in (
-                "if max_rounds > 0 and rs >= max_rounds",
-                "_record_stagnation_escalation",
-                'getattr(ctx, "profile_id", "") == "national-observatory"',
-                "continue-successor-radical-novelty-meta-search"):
-            if token not in shared:
-                raise RuntimeError(
-                    "shared escalation loop lacks non-satisficing policy: " + token)
+        _require_tokens(shared, (
+            "if max_rounds > 0 and rs >= max_rounds",
+            "_record_stagnation_escalation",
+            'getattr(ctx, "profile_id", "") == "national-observatory"',
+            "continue-successor-radical-novelty-meta-search"),
+            "shared escalation loop")
 
-        audit = _text(
-            "executable-orchestrator/lawmax21/observatory_audit.py")
-        _ordered(audit, [
+        audit = _text("executable-orchestrator/lawmax21/observatory_audit.py")
+        _ordered(audit, (
             "observatory_build_schema_hardening.install",
             "observatory_genome_auditor_diversity_hardening.install",
             "observatory_shared_corpus_hardening.install",
@@ -255,142 +241,66 @@ def main() -> int:
             "base.install",
             "observatory_cross_model_overlay.install",
             "observatory_genome_realization_overlay.install",
-            "observatory_phase_gate_hardening.install",
-        ], "final Observatory overlay")
-
-        audit_v2 = _text(
-            "executable-orchestrator/lawmax21/observatory_audit_v2.py")
-        for token in (
-                "cross_model_consistency",
-                "controlled_genome_realization"):
-            if token not in audit_v2:
-                raise RuntimeError(
-                    "independent audit omits campaign: " + token)
+            "observatory_supremacy_dossier_overlay.install",
+            "observatory_phase_gate_hardening.install"),
+            "final Observatory overlay")
 
         semantic_source = _text(
-            "executable-orchestrator/lawmax21/"
-            "observatory_semantic_evidence_binding_hardening.py")
-        for token in (
-                "candidate_sha256",
-                "in-memory and persisted semantic source bytes diverge",
-                "atomic_write_json",
-                "observatory-hidden-"):
-            if token not in semantic_source:
-                raise RuntimeError(
-                    "semantic source receipt binding lacks: " + token)
-
-        genome_source = _text(
-            "executable-orchestrator/lawmax21/"
-            "observatory_genome_realization_overlay.py")
-        for token in (
-                '"status": "PASS" if consensus else "FAIL"',
-                '"passed": consensus',
-                '"definitions"',
-                '"group"',
-                '"independent_auditors"'):
-            if token not in genome_source:
-                raise RuntimeError(
-                    "genome realization lacks load-bearing token: " + token)
-
+            "executable-orchestrator/lawmax21/observatory_semantic_evidence_binding_hardening.py")
+        _require_tokens(semantic_source, (
+            "candidate_sha256",
+            "in-memory and persisted semantic source bytes diverge",
+            "atomic_write_json", "observatory-hidden-"),
+            "semantic source receipt binding")
         evidence_source = _text(
-            "executable-orchestrator/lawmax21/"
-            "observatory_genome_evidence_binding_hardening.py")
-        for token in (
-                "_persisted_receipt",
-                "candidate_sha256",
-                "MIN_UNIQUE_DEFINITION_CITATIONS = 8",
-                "MAX_AXES_PER_DEFINITION = 4",
-                "no passing source-bound evidence"):
-            if token not in evidence_source:
-                raise RuntimeError(
-                    "genome evidence binding lacks: " + token)
-
+            "executable-orchestrator/lawmax21/observatory_genome_evidence_binding_hardening.py")
+        _require_tokens(evidence_source, (
+            "_persisted_receipt", "candidate_sha256",
+            "MIN_UNIQUE_DEFINITION_CITATIONS = 8",
+            "MAX_AXES_PER_DEFINITION = 4",
+            "no passing source-bound evidence"),
+            "genome evidence binding")
         cross_source = _text(
-            "executable-orchestrator/lawmax21/"
-            "observatory_genome_cross_auditor_hardening.py")
-        for token in (
-                "MIN_DIFFERING_AXIS_MAPS = 4",
-                "auditor_citation_maps_independent",
-                "genome._audit = audit"):
-            if token not in cross_source:
-                raise RuntimeError(
-                    "cross-auditor hardening lacks: " + token)
+            "executable-orchestrator/lawmax21/observatory_genome_cross_auditor_hardening.py")
+        _require_tokens(cross_source, (
+            "MIN_DIFFERING_AXIS_MAPS = 4",
+            "auditor_citation_maps_independent",
+            "genome._passes = passes"),
+            "cross-auditor hardening")
+        dossier_source = _text(
+            "executable-orchestrator/lawmax21/observatory_supremacy_dossier_overlay.py")
+        _require_tokens(dossier_source, (
+            'SUPREMACY_KEY = "supremacy_dossier_verified"',
+            "OMEGA-SUPREMACY-DOSSIER.json",
+            "EVIDENCE_SUPPORTED_SUPREMACY_WITHIN_SIGNED_PROTOCOL_AND_TESTED_BOUNDS",
+            "evidence_index",
+            'ctx.esc._sup()["final_dossier"]',
+            'out["INDEPENDENT_AUDIT"] = independent_audit'),
+            "deterministic supremacy dossier")
 
         provider = _text(
-            "executable-orchestrator/tools/"
-            "mock_observatory_protocol_server.py")
-        for token in (
-                "genome-realization-auditor-",
-                "PERSISTED EVIDENCE CATALOG",
-                "auditor_offset",
-                "Counter",
-                "_choose_definition"):
-            if token not in provider:
-                raise RuntimeError(
-                    "canonical localhost provider lacks: " + token)
-
+            "executable-orchestrator/tools/mock_observatory_protocol_server.py")
+        _require_tokens(provider, (
+            "genome-realization-auditor-", "PERSISTED EVIDENCE CATALOG",
+            "auditor_offset", "Counter", "_choose_definition"),
+            "canonical localhost provider")
         e2e = _text(
-            "executable-orchestrator/tools/"
-            "prove_complete_observatory_protocol.py")
-        if PROTOCOL_VERSION not in e2e:
-            raise RuntimeError(
-                "authoritative E2E does not require signed protocol v5")
-        if "mock_observatory_protocol_server.py" not in e2e:
-            raise RuntimeError(
-                "authoritative E2E does not use the canonical v5 localhost provider")
-        for condition in GENOME_CONDITIONS:
-            if condition not in e2e:
-                raise RuntimeError(
-                    "authoritative E2E omits condition: " + condition)
-        for token in (
-                "genome-realization-qualification-",
-                "genome-realization-replication-",
-                "genome-realization-crown-"):
-            if token not in e2e:
-                raise RuntimeError(
-                    "authoritative E2E omits evidence family: " + token)
-
-        hardened = _text(
-            "executable-orchestrator/tools/"
-            "prove_complete_observatory_protocol_hardened.py")
-        for relative in (
-                "executable-orchestrator/orchestrator.py",
-                "executable-orchestrator/lawmax21/observatory_launcher.py",
-                "executable-orchestrator/lawmax21/"
-                "observatory_genome_realization_overlay.py",
-                "executable-orchestrator/lawmax21/"
-                "observatory_genome_auditor_diversity_hardening.py",
-                "executable-orchestrator/lawmax21/"
-                "observatory_genome_evidence_binding_hardening.py",
-                "executable-orchestrator/lawmax21/"
-                "observatory_genome_cross_auditor_hardening.py",
-                "executable-orchestrator/lawmax21/"
-                "observatory_semantic_evidence_binding_hardening.py",
-                "executable-orchestrator/tools/"
-                "mock_observatory_protocol_server.py"):
-            if relative not in hardened:
-                raise RuntimeError(
-                    "hardened E2E census omits: " + relative)
-        for token in (
-                "unbounded_production_rounds_required",
-                "stagnation_escalates_search_required",
-                'mission.get("production_max_rounds") != 0',
-                'round_policy.get("unbounded") is not True',
-                "auditor_citation_maps_independent"):
-            if token not in hardened:
-                raise RuntimeError(
-                    "hardened E2E does not prove final policy: " + token)
-
-        stable = _text(
-            "executable-orchestrator/tools/run_observatory_proof.py")
+            "executable-orchestrator/tools/prove_complete_observatory_protocol_hardened.py")
+        _require_tokens(e2e, (
+            "deterministic_supremacy_dossier_required",
+            "OMEGA-SUPREMACY-DOSSIER.json",
+            "supremacy_dossier_verified",
+            "auditor_citation_maps_independent",
+            "unbounded_production_rounds_required",
+            "stagnation_escalates_search_required"),
+            "hardened E2E")
+        stable = _text("executable-orchestrator/tools/run_observatory_proof.py")
         if "prove_complete_observatory_protocol_v3" not in stable:
-            raise RuntimeError(
-                "stable proof command is not routed to the v5 closure seat")
+            raise RuntimeError("stable proof command bypasses v5 closure")
 
         bundle = protocol.protocol_bundle_sha256(ROOT)
         if len(bundle) != 64:
-            raise RuntimeError(
-                "protocol-v5 bundle hash is malformed")
+            raise RuntimeError("protocol-v5 bundle hash is malformed")
         result.update({
             "status": "PASS",
             "protocol_version": protocol.PROTOCOL_VERSION,
@@ -400,24 +310,15 @@ def main() -> int:
             "genome_axes": len(genome.oroles.GENOME_FIELDS),
             "genome_auditors": list(genome.AUDITORS),
             "genome_terminal_conditions": sorted(GENOME_CONDITIONS),
-            "strict_one_file_build_schema": True,
-            "semantic_source_receipts_bound": True,
-            "source_bound_evidence_required": True,
-            "auditor_inference_diversity_required": True,
-            "cross_auditor_citation_independence_required": True,
-            "unbounded_production_rounds_bound": True,
-            "stagnation_escalation_bound": True,
-            "final_overlay_order_verified": True,
-            "canonical_local_provider_verified": True,
-            "authoritative_e2e_protocol_v5_verified": True,
+            "dossier_terminal_condition": DOSSIER_KEY,
+            **STATIC_GATES,
         })
     except Exception as exc:
         result["reason"] = f"{type(exc).__name__}: {exc}"
 
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     with open(REPORT, "w", encoding="utf-8") as handle:
-        json.dump(
-            result, handle, ensure_ascii=False, indent=1, sort_keys=True)
+        json.dump(result, handle, ensure_ascii=False, indent=1, sort_keys=True)
     print(json.dumps(result, ensure_ascii=False, indent=1, sort_keys=True))
     print("proof report:", REPORT)
     return 0 if result.get("status") == "PASS" else 1
