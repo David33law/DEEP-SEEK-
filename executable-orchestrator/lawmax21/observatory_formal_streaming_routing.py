@@ -9,6 +9,9 @@ from .canonical import atomic_write_json, read_json
 from .handlers import A
 
 
+_EVALUATOR_TAIL_LIMIT = 4000
+
+
 def _sha256_file(path):
     digest = hashlib.sha256()
     with open(path, "rb") as handle:
@@ -33,12 +36,19 @@ def _run(ctx, cid, perspective, label, depth, candidate_path=None):
     for axis, value in formal._expected(ctx, cid).items():
         command.extend(["--expected-" + axis.replace("_", "-"), value])
     result = subprocess.run(command, capture_output=True, text=True)
+    process = {
+        "evaluator_returncode": result.returncode,
+        "evaluator_stdout_tail": (result.stdout or "")[-_EVALUATOR_TAIL_LIMIT:],
+        "evaluator_stderr_tail": (result.stderr or "")[-_EVALUATOR_TAIL_LIMIT:],
+    }
     if not os.path.exists(out):
-        return {"status": "FAIL", "passed": False,
-                "reason": "streaming formal evaluator produced no report: "
-                          + (result.stdout + result.stderr)[-1600:]}
+        return {
+            "status": "FAIL", "passed": False,
+            "reason": "streaming formal evaluator produced no report",
+            **process,
+        }
     report = read_json(out)
-    report["evaluator_returncode"] = result.returncode
+    report.update(process)
     report["evidence_path"] = os.path.relpath(
         out, ctx.runtime).replace("\\", "/")
     report["candidate_path"] = os.path.relpath(
