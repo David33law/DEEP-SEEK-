@@ -2,8 +2,8 @@
 """National Legal Observatory launcher over the shared LAWMAX v2.3 control plane.
 
 This file does not implement a second state machine. It injects profile paths, semantics,
-provider policy, currency-explicit accounting and Observatory/supremacy/crown/novelty handlers into
-the existing signed control loop.
+provider policy, currency-explicit accounting and Observatory/supremacy/crown/novelty/meta-search
+handlers into the existing signed control loop.
 """
 import argparse
 import hashlib
@@ -31,15 +31,19 @@ REQUIRED_NOVELTY_METHODS = [
 PROTOCOL_FILES = [
     "run_observatory.py",
     "setup_observatory.py",
+    "profiles/national-observatory/NOVELTY-SEARCH-CONTRACT.md",
     "executable-orchestrator/orchestrator.py",
     "executable-orchestrator/lawmax21/observatory_roles.py",
     "executable-orchestrator/lawmax21/observatory_runtime.py",
     "executable-orchestrator/lawmax21/observatory_supremacy_overlay.py",
     "executable-orchestrator/lawmax21/observatory_crown_overlay.py",
     "executable-orchestrator/lawmax21/observatory_novelty_overlay.py",
+    "executable-orchestrator/lawmax21/observatory_meta_search_overlay.py",
     "executable-orchestrator/lawmax21/observatory_escalation.py",
     "executable-orchestrator/lawmax21/observatory_audit.py",
     "private-evaluator/evaluator/observatory_systems_arena.py",
+    "executable-orchestrator/tools/mock_observatory_server.py",
+    "executable-orchestrator/tools/mock_observatory_meta_server.py",
     "executable-orchestrator/tools/run_observatory_proof.py",
     "executable-orchestrator/tools/prove_active_novelty_saturation.py",
 ]
@@ -57,8 +61,8 @@ base = _load_base_orchestrator()
 from lawmax21 import decisions as dec  # noqa: E402
 from lawmax21 import handlers as base_handlers  # noqa: E402
 from lawmax21 import (observatory_audit, observatory_blueprint_overlay, observatory_crown_overlay,
-                      observatory_handlers, observatory_novelty_overlay, observatory_preflight,
-                      observatory_roles, observatory_supremacy_overlay, profiles, roles)  # noqa: E402
+                      observatory_handlers, observatory_preflight, observatory_roles,
+                      observatory_supremacy_overlay, profiles, roles)  # noqa: E402
 from lawmax21.observatory_escalation import install_state_semantics  # noqa: E402
 from lawmax21.observatory_runtime import ObservatoryContext  # noqa: E402
 from lawmax21.budget import BudgetLedger  # noqa: E402
@@ -151,6 +155,9 @@ def _validate_signed_mission(D, root):
         "public_supremacy_case_required",
         "durable_systems_arena_required",
         "active_novelty_saturation_required",
+        "meta_search_required",
+        "mechanical_genome_coverage_required",
+        "independent_closure_auditors_required",
     )
     missing_flags = [k for k in required_true if mission.get(k) is not True]
     if missing_flags:
@@ -159,6 +166,15 @@ def _validate_signed_mission(D, root):
     if int(mission.get("novelty_dry_waves_required", 0)) != 3:
         raise observatory_preflight.PreflightFailed(
             "signed D09 must require exactly three consecutive active novelty dry waves")
+    if int(mission.get("meta_search_critics_required", 0)) != 2:
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 must require two independent meta-search critics per wave")
+    if int(mission.get("closure_auditors_required", 0)) != 2:
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 must require two independent closure auditors per wave")
+    if int(mission.get("critical_pair_breadth_required", 0)) != 3:
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 must require critical-pair breadth of three counterpart classes")
     if list(mission.get("novelty_methods") or []) != REQUIRED_NOVELTY_METHODS:
         raise observatory_preflight.PreflightFailed(
             "signed D09 novelty-miner portfolio does not match the production protocol")
@@ -232,7 +248,6 @@ def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_
     handlers = observatory_blueprint_overlay.install(ctx, handlers)
     handlers = observatory_supremacy_overlay.install(ctx, handlers)
     handlers = observatory_crown_overlay.install(ctx, handlers)
-    handlers = observatory_novelty_overlay.install(ctx, handlers)
     handlers = observatory_audit.install(ctx, handlers)
     machine = states_module.Machine(runtime, log, owner_pub, run_id, handlers)
     machine.profile_id = PROFILE.id
