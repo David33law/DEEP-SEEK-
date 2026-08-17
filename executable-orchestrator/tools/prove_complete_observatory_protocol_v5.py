@@ -13,7 +13,6 @@ import subprocess
 import sys
 
 import prove_complete_observatory_protocol_causal_hardened as e2e
-import prove_complete_observatory_protocol_v4 as inherited_entry
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -25,6 +24,25 @@ CAUSAL_STATIC_REPORT = os.path.join(
 E2E_REPORT = os.path.join(
     ROOT, "proof", "complete-observatory-protocol-e2e.json")
 PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5"
+INHERITED_STATIC_GATES = (
+    "strict_one_file_build_schema",
+    "semantic_source_receipts_bound",
+    "source_bound_evidence_required",
+    "auditor_inference_diversity_required",
+    "cross_auditor_citation_independence_required",
+    "unbounded_production_rounds_bound",
+    "stagnation_escalation_bound",
+    "deterministic_supremacy_dossier_bound",
+    "dossier_foundation_evidence_bound",
+    "portable_owner_signature_static_extension",
+    "final_launcher_v3_verified",
+    "owner_public_key_snapshot_verified",
+    "signed_owner_decisions_snapshot_verified",
+    "owner_gate_crypto_reverification_verified",
+    "final_overlay_order_verified",
+    "canonical_local_provider_verified",
+    "authoritative_e2e_protocol_v5_verified",
+)
 CAUSAL_STATIC_GATES = (
     "causal_genome_ablation_bound",
     "auditor_specific_definition_set_ablation",
@@ -53,7 +71,7 @@ def main(argv=None):
     inherited = _read(INHERITED_STATIC_REPORT)
     causal = _read(CAUSAL_STATIC_REPORT)
     inherited_missing = []
-    for key in inherited_entry.STATIC_GATES:
+    for key in INHERITED_STATIC_GATES:
         expected = (
             "PASS" if key == "portable_owner_signature_static_extension"
             else True)
@@ -87,7 +105,7 @@ def main(argv=None):
             "protocol_bundle_sha256": inherited.get(
                 "protocol_bundle_sha256"),
             **{key: inherited.get(key)
-               for key in inherited_entry.STATIC_GATES},
+               for key in INHERITED_STATIC_GATES},
             "report_sha256": e2e.sha256_file(
                 INHERITED_STATIC_REPORT),
         }
