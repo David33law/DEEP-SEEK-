@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Contract-rich extension of the zero-cost Observatory mock.
 
-The base mock continues to exercise the existing production roles. This wrapper adds responses for
-mechanical coverage, meta-search, taxonomy consensus and independent dry-wave closure. It deliberately
-injects one controlled ``other`` claim through G96 so the authoritative proof traverses the real
-taxonomy-adjudication and deferred-normalization path. It proves control flow and schema binding,
-never architecture quality.
+The base mock continues to exercise existing production roles. This wrapper adds responses for
+mechanical coverage, meta-search, taxonomy consensus, authoritative prior-art challenge and
+independent dry-wave closure. It deliberately injects one controlled ``other`` claim through G96
+and one prior-art-derived architecture challenger. It proves control flow and schema binding, never
+architecture quality or third-party endorsement.
 """
 import importlib.util
 import json
@@ -105,8 +105,6 @@ def targeted_lineage(prompt):
 
 def ontology_lineage(prompt):
     obj = base.lineage_answer(prompt)
-    # Exercise a real taxonomy challenge. The two independent mock adjudicators below map this
-    # deliberately vague `other` choice to the already-controlled hybrid authority class.
     first = obj["candidates"][0]
     first["genome"]["canonical_authority_seat"] = {
         "class": "other",
@@ -157,6 +155,74 @@ def taxonomy_adjudicator(prompt):
     }
 
 
+def prior_art_critic(prompt, role):
+    manifest = base.context_json(prompt, "owner-signed public prior-art manifest") or {}
+    sources = manifest.get("sources") or []
+    tag = role[len("prior-art-critic-"):]
+    challenger_id = "PA-ELI-IMPACT-COMPILER"
+    reviews = []
+    challengers = []
+    for source in sources:
+        sid = source.get("source_id")
+        if tag == "legal-interoperability" and sid == "EU-ELI-IMPACT-1.0":
+            reviews.append({
+                "source_id": sid,
+                "disposition": "MISSING",
+                "reasoning": (
+                    "The mock frontier needs an explicit architecture challenger that tests whether "
+                    "normative impacts can be compiled into ELI-compatible projections without making "
+                    "the exchange ontology a second authority seat."),
+                "evidence_refs": [],
+                "gap_kind": "architecture",
+                "required_action": "Construct and measure the complete impact-compiler challenger.",
+                "challenger_ids": [challenger_id],
+            })
+        else:
+            reviews.append({
+                "source_id": sid,
+                "disposition": "SATISFIED",
+                "reasoning": (
+                    "The zero-cost control proof treats this source challenge as already represented "
+                    "by persisted semantic, durable and publication-root evidence. This is not an "
+                    "architecture-quality judgment."),
+                "evidence_refs": [
+                    "frontier/members-round0.json",
+                    "reports/private-qualification-round0.json",
+                    "reports/systems-qualification-OBS-01.json",
+                ],
+                "gap_kind": "none",
+                "required_action": "No additional mock action; production critics remain evidence-bound.",
+                "challenger_ids": [],
+            })
+    if tag == "legal-interoperability" and any(
+            x.get("source_id") == "EU-ELI-IMPACT-1.0" for x in sources):
+        genome = base.genome("G05", 8, "prior-art-impact-compiler")
+        proposal = base.proposal(
+            "prior-art-ELI-impact-compiler-family",
+            "Compile typed normative impacts into proof-bound ELI-compatible projections from one canonical legal state",
+            genome)
+        challengers.append({
+            "challenger_id": challenger_id,
+            "source_ids": ["EU-ELI-IMPACT-1.0", "OASIS-LEGALRULEML-1.0"],
+            "attacked_assumption": (
+                "The existing frontier may treat external legal-impact and rule standards as passive "
+                "metadata rather than falsifiable compiler targets."),
+            "falsifiable_gain": (
+                "The challenger should preserve canonical effect semantics while deterministically "
+                "producing standards-conformant impact projections with no second writable truth."),
+            "introduced_cost": (
+                "A larger versioned compiler/proof surface and additional conformance obligations."),
+            "proposal": proposal,
+        })
+    return {
+        "critic_id": f"PRIOR-ART-{tag}",
+        "source_reviews": reviews,
+        "challengers": challengers,
+        "protocol_blockers": [],
+        "unresolved": [],
+    }
+
+
 def closure_auditor(prompt, tag):
     facts = base.context_json(prompt, "mechanical closure facts") or {}
     required = [
@@ -189,6 +255,8 @@ def answer(prompt):
         return meta_critic(prompt, role.rsplit("-", 1)[-1])
     if role.startswith("taxonomy-adjudicator-"):
         return taxonomy_adjudicator(prompt)
+    if role.startswith("prior-art-critic-"):
+        return prior_art_critic(prompt, role)
     if role.startswith("novelty-closure-auditor-"):
         return closure_auditor(prompt, role.rsplit("-", 1)[-1])
     return ORIGINAL_ANSWER(prompt)
