@@ -3,7 +3,8 @@
 
 The response uses only AST definitions, INV-* IDs and persisted evidence paths actually supplied by
 the production runner. The trusted validator independently reproduces every citation, so invented
-symbols or evidence make the proof fail. This calibrates control flow, not architecture quality.
+symbols, stale evidence or generic one-entrypoint mappings make the proof fail. This calibrates
+control flow, not architecture quality.
 """
 import importlib.util
 import os
@@ -87,22 +88,27 @@ def _invariants(formalization):
     return result
 
 
-def _definition(census, artifact):
+def _definitions(census, artifact):
     row = (census or {}).get(artifact) or {}
-    definitions = [
+    values = [
         str(value) for value in row.get("definitions") or []
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", str(value))
         and not str(value).startswith("__")]
-    if not definitions:
+    if not values:
         raise RuntimeError(
             "genome-realization mock has no AST definition for " + artifact)
     preferred = [
-        value for value in definitions
+        value for value in values
         if value.startswith((
             "open_", "state", "query", "project", "publish", "ingest",
             "transition", "recover", "integrity", "apply", "replay",
             "manifest", "commit", "append", "read", "write"))]
-    return (preferred or definitions)[0]
+    return list(dict.fromkeys(preferred + values))
+
+
+def _definition(census, artifact, index):
+    definitions = _definitions(census, artifact)
+    return definitions[index % len(definitions)]
 
 
 def _evidence_by_group(catalog):
@@ -130,6 +136,7 @@ def realization_answer(prompt, role):
         _context(prompt, "PERSISTED EVIDENCE CATALOG") or [])
     invariant_ids = _invariants(formalization)
     candidate_id = _candidate_id(prompt)
+    auditor_offset = 0 if role.endswith("-A") else 3
     reviews = []
     for index, axis in enumerate(AXES):
         value = genome.get(axis) or {}
@@ -141,9 +148,10 @@ def realization_answer(prompt, role):
         citations = []
         evidence_refs = []
         seen_citations = set()
-        for group in REQUIRED[axis]:
+        for group_index, group in enumerate(REQUIRED[axis]):
             artifact = ARTIFACT[group]
-            symbol = _definition(census, artifact)
+            symbol = _definition(
+                census, artifact, index + group_index + auditor_offset)
             key = (artifact, symbol)
             if key not in seen_citations:
                 seen_citations.add(key)
@@ -159,15 +167,16 @@ def realization_answer(prompt, role):
                 raise RuntimeError(
                     "genome-realization mock has no persisted evidence "
                     f"for required group {group}")
-            if paths[0] not in evidence_refs:
-                evidence_refs.append(paths[0])
+            selected = paths[(index + auditor_offset) % len(paths)]
+            if selected not in evidence_refs:
+                evidence_refs.append(selected)
         reviews.append({
             "axis": axis,
             "class": str(controlled_class),
             "realized": True,
             "source_symbols": citations,
             "invariant_ids": [
-                invariant_ids[index % len(invariant_ids)]],
+                invariant_ids[(index + auditor_offset) % len(invariant_ids)]],
             "evidence_refs": evidence_refs,
             "removal_failure": (
                 f"Removing the cited definitions or measured evidence "
@@ -185,10 +194,10 @@ def realization_answer(prompt, role):
         "overall_pass": True,
         "architecture_level_blockers": [],
         "summary": (
-            "Every controlled axis is bound only to definitions, "
+            "Every controlled axis is bound only to diversified definitions, "
             "formalization invariants and grouped persisted evidence "
             "supplied by the production runner; the trusted validator "
-            "rechecks every citation.")}
+            "rechecks every citation and rejects generic collapse.")}
 
 
 def answer(prompt):
