@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Local DeepSeek-shape provider for the National Observatory zero-cost rehearsal.
 
-It exercises the REAL HTTP client, structured-output validation, shared 37-state machine,
-candidate sandbox, hidden evaluator, frontier and owner gates. It is proof infrastructure only:
-no function here is imported by a real Observatory launch.
+It exercises the real HTTP client, structured-output validation, shared state machine, candidate
+sandbox, hidden evaluator, frontier and owner gates. It also emits the current V4 usage-accounting
+shape, including explicit prompt cache hit/miss counters.
 """
 import argparse
 import json
@@ -31,7 +31,6 @@ def partial_source():
 
 def weak_source():
     return reference_source() + r'''
-
 def apply_change(event):
     return {"accepted": False, "target_id": event.get("target_id", ""),
             "change_type": event.get("kind", ""), "unresolved": ["unsupported-change"]}
@@ -167,16 +166,21 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": {"message": "proof requires reasoning_effort=max"}})
         if int(body.get("max_tokens") or 0) < 384000:
             return self._send(400, {"error": {"message": "proof requires max_tokens>=384000"}})
+        if body.get("model") != "deepseek-v4-pro":
+            return self._send(400, {"error": {"message": "proof requires model=deepseek-v4-pro"}})
 
         prompt = "\n".join(m["content"] for m in body.get("messages", []) if m.get("role") == "user")
         content = json.dumps(answer(prompt), ensure_ascii=False)
         pt, ct = max(1, len(prompt) // 4), max(1, len(content) // 4)
+        # Official V4 usage schema: prompt_tokens == cache_hit + cache_miss. The mock uses all
+        # misses so the signed miss rate is exercised deterministically in the budget ledger.
         self._send(200, {
             "id": f"obs-mock-{call_no}", "object": "chat.completion", "model": body.get("model"),
             "choices": [{"index": 0, "finish_reason": "stop",
                          "message": {"role": "assistant", "content": content}}],
             "usage": {"prompt_tokens": pt, "completion_tokens": ct, "total_tokens": pt + ct,
-                      "prompt_tokens_details": {"cached_tokens": 0}},
+                      "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": pt,
+                      "completion_tokens_details": {"reasoning_tokens": 0}},
         })
 
     def _send(self, code, obj):
