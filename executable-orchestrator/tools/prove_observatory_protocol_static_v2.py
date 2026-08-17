@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Final static extension for streaming formal, protocol-v5 and genome-realization routing."""
+"""Final static extension for streaming formal, protocol-v5 and source-bound genome routing."""
 import json
 import os
 import sys
@@ -17,6 +17,7 @@ EXTRA_MODULES = [
     "lawmax21.observatory_evaluator_routing_hardening",
     "lawmax21.observatory_build_schema_hardening",
     "lawmax21.observatory_genome_realization_overlay",
+    "lawmax21.observatory_genome_evidence_binding_hardening",
 ]
 EXTRA_FILES = {
     "private-evaluator/evaluator/observatory_formal_arena_v3.py",
@@ -25,6 +26,7 @@ EXTRA_FILES = {
     "executable-orchestrator/lawmax21/observatory_formal_streaming_routing.py",
     "executable-orchestrator/lawmax21/observatory_build_schema_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_realization_overlay.py",
+    "executable-orchestrator/lawmax21/observatory_genome_evidence_binding_hardening.py",
     "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md",
     "executable-orchestrator/tools/mock_observatory_genome_server.py",
 }
@@ -54,6 +56,7 @@ def main():
             "observatory_formal_streaming_routing.install",
             "observatory_scale_hardening.install",
             "observatory_cross_model_workload_hardening.install",
+            "observatory_genome_evidence_binding_hardening.install",
             "observatory_prior_art_hardening_overlay.install",
             "base.install",
             "observatory_cross_model_overlay.install",
@@ -69,6 +72,12 @@ def main():
         routing = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_formal_streaming_routing.py")
+        evaluator_routing = _text(
+            "executable-orchestrator/lawmax21/"
+            "observatory_evaluator_routing_hardening.py")
+        evidence_binding = _text(
+            "executable-orchestrator/lawmax21/"
+            "observatory_genome_evidence_binding_hardening.py")
         phase = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_phase_gate_hardening.py")
@@ -81,11 +90,19 @@ def main():
         if "observatory_formal_arena_v3.py" not in routing:
             raise RuntimeError(
                 "production formal routing does not use streaming v3")
+        if "candidate_sha256" not in routing \
+                or "candidate_sha256" not in evaluator_routing:
+            raise RuntimeError(
+                "specialized evaluator reports are not source-hash-bound")
         if "genome_realization_qualification" not in phase:
             raise RuntimeError(
                 "genome realization hard minimum is not phase-aware")
         if "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5" not in protocol:
             raise RuntimeError("protocol-v5 binding is absent")
+        if "no passing source-bound evidence" not in evidence_binding \
+                or "candidate_sha256" not in evidence_binding:
+            raise RuntimeError(
+                "genome evidence hardening does not reject stale reports")
         build_schema = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_build_schema_hardening.py")
@@ -113,6 +130,7 @@ def main():
             "preflight_v5_verified": True,
             "strict_build_schema_verified": True,
             "genome_realization_routing_verified": True,
+            "genome_evidence_source_binding_verified": True,
             "protocol_v5_verified": True})
     except Exception as exc:
         report["status"] = "FAIL"
