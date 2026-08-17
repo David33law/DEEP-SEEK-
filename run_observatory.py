@@ -2,8 +2,8 @@
 """National Legal Observatory launcher over the shared LAWMAX v2.3 control plane.
 
 This file does not implement a second state machine. It injects profile paths, semantics,
-provider policy, currency-explicit accounting and Observatory/supremacy handlers into the existing
-signed control loop.
+provider policy, currency-explicit accounting and Observatory/supremacy/crown handlers into the
+existing signed control loop.
 """
 import argparse
 import importlib.util
@@ -29,9 +29,9 @@ def _load_base_orchestrator():
 base = _load_base_orchestrator()
 from lawmax21 import decisions as dec  # noqa: E402
 from lawmax21 import handlers as base_handlers  # noqa: E402
-from lawmax21 import (observatory_audit, observatory_blueprint_overlay, observatory_handlers,
-                      observatory_preflight, observatory_roles, observatory_supremacy_overlay,
-                      profiles, roles)  # noqa: E402
+from lawmax21 import (observatory_audit, observatory_blueprint_overlay, observatory_crown_overlay,
+                      observatory_handlers, observatory_preflight, observatory_roles,
+                      observatory_supremacy_overlay, profiles, roles)  # noqa: E402
 from lawmax21.observatory_escalation import install_state_semantics  # noqa: E402
 from lawmax21.observatory_runtime import ObservatoryContext  # noqa: E402
 from lawmax21.budget import BudgetLedger  # noqa: E402
@@ -101,6 +101,7 @@ def _validate_signed_mission(D, root):
         "supremacy_search_required",
         "no_first_answer_privilege",
         "public_supremacy_case_required",
+        "durable_systems_arena_required",
     )
     missing_flags = [k for k in required_true if mission.get(k) is not True]
     if missing_flags:
@@ -117,6 +118,7 @@ def _validate_signed_mission(D, root):
         "pareto_sha256": sha256_file(os.path.join(profile, "PARETO-DIMENSIONS.json")),
         "evaluator_contract_sha256": sha256_file(os.path.join(profile, "EVALUATOR-CONTRACT.md")),
         "supremacy_contract_sha256": sha256_file(os.path.join(profile, "SUPREMACY-CONTRACT.md")),
+        "systems_contract_sha256": sha256_file(os.path.join(profile, "SYSTEMS-CONTRACT.md")),
     }
     drift = [k for k, v in expected.items() if mission.get(k) != v]
     if drift:
@@ -160,6 +162,7 @@ def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_
     handlers = observatory_handlers.build_observatory_handlers(ctx, base_handlers.build_handlers(ctx))
     handlers = observatory_blueprint_overlay.install(ctx, handlers)
     handlers = observatory_supremacy_overlay.install(ctx, handlers)
+    handlers = observatory_crown_overlay.install(ctx, handlers)
     handlers = observatory_audit.install(ctx, handlers)
     machine = states_module.Machine(runtime, log, owner_pub, run_id, handlers)
     machine.profile_id = PROFILE.id
