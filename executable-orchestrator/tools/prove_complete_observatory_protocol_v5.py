@@ -2,8 +2,9 @@
 """Authoritative protocol-v5 proof with causal controlled-genome realization.
 
 Runs portable-owner static closure, causal static closure and then the causal-hardened production-
-container E2E proof. The E2E still uses the real runner/state-machine/API shape against a local
-provider, performs crash/resume and every owner gate, and makes zero real provider calls.
+container E2E proof through the complete genome-aware localhost provider. The E2E still uses the real
+runner/state-machine/API shape, performs crash/resume and every owner gate, and makes zero real
+provider calls.
 """
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ import os
 import subprocess
 import sys
 
-import prove_complete_observatory_protocol_causal_hardened as e2e
+import prove_complete_observatory_protocol_causal_provider_hardened as e2e
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -123,6 +124,7 @@ def main(argv=None):
         report["authoritative_entrypoint"] = (
             "prove_complete_observatory_protocol_v5.py")
         report["causal_genome_ablation_bound"] = True
+        report["genome_aware_local_provider_used"] = True
         with open(E2E_REPORT, "w", encoding="utf-8") as handle:
             json.dump(report, handle, ensure_ascii=False,
                       indent=1, sort_keys=True)
