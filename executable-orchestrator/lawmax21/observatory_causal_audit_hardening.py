@@ -37,6 +37,20 @@ def install(_ctx, handlers):
                 "genome_axis_specific_crown_tasks", 0),
             "axis_specific_crown_attributed": summary.get(
                 "genome_axis_specific_crown_attributed", 0),
+            "definition_semantics_required": summary.get(
+                "genome_definition_semantic_attribution_required", False),
+            "definition_semantics_replication_checked": summary.get(
+                "genome_definition_semantic_replication_checked", False),
+            "definition_semantics_crown_checked": summary.get(
+                "genome_definition_semantic_crown_checked", False),
+            "definition_semantics_replication_tasks": summary.get(
+                "genome_definition_semantic_replication_tasks", 0),
+            "definition_semantics_replication_failure_scoped": summary.get(
+                "genome_definition_semantic_replication_failure_scoped", 0),
+            "definition_semantics_crown_tasks": summary.get(
+                "genome_definition_semantic_crown_tasks", 0),
+            "definition_semantics_crown_failure_scoped": summary.get(
+                "genome_definition_semantic_crown_failure_scoped", 0),
             "causal_definition_set_ablation": True,
             "inert_mutation_controls_required": True,
         })
@@ -50,6 +64,18 @@ def install(_ctx, handlers):
             == int(controlled["axis_specific_replication_attributed"])
             and int(controlled["axis_specific_crown_tasks"])
             == int(controlled["axis_specific_crown_attributed"]))
+        all_definition_semantics = bool(
+            controlled["definition_semantics_required"] is True
+            and controlled["definition_semantics_replication_checked"] is True
+            and controlled["definition_semantics_crown_checked"] is True
+            and int(controlled["definition_semantics_replication_tasks"]) > 0
+            and int(controlled["definition_semantics_crown_tasks"]) > 0
+            and int(controlled["definition_semantics_replication_tasks"])
+            == int(controlled[
+                "definition_semantics_replication_failure_scoped"])
+            and int(controlled["definition_semantics_crown_tasks"])
+            == int(controlled[
+                "definition_semantics_crown_failure_scoped"]))
         result["causal_genome_ablation"] = {
             "replication_passed": controlled["causal_replication"],
             "crown_passed": controlled["causal_crown"],
@@ -66,6 +92,15 @@ def install(_ctx, handlers):
                 "axis_specific_replication_attributed"],
             "crown_axis_specific_tasks": controlled[
                 "axis_specific_crown_attributed"],
+            "cited_definition_semantics_required": controlled[
+                "definition_semantics_required"],
+            "all_tasks_definition_semantics_checked":
+                all_definition_semantics,
+            "replication_definition_semantics_tasks": controlled[
+                "definition_semantics_replication_failure_scoped"],
+            "crown_definition_semantics_tasks": controlled[
+                "definition_semantics_crown_failure_scoped"],
+            "whole_success_receipt_searched": False,
             "infrastructure_failure_counts_as_causal_failure": False,
             "exact_mutated_source_receipts_required": True,
         }
