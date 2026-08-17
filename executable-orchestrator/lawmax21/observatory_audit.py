@@ -1,11 +1,14 @@
 """Compatibility entrypoint for the final integrated Observatory audit layer."""
 from . import observatory_audit_v2 as base
 from . import observatory_build_schema_hardening
+from . import observatory_causal_audit_hardening
+from . import observatory_causal_dossier_hardening
 from . import observatory_cross_model_overlay
 from . import observatory_cross_model_workload_hardening
 from . import observatory_evaluator_routing_hardening
 from . import observatory_formal_streaming_routing
 from . import observatory_genome_auditor_diversity_hardening
+from . import observatory_genome_causal_ablation_hardening
 from . import observatory_genome_cross_auditor_hardening
 from . import observatory_genome_evidence_binding_hardening
 from . import observatory_genome_realization_overlay
@@ -29,14 +32,15 @@ def install(ctx, handlers):
     observatory_formal_streaming_routing.install(ctx, handlers)
     observatory_scale_hardening.install(ctx, handlers)
     observatory_cross_model_workload_hardening.install(ctx, handlers)
+    observatory_causal_audit_hardening.install(ctx, handlers)
 
-    # Tighten the genome auditor before its handler wrappers are constructed. Every citation must
-    # bind an actual definition and passing exact-source report, and the two auditors must produce
-    # materially different per-axis citation maps rather than duplicated prose with different IDs.
+    # Tighten the genome auditor before its handler wrappers are constructed. Every citation binds
+    # a real definition and passing exact-source report, and the two auditors must produce materially
+    # different per-axis citation maps rather than duplicated prose with different IDs.
     observatory_genome_evidence_binding_hardening.install(ctx, handlers)
     observatory_genome_cross_auditor_hardening.install(ctx, handlers)
 
-    # The deterministic dossier builder is hardened before its INDEPENDENT_AUDIT wrapper is created,
+    # Harden the deterministic dossier foundation before its INDEPENDENT_AUDIT wrapper is created,
     # so CP1 identity, CP2 quarantine, hidden commitment, signed log, budget and owner-gate subjects
     # are part of the same final hashed artifact.
     observatory_supremacy_dossier_hardening.install(ctx, handlers)
@@ -56,11 +60,18 @@ def install(ctx, handlers):
     observatory_prior_art_hardening_overlay.install(ctx, handlers)
 
     # Build the complete semantic/durable/distributed/scale/formal/interoperability/search stack,
-    # then add cross-model, executable-genome and deterministic final-dossier gates around the same
-    # signed state-machine handlers.
+    # then add cross-model and executable-genome gates around the same signed state machine.
     out = base.install(ctx, handlers)
     out = observatory_cross_model_overlay.install(ctx, out)
     out = observatory_genome_realization_overlay.install(ctx, out)
+
+    # Citation validity is still not causal proof. Replication and crown now run auditor-specific
+    # AST definition-set ablations plus inert negative controls under exact source-bound evaluators.
+    observatory_genome_causal_ablation_hardening.install(ctx, out)
+
+    # Index the direct causal receipts in the deterministic dossier before its final audit handler is
+    # installed, then add the dossier itself as an explicit terminal condition.
+    observatory_causal_dossier_hardening.install(ctx, out)
     out = observatory_supremacy_dossier_overlay.install(ctx, out)
 
     # Hard minima become active only after the corresponding report exists; once active they remain
