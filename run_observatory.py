@@ -57,8 +57,8 @@ base = _load_base_orchestrator()
 from lawmax21 import decisions as dec  # noqa: E402
 from lawmax21 import handlers as base_handlers  # noqa: E402
 from lawmax21 import (observatory_audit, observatory_blueprint_overlay, observatory_crown_overlay,
-                      observatory_handlers, observatory_preflight, observatory_roles,
-                      observatory_supremacy_overlay, profiles, roles)  # noqa: E402
+                      observatory_handlers, observatory_novelty_overlay, observatory_preflight,
+                      observatory_roles, observatory_supremacy_overlay, profiles, roles)  # noqa: E402
 from lawmax21.observatory_escalation import install_state_semantics  # noqa: E402
 from lawmax21.observatory_runtime import ObservatoryContext  # noqa: E402
 from lawmax21.budget import BudgetLedger  # noqa: E402
@@ -232,6 +232,7 @@ def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_
     handlers = observatory_blueprint_overlay.install(ctx, handlers)
     handlers = observatory_supremacy_overlay.install(ctx, handlers)
     handlers = observatory_crown_overlay.install(ctx, handlers)
+    handlers = observatory_novelty_overlay.install(ctx, handlers)
     handlers = observatory_audit.install(ctx, handlers)
     machine = states_module.Machine(runtime, log, owner_pub, run_id, handlers)
     machine.profile_id = PROFILE.id
