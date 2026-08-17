@@ -1,10 +1,10 @@
 """Make hard-minimum evaluation phase-aware.
 
-Semantic implementation selection occurs before scale, bounded-formal, interoperability and shared
-cross-model witnesses exist. Their hard dimensions must not reject every semantic implementation as
-zero before those architecture-level campaigns run. Each later overlay has its own fail-closed
-qualification, frontier, replication and crown gate; once its report exists the hard dimension is no
-longer filtered.
+Semantic implementation selection occurs before scale, bounded-formal, interoperability, shared
+cross-model and executable-genome realization evidence exists. Their hard dimensions must not reject
+every semantic implementation as zero before those architecture-level campaigns run. Each later
+overlay has its own fail-closed qualification, frontier, replication and crown gate; once its report
+exists the hard dimension is no longer filtered.
 """
 from . import observatory_implementation_search_overlay as implementation
 
@@ -18,6 +18,8 @@ _DOWNSTREAM = {
         "legal_interoperability_survival", "interoperability_case_coverage"},
     "cross_model_qualification": {
         "cross_model_consistency_survival"},
+    "genome_realization_qualification": {
+        "genome_realization_survival"},
 }
 
 
