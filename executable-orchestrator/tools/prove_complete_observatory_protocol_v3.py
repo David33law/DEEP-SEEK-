@@ -2,9 +2,10 @@
 """Authoritative proof entrypoint: protocol-v5 static closure followed by hardened full E2E.
 
 The static phase proves that all protocol-v5 mechanisms are connected to the signed mission and final
-proof path, including exact semantic source receipts, independently diversified genome auditors and
-the canonical localhost provider. Only after that receipt passes does the hardened disposable-clone
-Docker E2E execute. Neither phase contacts the real DeepSeek endpoint.
+proof path, including exact semantic source receipts, independently diversified genome auditors, the
+unbounded real-provider round policy with stagnation escalation, and the canonical localhost
+provider. Only after that receipt passes does the hardened disposable-clone Docker E2E execute.
+Neither phase contacts the real DeepSeek endpoint.
 """
 from __future__ import annotations
 
@@ -28,6 +29,8 @@ STATIC_BOOLEAN_GATES = (
     "semantic_source_receipts_bound",
     "source_bound_evidence_required",
     "auditor_inference_diversity_required",
+    "unbounded_production_rounds_bound",
+    "stagnation_escalation_bound",
     "final_overlay_order_verified",
     "canonical_local_provider_verified",
     "authoritative_e2e_protocol_v5_verified",
