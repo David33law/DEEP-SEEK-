@@ -1,28 +1,29 @@
 """Profile-specific independent audit for the National Legal Observatory.
 
-The active novelty, meta-search, hardening and taxonomy-completion overlays are installed here
-because this is the final profile layer: they must wrap the complete crown search while remaining
-inside the same signed state machine and the final independent audit.
+The active novelty, meta-search, hardening, taxonomy-completion and search-integrity overlays are
+installed here because this is the final profile layer: they must wrap the complete crown search
+while remaining inside the same signed state machine and final independent audit.
 """
 
 from .canonical import atomic_write_json
 from .handlers import A, tree_hash
 from . import (observatory_meta_hardening_overlay, observatory_meta_search_overlay,
-               observatory_novelty_overlay, observatory_taxonomy_completion_overlay)
+               observatory_novelty_overlay, observatory_search_integrity_overlay,
+               observatory_taxonomy_completion_overlay)
 
 
 # The limit is a corruption/denial-of-service sanity bound, not an economy policy. Every genuinely
-# unseen nonduplicate seed produced by the bounded schemas (fixed miners + carried backlog) enters
-# construction in the same wave unless the count itself demonstrates malformed/unbounded state.
+# unseen nonduplicate seed produced by the bounded schemas enters construction in the same wave.
 observatory_novelty_overlay.NOVELTY_BUILD_LIMIT = 100_000
 
 
 def install(ctx, handlers):
-    """Install novelty → meta-search → hardening → taxonomy completion → audit."""
+    """Install novelty → meta → hardening → taxonomy → search integrity → audit."""
     out = observatory_novelty_overlay.install(ctx, handlers)
     out = observatory_meta_search_overlay.install(ctx, out)
     out = observatory_meta_hardening_overlay.install(ctx, out)
     out = observatory_taxonomy_completion_overlay.install(ctx, out)
+    out = observatory_search_integrity_overlay.install(ctx, out)
 
     def independent_audit(_machine):
         ok, n, why = ctx.log.verify()
@@ -51,11 +52,14 @@ def install(ctx, handlers):
                 "meta_search_contract": supremacy.get("meta_search_contract"),
                 "meta_search_hardening": "observatory_meta_hardening_overlay.py",
                 "taxonomy_completion": "observatory_taxonomy_completion_overlay.py",
+                "search_integrity": "observatory_search_integrity_overlay.py",
                 "waves": supremacy.get("novelty_waves", 0),
                 "dry_waves": supremacy.get("genome_dry_waves", 0),
                 "known_controlled_genomes": supremacy.get("known_genomes", 0),
                 "methods_expected": supremacy.get("novelty_methods_expected", []),
                 "methods_complete": supremacy.get("novelty_methods_complete", False),
+                "active_miner_minimum_structural_clusters": (
+                    observatory_search_integrity_overlay.MIN_ACTIVE_CLUSTERS),
                 "meta_search_closed": supremacy.get("meta_search_closed", False),
                 "mechanical_coverage_closed": supremacy.get(
                     "mechanical_coverage_closed", False),
