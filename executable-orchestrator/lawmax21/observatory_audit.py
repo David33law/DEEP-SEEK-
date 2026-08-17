@@ -10,6 +10,11 @@ from . import observatory_shared_corpus_hardening
 def install(ctx, handlers):
     observatory_shared_corpus_hardening.install(ctx, handlers)
     observatory_evaluator_routing_hardening.install(ctx, handlers)
+    if not any(key == "cross_model_qualification"
+               for key, _statuses in
+               observatory_prior_art_hardening_overlay._REQUIRED_SCORE_REPORTS):
+        observatory_prior_art_hardening_overlay._REQUIRED_SCORE_REPORTS += (
+            ("cross_model_qualification", ("PASS",)),)
     observatory_prior_art_hardening_overlay.install(ctx, handlers)
     out = base.install(ctx, handlers)
     out = observatory_cross_model_overlay.install(ctx, out)
