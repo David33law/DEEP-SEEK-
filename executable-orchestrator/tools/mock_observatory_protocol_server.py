@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import re
+from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BASE_PATH = os.path.join(HERE, "mock_observatory_interoperability_server.py")
@@ -25,7 +26,8 @@ AXES = [
     "state_derivation_model", "temporal_model", "normative_effect_model",
     "consistency_commit_model", "replication_distribution_model",
     "trusted_core_topology", "provenance_proof_model", "publication_topology",
-    "governance_evolution_model", "scaling_partition_model"]
+    "governance_evolution_model", "scaling_partition_model",
+]
 GENOME_REQUIRED = {
     "canonical_authority_seat": ("semantic", "formal"),
     "evidence_primitive": ("semantic", "formal"),
@@ -41,16 +43,21 @@ GENOME_REQUIRED = {
     "governance_evolution_model": ("semantic", "formal"),
     "scaling_partition_model": ("scale",),
 }
-GENOME_ARTIFACT = {
-    "semantic": "semantic", "formal": "formal_A",
-    "interoperability": "interoperability_A",
-    "distributed": "distributed", "scale": "scale", "systems": "systems"}
+GENOME_ARTIFACTS = {
+    "semantic": ("semantic",),
+    "formal": ("formal_A", "formal_B"),
+    "interoperability": ("interoperability_A", "interoperability_B"),
+    "distributed": ("distributed",),
+    "scale": ("scale",),
+    "systems": ("systems",),
+}
 
 
 def _deepest(module):
     seen = set()
     while hasattr(module, "base") and id(module) not in seen:
-        seen.add(id(module)); module = module.base
+        seen.add(id(module))
+        module = module.base
     return module
 
 
@@ -79,7 +86,8 @@ def _evidence_refs(prompt):
 
 def prior_art_critic(prompt, role):
     root = _deepest(base)
-    manifest = _context_json(prompt, "owner-signed public prior-art manifest") or {}
+    manifest = _context_json(
+        prompt, "owner-signed public prior-art manifest") or {}
     sources = manifest.get("sources") or []
     tag = role[len("prior-art-critic-"):]
     refs = _evidence_refs(prompt)
@@ -99,10 +107,12 @@ def prior_art_critic(prompt, role):
                     "The control proof creates one constructible gap: the frontier must build and "
                     "measure a typed ELI-impact compiler projection instead of treating the standard "
                     "as passive metadata or a second authority seat."),
-                "evidence_refs": [], "gap_kind": "architecture",
+                "evidence_refs": [],
+                "gap_kind": "architecture",
                 "required_action": (
                     "Construct and measure the complete impact-compiler challenger."),
-                "challenger_ids": [challenger_id]})
+                "challenger_ids": [challenger_id],
+            })
         else:
             reviews.append({
                 "source_id": source_id,
@@ -111,16 +121,20 @@ def prior_art_critic(prompt, role):
                     "For zero-cost control calibration, the persisted frontier evidence below is "
                     "sufficient to exercise the production evidence verifier. This is not a claim "
                     "that the mock architecture satisfies the external source."),
-                "evidence_refs": refs[:3], "gap_kind": "none",
+                "evidence_refs": refs[:3],
+                "gap_kind": "none",
                 "required_action": (
                     "No additional mock action; production remains evidence-bound."),
-                "challenger_ids": []})
+                "challenger_ids": [],
+            })
     challengers = []
     if tag == "legal-interoperability" and any(
-            row.get("source_id") == "EU-ELI-IMPACT-1.0" for row in sources):
+            row.get("source_id") == "EU-ELI-IMPACT-1.0"
+            for row in sources):
         challengers.append({
             "challenger_id": challenger_id,
-            "source_ids": ["EU-ELI-IMPACT-1.0", "OASIS-LEGALRULEML-1.0"],
+            "source_ids": [
+                "EU-ELI-IMPACT-1.0", "OASIS-LEGALRULEML-1.0"],
             "attacked_assumption": (
                 "The current frontier may implement external impact/rule standards only as loose "
                 "metadata instead of deterministic proof-bound compiler targets."),
@@ -130,9 +144,15 @@ def prior_art_critic(prompt, role):
             "introduced_cost": (
                 "A larger versioned projection/compiler surface and additional conformance evidence."),
             "proposal": _proposal(
-                root, "prior-art-ELI-impact-compiler-family")})
-    return {"critic_id": f"PRIOR-ART-{tag}", "source_reviews": reviews,
-            "challengers": challengers, "protocol_blockers": [], "unresolved": []}
+                root, "prior-art-ELI-impact-compiler-family"),
+        })
+    return {
+        "critic_id": f"PRIOR-ART-{tag}",
+        "source_reviews": reviews,
+        "challengers": challengers,
+        "protocol_blockers": [],
+        "unresolved": [],
+    }
 
 
 def _candidate_id(prompt):
@@ -161,22 +181,40 @@ def _invariants(formalization):
     return result
 
 
-def _definition(census, artifact):
-    row = (census or {}).get(artifact) or {}
-    definitions = [
-        str(value) for value in row.get("definitions") or []
-        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", str(value))
-        and not str(value).startswith("__")]
-    if not definitions:
+def _definitions(census, group, auditor_offset):
+    pairs = []
+    for artifact in GENOME_ARTIFACTS[group]:
+        row = (census or {}).get(artifact) or {}
+        values = [
+            str(value) for value in row.get("definitions") or []
+            if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", str(value))
+            and not str(value).startswith("__")]
+        preferred = [
+            value for value in values
+            if value.startswith((
+                "open_", "state", "query", "project", "publish", "ingest",
+                "transition", "recover", "integrity", "apply", "replay",
+                "manifest", "commit", "append", "read", "write", "close",
+                "checkpoint", "partition", "root", "link", "attach"))]
+        ordered = preferred + [value for value in values if value not in preferred]
+        for value in ordered:
+            pairs.append((artifact, value))
+    if not pairs:
         raise RuntimeError(
-            "genome-realization mock has no AST definition for " + artifact)
-    preferred = [
-        value for value in definitions
-        if value.startswith((
-            "open_", "state", "query", "project", "publish", "ingest",
-            "transition", "recover", "integrity", "apply", "replay",
-            "manifest", "commit", "append", "read", "write"))]
-    return (preferred or definitions)[0]
+            "genome-realization mock has no AST definition for group " + group)
+    shift = auditor_offset % len(pairs)
+    return pairs[shift:] + pairs[:shift]
+
+
+def _choose_definition(census, group, use, auditor_offset, axis_index):
+    candidates = _definitions(census, group, auditor_offset + axis_index)
+    # Select the least-used real definition. Lexical position after the auditor-specific rotation
+    # breaks ties, producing independent but deterministically reproducible citation maps.
+    pair = min(
+        enumerate(candidates),
+        key=lambda item: (use[item[1]], item[0]))[1]
+    use[pair] += 1
+    return pair
 
 
 def _evidence_by_group(catalog):
@@ -203,35 +241,45 @@ def genome_realization(prompt, role):
         _context_json(prompt, "PERSISTED EVIDENCE CATALOG") or [])
     invariant_ids = _invariants(formalization)
     candidate_id = _candidate_id(prompt)
+    auditor_offset = 0 if role.endswith("-A") else 17
+    use = Counter()
     reviews = []
-    for index, axis in enumerate(AXES):
+
+    for axis_index, axis in enumerate(AXES):
         value = genome.get(axis) or {}
-        controlled_class = value.get("class") if isinstance(value, dict) else None
+        controlled_class = (
+            value.get("class") if isinstance(value, dict) else None)
         if not controlled_class:
             raise RuntimeError(
                 "genome-realization mock received no class for " + axis)
-        citations, evidence_refs, seen = [], [], set()
-        for group in GENOME_REQUIRED[axis]:
-            artifact = GENOME_ARTIFACT[group]
-            symbol = _definition(census, artifact)
-            key = (artifact, symbol)
-            if key not in seen:
-                seen.add(key)
-                citations.append({
-                    "artifact": artifact, "symbol": symbol,
-                    "reason": (
-                        f"The persisted {artifact} AST definition {symbol} is the executable "
-                        f"citation supplied for controlled axis {axis} in the control proof.")})
+        citations, evidence_refs = [], []
+        for group_index, group in enumerate(GENOME_REQUIRED[axis]):
+            artifact, symbol = _choose_definition(
+                census, group, use,
+                auditor_offset + group_index * 7, axis_index)
+            citations.append({
+                "artifact": artifact,
+                "symbol": symbol,
+                "reason": (
+                    f"The persisted {artifact} AST definition {symbol} is the executable "
+                    f"citation selected for controlled axis {axis} by the {role} perspective."),
+            })
             paths = evidence.get(group) or []
             if not paths:
                 raise RuntimeError(
                     f"genome-realization mock has no evidence for group {group}")
-            if paths[0] not in evidence_refs:
-                evidence_refs.append(paths[0])
+            evidence_path = paths[
+                (axis_index + group_index + auditor_offset) % len(paths)]
+            if evidence_path not in evidence_refs:
+                evidence_refs.append(evidence_path)
         reviews.append({
-            "axis": axis, "class": str(controlled_class), "realized": True,
+            "axis": axis,
+            "class": str(controlled_class),
+            "realized": True,
             "source_symbols": citations,
-            "invariant_ids": [invariant_ids[index % len(invariant_ids)]],
+            "invariant_ids": [
+                invariant_ids[
+                    (axis_index + auditor_offset) % len(invariant_ids)]],
             "evidence_refs": evidence_refs,
             "removal_failure": (
                 f"Removing the cited definitions or measured evidence would leave "
@@ -240,15 +288,25 @@ def genome_realization(prompt, role):
             "falsifier": (
                 f"A missing AST definition, unknown invariant, absent evidence hash or executable "
                 f"report inconsistent with {axis}={controlled_class} falsifies this claim."),
-            "blockers": []})
+            "blockers": [],
+        })
+
+    if len(use) < 8 or max(use.values()) > 4:
+        raise RuntimeError(
+            "genome-realization control provider could not construct a sufficiently diverse "
+            f"definition map: unique={len(use)}, max-reuse={max(use.values())}")
     return {
         "auditor_id": "GENOME-MOCK-" + role.rsplit("-", 1)[-1],
-        "candidate_id": candidate_id, "axis_reviews": reviews,
-        "overall_pass": True, "architecture_level_blockers": [],
+        "candidate_id": candidate_id,
+        "axis_reviews": reviews,
+        "overall_pass": True,
+        "architecture_level_blockers": [],
         "summary": (
             "Every controlled axis is bound only to AST definitions, formalization invariants and "
             "grouped persisted evidence supplied by the runner; the trusted validator rechecks all "
-            "citations and their source hashes.")}
+            f"citations and their source hashes. Definition map: {len(use)} unique, "
+            f"maximum reuse {max(use.values())}."),
+    }
 
 
 def answer(prompt):
@@ -264,7 +322,8 @@ def answer(prompt):
 def _install_answer(module):
     seen = set()
     while id(module) not in seen:
-        seen.add(id(module)); module.answer = answer
+        seen.add(id(module))
+        module.answer = answer
         if not hasattr(module, "base"):
             break
         module = module.base
