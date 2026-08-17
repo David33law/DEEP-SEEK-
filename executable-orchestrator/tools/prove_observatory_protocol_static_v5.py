@@ -3,8 +3,8 @@
 
 Runs the complete portable-owner protocol-v5 static proof, then verifies that causal source ablation
 is bound to the owner-signed mission, explicit terminal conditions, final overlay order, independent
-audit, hard Pareto gate, deterministic dossier and authoritative Docker E2E path. No provider call,
-candidate execution or owner mutation occurs here.
+audit, hard Pareto gate, deterministic dossier, genome-aware localhost provider and authoritative
+Docker E2E path. No provider call, candidate execution or owner mutation occurs here.
 """
 from __future__ import annotations
 
@@ -36,6 +36,7 @@ REQUIRED_FILES = {
     "executable-orchestrator/lawmax21/observatory_causal_dossier_hardening.py",
     "executable-orchestrator/tools/prove_observatory_protocol_static_v5.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_causal_hardened.py",
+    "executable-orchestrator/tools/prove_complete_observatory_protocol_causal_provider_hardened.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_v5.py",
 }
 
@@ -196,13 +197,24 @@ def main():
             "causal_failure_observed",
             "evaluator_receipt_sha256"),
             "causal Docker E2E verifier")
+        provider = _text(
+            "executable-orchestrator/tools/"
+            "prove_complete_observatory_protocol_causal_provider_hardened.py")
+        _require(provider, (
+            "_genome_provider_popen",
+            "mock_observatory_protocol_server.py",
+            "mock_observatory_genome_server.py",
+            "CORE.subprocess.Popen",
+            "Real-provider endpoints are never affected"),
+            "genome-aware local-provider route")
         final_entry = _text(
             "executable-orchestrator/tools/"
             "prove_complete_observatory_protocol_v5.py")
         _require(final_entry, (
             "prove_observatory_protocol_static_v5.py",
-            "prove_complete_observatory_protocol_causal_hardened",
-            "causal_genome_ablation_bound"),
+            "prove_complete_observatory_protocol_causal_provider_hardened",
+            "causal_genome_ablation_bound",
+            "genome_aware_local_provider_used"),
             "authoritative causal proof entrypoint")
         stable = _text(
             "executable-orchestrator/tools/run_observatory_proof.py")
@@ -224,6 +236,7 @@ def main():
             "exact_mutated_source_receipts_required": True,
             "causal_dossier_direct_indexing_required": True,
             "causal_genome_ablation_bound": True,
+            "genome_aware_local_provider_verified": True,
             "authoritative_causal_e2e_verified": True,
             "inherited_static_report_sha256":
                 _sha256(PREVIOUS_REPORT),
