@@ -1,10 +1,10 @@
-# National Legal Observatory — Controlled Genome Realization Contract v2
+# National Legal Observatory — Controlled Genome Realization Contract v3
 
 ## 1. Purpose
 
 A controlled architecture genome is a search-space identity, not proof that the implementation realizes the declared architecture. A candidate that changes labels or constants while retaining one generic mechanism must not receive credit for a distinct family.
 
-Every surviving architecture must therefore prove that all thirteen controlled axes are load-bearing in its actual semantic, durable, distributed, scale, bounded-formal and interoperability artifacts. Citation validity is necessary but is not itself causal evidence; replication and crown additionally require executable source ablation.
+Every surviving architecture must therefore prove that all thirteen controlled axes are load-bearing in its actual semantic, durable, distributed, scale, bounded-formal and interoperability artifacts. Citation validity is necessary but is not itself causal evidence; replication and crown additionally require executable source ablation and axis-specific failure attribution.
 
 ## 2. Required axes
 
@@ -96,7 +96,21 @@ For each obligation the trusted ablation engine must:
 
 Every obligation from both independent auditors must be causally falsified. Unioning the two auditor maps into one oversized mutation is insufficient; each auditor's claimed definition set must fail independently.
 
-## 7. Inert negative controls
+## 7. Axis-specific failure attribution
+
+A central function may be load-bearing while remaining irrelevant to the particular architecture axis for which it was cited. Therefore a generic candidate crash does not prove an axis.
+
+Every failed load-bearing mutant must additionally expose one of:
+
+- a violated hard semantic dimension explicitly mapped to the claimed axis;
+- a failed specialized test or counterexample whose persisted path or diagnostic vocabulary maps to that axis or its required artifact group;
+- an evaluator diagnostic that names one of the removed definitions.
+
+The trusted attribution layer records the matched hard dimensions, failed test paths, counterexample count, matched axis/group signatures and whether a removed definition was named. If no relevant attribution exists, the mutation is treated as unrelated failure and the causal obligation remains open.
+
+Every task in replication and crown must carry `axis_specific_failure_attributed=true`. The independent audit and deterministic supremacy dossier must reproduce the complete attributed task counts.
+
+## 8. Inert negative controls
 
 A failed mutant is meaningful only if failure was caused by the cited mechanism rather than AST rewriting, source hashing or evaluator routing.
 
@@ -104,7 +118,7 @@ Before load-bearing mutations, the engine must run one inert negative control fo
 
 A failed control invalidates the causal environment. Infrastructure refusal, timeout, missing output, evaluator invalidation, source-hash drift or malformed reports never count as evidence that an architecture mechanism is load-bearing.
 
-## 8. Qualification, replication and crown
+## 9. Qualification, replication and crown
 
 The complete citation/evidence realization audit runs:
 
@@ -112,9 +126,9 @@ The complete citation/evidence realization audit runs:
 - again after independent replication with fresh auditor calls and replication evidence;
 - again at the final crown after all crown arenas have completed.
 
-Qualification proves source/evidence binding across the broad field. Replication and crown additionally require the full auditor-specific causal-ablation campaign and inert controls. No architecture revision is allowed during replication or crown realization audit.
+Qualification proves source/evidence binding across the broad field. Replication and crown additionally require the full auditor-specific causal-ablation campaign, axis-specific failure attribution and inert controls. No architecture revision is allowed during replication or crown realization audit.
 
-## 9. Persisted evidence
+## 10. Persisted evidence
 
 Each causal campaign persists:
 
@@ -125,13 +139,14 @@ Each causal campaign persists:
 - every mutated source path and SHA-256;
 - every evaluator receipt path and SHA-256;
 - observed pass/fail outcome and bounded diagnostics;
+- axis-specific attribution mode and evidence;
 - all inert negative-control outcomes;
 - verified axis and obligation counts;
 - an explicit proof boundary.
 
-The genome-realization report binds the causal campaign path and SHA-256. The deterministic supremacy dossier indexes the replication and crown causal campaign bytes directly.
+The genome-realization report binds the causal campaign path and SHA-256. The deterministic supremacy dossier independently rehashes the mutated sources and evaluator receipts, verifies every axis-specific attribution and indexes the replication and crown causal campaign bytes directly.
 
-## 10. Terminal consequence
+## 11. Terminal consequence
 
 The following are explicit supremacy conditions:
 
@@ -141,6 +156,6 @@ The following are explicit supremacy conditions:
 - `genome_causal_ablation_replication_passed`;
 - `genome_causal_ablation_crown_passed`.
 
-A missing axis, class mismatch, invented definition, missing `INV-*` obligation, stale evidence, generic citation map, auditor dependence, passing load-bearing mutant, failing inert control or infrastructure-only failure blocks `COMMITTED`. Resource exhaustion yields only `BEST_DISCOVERED_SO_FAR`.
+A missing axis, class mismatch, invented definition, missing `INV-*` obligation, stale evidence, generic citation map, auditor dependence, passing load-bearing mutant, unrelated failure, failing inert control or infrastructure-only failure blocks `COMMITTED`. Resource exhaustion yields only `BEST_DISCOVERED_SO_FAR`.
 
-The causal proof is bounded to the exact cited source bytes, hidden corpora, fault workloads and definition-set mutations. It does not claim an unbounded theorem about all semantically equivalent rewrites or all future deployments.
+The causal proof is bounded to the exact cited source bytes, hidden corpora, fault workloads, attribution signatures and definition-set mutations. It does not claim an unbounded theorem about all semantically equivalent rewrites or all future deployments.
