@@ -200,6 +200,26 @@
     "source_artifact": "bounded formal model arena"
   },
   {
+    "id": "legal_interoperability_survival",
+    "direction": "higher",
+    "unit": "fraction",
+    "scale": "0-1",
+    "measurement": "two independent projection implementations preserve one canonical root and pass bounded hidden ELI/ELI-impact/ECLI/Akoma-Ntoso/LegalRuleML/PROV checks",
+    "noise_floor": 0.0,
+    "hard_minimum": 1.0,
+    "source_artifact": "legal interoperability arena"
+  },
+  {
+    "id": "interoperability_case_coverage",
+    "direction": "higher",
+    "unit": "cases",
+    "scale": "minimum hidden cases across independent implementations",
+    "measurement": "number of randomized hidden legal bundles passed by each agreeing interoperability implementation",
+    "noise_floor": 1.0,
+    "hard_minimum": null,
+    "source_artifact": "legal interoperability arena"
+  },
+  {
     "id": "publication_latency",
     "direction": "lower",
     "unit": "seconds",
