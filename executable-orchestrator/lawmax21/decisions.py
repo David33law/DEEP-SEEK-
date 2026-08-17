@@ -1,17 +1,13 @@
-"""The eleven owner decisions of protocol 24, as a frozen and SIGNED precondition.
+"""The eleven owner decisions of protocol 24, frozen and signed before any paid call.
 
-v2.0 listed them in prose and launched anyway. Here they are a schema with eleven
-required entries, signed by the owner key. `--launch` loads them before anything else;
-an unsigned, incomplete or altered decision file stops the run before a single call.
-
-Because the budget ceiling, the stagnation definition and the challenger reserve all
-come from this file, "we forgot to decide" can no longer become "we spent the money".
+Budget decisions support the historical LAWMAX EUR contract and a currency-explicit contract used
+by provider profiles. A currency-explicit budget carries its provider price schedule inside the
+owner-signed payload so accounting rules cannot drift silently after the ceremony.
 """
 import os
 
 from .canonical import read_json, sha256_obj
 from .schema import ValidationError, validate
-from .signing import SignatureRejected
 
 DECISION_IDS = [
     "D01_BUDGET", "D02_HIDDEN_SET_AUTHORITY", "D03_RUNTIME_DIRECTION",
@@ -60,12 +56,35 @@ DECISIONS_SCHEMA = {
     },
 }
 
+PRICE_SCHEDULE_SCHEMA = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object", "additionalProperties": False,
+    "required": ["model", "currency", "input_cache_hit_per_mtok",
+                 "input_cache_miss_per_mtok", "output_per_mtok",
+                 "require_cache_split", "source", "verified_date"],
+    "properties": {
+        "model": {"type": "string", "minLength": 1},
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "input_cache_hit_per_mtok": {"type": "number", "minimum": 0},
+        "input_cache_miss_per_mtok": {"type": "number", "minimum": 0},
+        "output_per_mtok": {"type": "number", "minimum": 0},
+        "require_cache_split": {"const": True},
+        "source": {"type": "string", "minLength": 1},
+        "verified_date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    },
+}
+
 BUDGET_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object", "additionalProperties": False,
-    "required": ["eur", "tokens", "calls", "wall_clock_days", "successor_reserve_fraction"],
+    "required": ["tokens", "calls", "wall_clock_days", "successor_reserve_fraction"],
     "properties": {
+        # Historical LAWMAX budget seat.
         "eur": {"type": "number", "exclusiveMinimum": 0},
+        # Currency-explicit seat for new provider profiles.
+        "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "amount": {"type": "number", "exclusiveMinimum": 0},
+        "price_schedule": PRICE_SCHEDULE_SCHEMA,
         "tokens": {"type": "integer", "exclusiveMinimum": 0},
         "calls": {"type": "integer", "exclusiveMinimum": 0},
         "wall_clock_days": {"type": "integer", "exclusiveMinimum": 0},
@@ -85,7 +104,6 @@ THRESHOLDS_SCHEMA = {
         "ablation_min_drop": {"type": "number", "minimum": 0.05},
         "progress_min_delta": {"type": "number", "minimum": 0.0},
         "max_stagnant_windows": {"type": "integer", "minimum": 1},
-        # How hard the extraction pushes the builder. Owner-controlled, budget-bounded.
         "best_of_n": {"type": "integer", "minimum": 1, "maximum": 8},
         "revision_rounds": {"type": "integer", "minimum": 0, "maximum": 5},
     },
@@ -120,6 +138,18 @@ class OwnerDecisions:
         return sha256_obj(self.payload)
 
 
+def _validate_budget_contract(b):
+    legacy = "eur" in b
+    explicit = all(k in b for k in ("currency", "amount", "price_schedule"))
+    if legacy == explicit:
+        raise DecisionsRejected(
+            "budget must use exactly one monetary contract: legacy eur OR currency+amount+price_schedule")
+    if explicit:
+        schedule = b["price_schedule"]
+        if str(b["currency"]).upper() != str(schedule["currency"]).upper():
+            raise DecisionsRejected("budget currency does not match signed provider price schedule")
+
+
 def load(path, owner_public, run_id):
     if not os.path.exists(path):
         raise DecisionsRejected(
@@ -138,8 +168,10 @@ def load(path, owner_public, run_id):
     if p["run_id"] != run_id:
         raise DecisionsRejected(f"decisions are frozen for run {p['run_id']!r}, not {run_id!r}")
     try:
-        validate(p["decisions"]["D01_BUDGET"]["value"], BUDGET_SCHEMA)
+        b = p["decisions"]["D01_BUDGET"]["value"]
+        validate(b, BUDGET_SCHEMA)
         validate(p["decisions"]["D07_ACCEPTANCE_THRESHOLDS"]["value"], THRESHOLDS_SCHEMA)
+        _validate_budget_contract(b)
     except ValidationError as e:
         raise DecisionsRejected(f"budget/thresholds unusable: {e}")
     undecided = [k for k, v in p["decisions"].items() if not v.get("decided")]
