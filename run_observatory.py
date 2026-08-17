@@ -2,7 +2,8 @@
 """National Legal Observatory launcher over the shared LAWMAX v2.3 control plane.
 
 This file does not implement a second state machine. It injects profile paths, semantics,
-provider policy, currency-explicit accounting and handlers into the existing signed control loop.
+provider policy, currency-explicit accounting and Observatory/supremacy handlers into the existing
+signed control loop.
 """
 import argparse
 import importlib.util
@@ -29,7 +30,8 @@ base = _load_base_orchestrator()
 from lawmax21 import decisions as dec  # noqa: E402
 from lawmax21 import handlers as base_handlers  # noqa: E402
 from lawmax21 import (observatory_audit, observatory_blueprint_overlay, observatory_handlers,
-                      observatory_preflight, observatory_roles, profiles, roles)  # noqa: E402
+                      observatory_preflight, observatory_roles, observatory_supremacy_overlay,
+                      profiles, roles)  # noqa: E402
 from lawmax21.observatory_escalation import install_state_semantics  # noqa: E402
 from lawmax21.observatory_runtime import ObservatoryContext  # noqa: E402
 from lawmax21.budget import BudgetLedger  # noqa: E402
@@ -93,11 +95,17 @@ def _validate_signed_mission(D, root):
     if not isinstance(mission, dict):
         raise observatory_preflight.PreflightFailed(
             "Observatory D09 must be the structured signed mission binding")
-    if mission.get("all_twelve_layers_required") is not True:
-        raise observatory_preflight.PreflightFailed("signed D09 does not require all twelve layers")
-    if mission.get("no_silent_legally_material_loss") is not True:
+    required_true = (
+        "all_twelve_layers_required",
+        "no_silent_legally_material_loss",
+        "supremacy_search_required",
+        "no_first_answer_privilege",
+        "public_supremacy_case_required",
+    )
+    missing_flags = [k for k in required_true if mission.get(k) is not True]
+    if missing_flags:
         raise observatory_preflight.PreflightFailed(
-            "signed D09 does not forbid silent legally-material loss")
+            "signed D09 does not bind the supremacy mission flags: " + ", ".join(missing_flags))
     if not REQUIRED_PUBLICATION_CHANNELS.issubset(set(mission.get("publication_channels") or [])):
         raise observatory_preflight.PreflightFailed(
             "signed D09 does not bind all required national publication channels")
@@ -108,6 +116,7 @@ def _validate_signed_mission(D, root):
         "master_system_sha256": sha256_file(os.path.join(profile, "MASTER-SYSTEM-PROMPT.md")),
         "pareto_sha256": sha256_file(os.path.join(profile, "PARETO-DIMENSIONS.json")),
         "evaluator_contract_sha256": sha256_file(os.path.join(profile, "EVALUATOR-CONTRACT.md")),
+        "supremacy_contract_sha256": sha256_file(os.path.join(profile, "SUPREMACY-CONTRACT.md")),
     }
     drift = [k for k, v in expected.items() if mission.get(k) != v]
     if drift:
@@ -150,6 +159,7 @@ def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_
         canonical_repo, P["suite"], backend, mode, corpus_root, PROFILE, cp1, prior)
     handlers = observatory_handlers.build_observatory_handlers(ctx, base_handlers.build_handlers(ctx))
     handlers = observatory_blueprint_overlay.install(ctx, handlers)
+    handlers = observatory_supremacy_overlay.install(ctx, handlers)
     handlers = observatory_audit.install(ctx, handlers)
     machine = states_module.Machine(runtime, log, owner_pub, run_id, handlers)
     machine.profile_id = PROFILE.id
@@ -160,8 +170,6 @@ def install_overlay():
     base._paths = observatory_paths
     base.build_context = observatory_build_context
     base.preflight.run = observatory_preflight.run
-    # Profile-local rich schemas. This process is the Observatory launcher; ordinary LAWMAX
-    # processes continue to import the historical schemas untouched.
     roles.PROPOSAL_SCHEMA = observatory_roles.PROPOSAL_SCHEMA
     roles.BUILD_SCHEMA = observatory_roles.BUILD_SCHEMA
     roles.CEILING_SCHEMA = observatory_roles.CEILING_SCHEMA
@@ -188,7 +196,8 @@ def main(argv=None):
     ap.add_argument("--canonical-repo", default=os.environ.get("OBSERVATORY_CANONICAL_REPO"))
     ap.add_argument("--cp1-evidence", default=os.environ.get("OBSERVATORY_CP1_EVIDENCE"))
     ap.add_argument("--prior-cp2", default=os.environ.get("OBSERVATORY_PRIOR_CP2"))
-    ap.add_argument("--max-rounds", type=int, default=6)
+    ap.add_argument("--max-rounds", type=int, default=64,
+                    help="resource backstop only; reaching it yields BEST_DISCOVERED_SO_FAR, never supremacy")
     ap.add_argument("--crash-after", type=int, default=None)
     a = ap.parse_args(argv)
 
