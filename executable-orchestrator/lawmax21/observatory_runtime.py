@@ -1,15 +1,14 @@
 """Profile-specific runtime context for the National Legal Observatory.
 
-It inherits all generic persistence, model-call, worktree and candidate-install machinery from the
+It inherits generic persistence, model-call, worktree and candidate-install machinery from the
 LAWMAX Context, but constructs its own frontier/escalation objects BEFORE resume state is loaded.
 """
 import hashlib
-import json
 import os
 import subprocess
 import sys
 
-from .canonical import atomic_write_json, read_json
+from .canonical import read_json
 from .frontier import Frontier
 from .handlers import Context as BaseContext, A
 from .patch import WorktreeManager
@@ -18,13 +17,7 @@ from .observatory_escalation import ObservatoryEscalationLedger
 
 
 class ObservatoryFrontier(Frontier):
-    """The shared control loop may call head_to_head() without naming dimensions.
-
-    LAWMAX's Frontier defaults are legal_capability/cross_domain_transfer. Those names do not
-    belong to the Observatory Pareto contract. This profile-local subclass changes only the
-    DEFAULT selector; explicit calls still work exactly as in Frontier. Dominance remains driven
-    exclusively by the profile's PARETO-DIMENSIONS.json.
-    """
+    """The shared control loop may call head_to_head() without naming dimensions."""
     def __init__(self, dims_path, primary_dimension, secondary_dimension):
         super().__init__(dims_path)
         self.primary_dimension = primary_dimension
@@ -39,9 +32,8 @@ class ObservatoryContext(BaseContext):
     def __init__(self, root, runtime, run_id, client, ledger, log, decisions, owner_public,
                  evaluator_dir, bank_dir, key_path, canonical_repo, suite_path, backend,
                  mode, corpus_root, profile, cp1_evidence, prior_cp2):
-        # Deliberately mirror BaseContext's field contract without calling its constructor: the
-        # base constructor instantiates LAWMAX dimensions/escalation and would mis-read an
-        # Observatory arena during --resume before we could replace them.
+        # Mirror BaseContext's field contract without calling its constructor: the base
+        # constructor would instantiate LAWMAX dimensions/escalation before profile resume.
         self.mode = mode
         self.corpus_root = corpus_root
         self.root = root
@@ -62,7 +54,7 @@ class ObservatoryContext(BaseContext):
         self.profile_id = profile.id
         self.cp1_evidence = os.path.abspath(cp1_evidence)
         self.prior_cp2 = os.path.abspath(prior_cp2)
-        self.pkg = os.path.join(root, "immutable-package")              # historical LAWMAX seal
+        self.pkg = os.path.join(root, "immutable-package")
         self.profile_pkg = os.path.join(root, "profiles", "national-observatory")
         self.vault = os.path.join(root, "evidence-vault")
         self.orch = os.path.join(root, "executable-orchestrator")
@@ -92,7 +84,6 @@ class ObservatoryContext(BaseContext):
         self._load_arena()
 
     def credit_integration_if_attested(self):
-        # Observatory layers are credited only from profile-specific executable measurement.
         return False
 
     def measure_visible(self, cid):
@@ -136,7 +127,7 @@ class ObservatoryContext(BaseContext):
     def demonstrated_layers(self, cid, hidden_rep):
         s = hidden_rep.get("dimension_scores", {})
         demo = []
-        if self._ge(s, "source_coverage", .98) and self._ge(s, "provenance_completeness", .995):
+        if self._ge(s, "source_coverage", 1.0) and self._ge(s, "provenance_completeness", .995):
             demo.append("L1")
         if self._ge(s, "canonical_identity_accuracy", .995):
             demo.append("L2")
@@ -144,7 +135,9 @@ class ObservatoryContext(BaseContext):
             demo.append("L3")
         if self._ge(s, "normative_effect_accuracy", .99):
             demo.append("L4")
-        if self._ge(s, "change_detection_recall", .98) and self._ge(s, "honest_unknown_rate", 1.0):
+        if (self._ge(s, "source_coverage", 1.0)
+                and self._ge(s, "change_detection_recall", 1.0)
+                and self._ge(s, "honest_unknown_rate", 1.0)):
             demo.append("L5")
         if self._ge(s, "jurisprudence_temporal_link_accuracy", .98):
             demo.append("L6")
@@ -154,8 +147,9 @@ class ObservatoryContext(BaseContext):
             demo.append("L8")
         if self._ge(s, "honest_unknown_rate", 1.0):
             demo.append("L9")
-        if (self._ge(s, "source_coverage", .98)
+        if (self._ge(s, "source_coverage", 1.0)
                 and self._ge(s, "provenance_completeness", .995)
+                and self._ge(s, "publication_projection_consistency", 1.0)
                 and float(hidden_rep.get("publication_latency", 9999.0)) < 9999.0):
             demo.append("L10")
         if self._ge(s, "replay_determinism", 1.0) and self._ge(s, "recovery_success", 1.0):
@@ -167,24 +161,34 @@ class ObservatoryContext(BaseContext):
     def screen_axioms(self, cid, hidden_rep):
         s = hidden_rep.get("dimension_scores", {})
         violations = []
+
         def fail(aid, detail):
             violations.append((aid, detail))
             self.esc.record_axiom_violation(cid, aid, detail)
 
-        if not (self._ge(s, "source_coverage", .98) and self._ge(s, "provenance_completeness", .995)):
-            fail("primary_evidence_required", "source/provenance hard minimum not demonstrated")
+        if not (self._ge(s, "source_coverage", 1.0)
+                and self._ge(s, "provenance_completeness", .995)):
+            fail("primary_evidence_required", "complete source admission/provenance hard gate not demonstrated")
+        if not (self._ge(s, "source_coverage", 1.0)
+                and self._ge(s, "change_detection_recall", 1.0)):
+            fail("no_silent_material_loss", "one or more injected legally material source/change events were not fully detected")
         if not self._ge(s, "temporal_reconstruction_accuracy", .99):
             fail("bitemporal_noncollapse", "bitemporal replay hard minimum not demonstrated")
         if not self._ge(s, "normative_effect_accuracy", .99):
             fail("history_is_append_only", "change/effect replay did not preserve correct historical state")
         if not self._ge(s, "doctrine_epistemic_separation", 1.0):
             fail("doctrine_never_binding_by_accident", "doctrine changed or contaminated binding state")
+        if float(s.get("external_model_dependence", 0.0)) > 0.0:
+            fail("no_model_in_trusted_effect_path", "trusted-path result depends on a probabilistic model")
         if not self._ge(s, "honest_unknown_rate", 1.0):
-            fail("honest_unknown", "conflicting/unknown evidence was not preserved as unresolved")
-        if not (self._ge(s, "replay_determinism", 1.0) and self._ge(s, "recovery_success", 1.0)):
+            fail("honest_unknown", "conflicting/unknown evidence was not preserved as explicitly unresolved")
+        if not (self._ge(s, "replay_determinism", 1.0)
+                and self._ge(s, "recovery_success", 1.0)):
             fail("deterministic_rebuild", "clean replay/recovery did not reproduce canonical state")
         if not self._ge(s, "canonical_identity_accuracy", .995):
             fail("one_canonical_seat", "canonical identity trials failed")
+        if not self._ge(s, "publication_projection_consistency", 1.0):
+            fail("one_canonical_seat", "publication channels diverged from the canonical identity/status cut")
         return violations
 
     def dimension_vector(self, cid, hidden_rep, fidelity_rep=None):
@@ -226,7 +230,7 @@ class ObservatoryContext(BaseContext):
         host = self.obs_host.ObservatoryCandidateHost(c["source"], backend=self.backend, timeout=60)
         try:
             rep = host.extension_probe(kind, marker, event)
-        except Exception as exc:  # noqa: BLE001 — failed growth is a measured negative result
+        except Exception as exc:  # noqa: BLE001
             rep = {"supported": False, "reason": str(exc)[:300]}
         result = rep.get("result") if isinstance(rep, dict) else None
         ok = bool(rep.get("supported") if isinstance(rep, dict) else False)
@@ -240,8 +244,10 @@ class ObservatoryContext(BaseContext):
         self.record_score(cid, "evolvability", out)
         self.esc.record_evolvability(cid, verdict)
         if ok:
-            self.esc.record_altitude_evidence(cid, "L12", "runtime extension probe registered and executed without core edit")
+            self.esc.record_altitude_evidence(
+                cid, "L12", "runtime extension probe registered and executed without core edit")
         else:
-            self.esc.record_axiom_violation(cid, "human_governance_nonbypassable",
-                                            "no measured extension registry capable of governed capability growth")
+            self.esc.record_axiom_violation(
+                cid, "human_governance_nonbypassable",
+                "no measured extension registry capable of governed capability growth")
         return out
