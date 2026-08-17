@@ -5,8 +5,8 @@ The underlying driver retains the readable owner-gate, crash/resume and artifact
 This layer forces the production container backend, requires every final protocol-v5 route in the
 owner-signed census, proves that real-provider runs forbid a finite round cap and treat stagnation as
 search escalation, verifies streaming formal crowns, and independently rechecks source-bound,
-diversified executable-genome qualification, replication and crown evidence. It never contacts the
-real DeepSeek endpoint.
+source-diverse and cross-auditor-independent executable-genome qualification, replication and crown
+evidence. It never contacts the real DeepSeek endpoint.
 """
 from __future__ import annotations
 
@@ -33,6 +33,7 @@ base.REQUIRED_PROTOCOL_FILES.update({
     "executable-orchestrator/lawmax21/observatory_genome_realization_overlay.py",
     "executable-orchestrator/lawmax21/observatory_genome_auditor_diversity_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_evidence_binding_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_genome_cross_auditor_hardening.py",
     "executable-orchestrator/lawmax21/observatory_setup_v4.py",
     "executable-orchestrator/lawmax21/observatory_preflight_v5.py",
     "executable-orchestrator/tools/mock_observatory_protocol_server.py",
@@ -69,6 +70,10 @@ def _verify_genome_report(path, label, incumbent):
             or report.get("all_axes_realized") is not True \
             or report.get("candidate_id") != incumbent:
         raise RuntimeError(f"{label}: genome-realization report did not pass")
+    if report.get("auditor_citation_maps_independent") is not True \
+            or int(report.get("auditor_citation_map_differing_count", 0)) < 4:
+        raise RuntimeError(
+            f"{label}: genome auditors did not produce materially independent citation maps")
     auditors = report.get("auditors") or []
     if len(auditors) != 2 \
             or len({row.get("auditor_id") for row in auditors}) != 2 \
@@ -190,6 +195,9 @@ def _verify(repo, runtime, source_head, preflight, launch):
             "axes_per_auditor": 13,
             "source_bound": True,
             "definition_diversity": True,
+            "cross_auditor_citation_map_independence": True,
+            "differing_axis_maps": report.get(
+                "auditor_citation_map_differing_count"),
         }
         for label, report in genome_reports.items()
     }
