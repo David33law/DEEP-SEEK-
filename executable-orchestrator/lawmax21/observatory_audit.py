@@ -5,6 +5,7 @@ from . import observatory_cross_model_overlay
 from . import observatory_cross_model_workload_hardening
 from . import observatory_evaluator_routing_hardening
 from . import observatory_formal_streaming_routing
+from . import observatory_genome_auditor_diversity_hardening
 from . import observatory_genome_evidence_binding_hardening
 from . import observatory_genome_realization_overlay
 from . import observatory_phase_gate_hardening
@@ -14,8 +15,10 @@ from . import observatory_shared_corpus_hardening
 
 
 def install(ctx, handlers):
-    # Patch shared schemas and evaluator seats before any overlay captures them.
+    # Patch shared schemas and the two genuinely independent genome-auditor model-call profiles
+    # before any overlay captures ctx.ask or constructs handler closures.
     observatory_build_schema_hardening.install(ctx, handlers)
+    observatory_genome_auditor_diversity_hardening.install(ctx, handlers)
     observatory_shared_corpus_hardening.install(ctx, handlers)
     observatory_evaluator_routing_hardening.install(ctx, handlers)
     observatory_formal_streaming_routing.install(ctx, handlers)
