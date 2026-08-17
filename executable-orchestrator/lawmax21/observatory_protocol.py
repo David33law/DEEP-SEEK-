@@ -3,7 +3,7 @@
 The setup ceremony and production launcher import this module rather than maintaining duplicated
 file lists or mission flags. The protocol bundle is a deterministic census of all load-bearing
 profile, orchestration, evaluator, proof and reference files. Production may never use the reduced
-zero-cost proof workload.
+zero-cost proof workload or a finite round cap.
 """
 from __future__ import annotations
 
@@ -41,6 +41,8 @@ MISSION_FLAGS = {
     "bounded_candidate_output_required": True,
     "terminal_negative_proof_required": True,
     "proof_mode_forbidden_in_production": True,
+    "unbounded_production_rounds_required": True,
+    "stagnation_escalates_search_required": True,
 }
 SEARCH_POLICY = {
     "novelty_dry_waves_required": 3,
@@ -54,6 +56,8 @@ SEARCH_POLICY = {
     "formal_models_required": 2,
     "interoperability_implementations_required": 2,
     "genome_realization_auditors_required": 2,
+    "production_max_rounds": 0,
+    "stagnation_response": "continue-successor-radical-novelty-meta-search",
 }
 PRODUCTION_WORKLOADS = {
     "distributed": {"qualification": 5000, "replication": 10000, "crown": 50000},
@@ -166,8 +170,10 @@ def protocol_files(root):
 def protocol_bundle_sha256(root):
     digest = hashlib.sha256()
     for relative in protocol_files(root):
-        digest.update(relative.encode("utf-8")); digest.update(b"\0")
-        digest.update(bytes.fromhex(file_sha256(os.path.join(root, *relative.split("/")))))
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(bytes.fromhex(file_sha256(
+            os.path.join(root, *relative.split("/")))))
     return digest.hexdigest()
 
 
@@ -177,23 +183,27 @@ def contract_hashes(root):
 
 
 def mission_binding(root, git_value):
-    mission = {"protocol_version": PROTOCOL_VERSION,
-               "target": "National Legal Observatory — canonical Greek legal information infrastructure",
-               **MISSION_FLAGS, **SEARCH_POLICY,
-               "novelty_methods": list(REQUIRED_NOVELTY_METHODS),
-               "publication_channels": list(PUBLICATION_CHANNELS),
-               "production_workloads": PRODUCTION_WORKLOADS,
-               "runner_head": git_value("rev-parse", "HEAD"),
-               "runner_tree": git_value("rev-parse", "HEAD^{tree}"),
-               "research_protocol_files": protocol_files(root),
-               "research_protocol_bundle_sha256": protocol_bundle_sha256(root)}
+    mission = {
+        "protocol_version": PROTOCOL_VERSION,
+        "target": "National Legal Observatory — canonical Greek legal information infrastructure",
+        **MISSION_FLAGS,
+        **SEARCH_POLICY,
+        "novelty_methods": list(REQUIRED_NOVELTY_METHODS),
+        "publication_channels": list(PUBLICATION_CHANNELS),
+        "production_workloads": PRODUCTION_WORKLOADS,
+        "runner_head": git_value("rev-parse", "HEAD"),
+        "runner_tree": git_value("rev-parse", "HEAD^{tree}"),
+        "research_protocol_files": protocol_files(root),
+        "research_protocol_bundle_sha256": protocol_bundle_sha256(root),
+    }
     mission.update(contract_hashes(root))
     return mission
 
 
 def validate_mission(root, mission, git_value):
     expected = mission_binding(root, git_value)
-    mismatched = [key for key, value in expected.items() if mission.get(key) != value]
+    mismatched = [key for key, value in expected.items()
+                  if mission.get(key) != value]
     extra = sorted(set(mission) - set(expected))
     if mismatched or extra:
         detail = []
@@ -201,5 +211,6 @@ def validate_mission(root, mission, git_value):
             detail.append("mismatched: " + ", ".join(mismatched))
         if extra:
             detail.append("unexpected: " + ", ".join(extra))
-        raise RuntimeError("signed Observatory mission drift — " + "; ".join(detail))
+        raise RuntimeError(
+            "signed Observatory mission drift — " + "; ".join(detail))
     return expected
