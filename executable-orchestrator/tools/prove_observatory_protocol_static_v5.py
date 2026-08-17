@@ -3,9 +3,9 @@
 
 Runs the complete portable-owner protocol-v5 static proof, then verifies that causal source ablation
 is bound to the owner-signed mission, explicit terminal conditions, final overlay order, independent
-audit, axis-specific failure attribution, hard Pareto gate, deterministic dossier, conservative
-failure classification, causal-aware localhost provider and authoritative Docker E2E path. No
-provider call, candidate execution or owner mutation occurs here.
+audit, failure-scoped axis attribution, hard Pareto gate, deterministic dossier, conservative failure
+classification, causal-aware localhost provider and authoritative Docker E2E path. No provider call,
+candidate execution or owner mutation occurs here.
 """
 from __future__ import annotations
 
@@ -32,6 +32,7 @@ REQUIRED_MODULES = (
     "lawmax21.observatory_causal_dossier_hardening",
     "lawmax21.observatory_causal_failure_classification_hardening",
     "lawmax21.observatory_causal_axis_attribution_hardening",
+    "lawmax21.observatory_causal_attribution_scope_hardening",
 )
 REQUIRED_FILES = {
     "executable-orchestrator/lawmax21/observatory_genome_causal_ablation_hardening.py",
@@ -39,6 +40,7 @@ REQUIRED_FILES = {
     "executable-orchestrator/lawmax21/observatory_causal_dossier_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_failure_classification_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_axis_attribution_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_causal_attribution_scope_hardening.py",
     "executable-orchestrator/tools/mock_observatory_causal_server.py",
     "executable-orchestrator/tools/prove_observatory_protocol_static_v5.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_causal_hardened.py",
@@ -137,6 +139,7 @@ def main():
             "observatory_genome_realization_overlay.install",
             "observatory_causal_failure_classification_hardening.install",
             "observatory_causal_axis_attribution_hardening.install",
+            "observatory_causal_attribution_scope_hardening.install",
             "observatory_genome_causal_ablation_hardening.install",
             "observatory_causal_dossier_hardening.install",
             "observatory_supremacy_dossier_overlay.install",
@@ -179,6 +182,15 @@ def main():
             "genome_axis_specific_replication_passed",
             "genome_axis_specific_crown_passed"),
             "axis-specific causal attribution")
+        attribution_scope = _text(
+            "executable-orchestrator/lawmax21/"
+            "observatory_causal_attribution_scope_hardening.py")
+        _require(attribution_scope, (
+            "_FAILURE_FIELDS", "failed_test_paths",
+            "failed_directed_paths", "whole_receipt_searched",
+            "failure-specific evidence only",
+            "axis._attribution = attribution"),
+            "failure-scoped causal attribution")
         contract = _text(
             "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md")
         _require(contract, (
@@ -242,6 +254,7 @@ def main():
             "axis_specific_failure_attributed",
             "matched_dimensions",
             "matched_axis_or_group_tokens",
+            "whole_receipt_searched",
             "axis_specific_causal_attribution_required",
             "all_tasks_axis_specifically_attributed"),
             "axis-specific Docker E2E verifier")
@@ -290,6 +303,7 @@ def main():
             "causal_phases": list(causal.CAUSAL_LABELS),
             "auditor_specific_definition_set_ablation": True,
             "axis_specific_causal_attribution_verified": True,
+            "failure_scoped_attribution_verified": True,
             "inert_negative_controls_required": True,
             "exact_mutated_source_receipts_required": True,
             "infrastructure_failure_exclusion_verified": True,
