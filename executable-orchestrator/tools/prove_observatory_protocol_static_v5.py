@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Static closure extension for causal controlled-genome realization.
 
-Runs the complete portable-owner protocol-v5 static proof, then verifies that causal source ablation
-is bound to the owner-signed mission, explicit terminal conditions, final overlay order, independent
-audit, failure-scoped axis attribution, hard Pareto gate, deterministic dossier, conservative failure
-classification, causal-aware localhost provider and authoritative Docker E2E path. No provider call,
-candidate execution or owner mutation occurs here.
+Runs the complete portable-owner protocol-v5 static proof, then verifies the final production wiring
+as one owner-bindable mechanism: audit-v3 candidate identity, exact-source evaluator receipts with
+bounded process witnesses, causal definition-set ablation, failure-scoped axis attribution, cited-
+definition semantics, deterministic dossier binding, exactly one causal localhost-provider route and
+the authoritative Docker E2E entrypoint. No provider call, candidate execution or owner mutation
+occurs here.
 """
 from __future__ import annotations
 
@@ -26,6 +27,10 @@ CAUSAL_CONDITIONS = {
     "genome_causal_ablation_replication_passed",
     "genome_causal_ablation_crown_passed",
 }
+REQUIRED_INHERITED_GATES = (
+    "final_audit_v3_wired",
+    "candidate_identity_prompt_bound",
+)
 REQUIRED_MODULES = (
     "lawmax21.observatory_genome_causal_ablation_hardening",
     "lawmax21.observatory_causal_audit_hardening",
@@ -33,14 +38,20 @@ REQUIRED_MODULES = (
     "lawmax21.observatory_causal_failure_classification_hardening",
     "lawmax21.observatory_causal_axis_attribution_hardening",
     "lawmax21.observatory_causal_attribution_scope_hardening",
+    "lawmax21.observatory_causal_definition_semantics_hardening",
 )
 REQUIRED_FILES = {
+    "executable-orchestrator/lawmax21/observatory_audit_v3.py",
+    "executable-orchestrator/lawmax21/observatory_genome_realization_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_causal_ablation_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_audit_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_dossier_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_failure_classification_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_axis_attribution_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_attribution_scope_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_causal_definition_semantics_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_evaluator_routing_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_formal_streaming_routing.py",
     "executable-orchestrator/tools/mock_observatory_causal_server.py",
     "executable-orchestrator/tools/prove_observatory_protocol_static_v5.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_causal_hardened.py",
@@ -99,6 +110,13 @@ def main():
             inherited = json.load(handle)
         if inherited.get("status") != "PASS":
             raise RuntimeError("inherited static receipt is not PASS")
+        missing_inherited = [
+            key for key in REQUIRED_INHERITED_GATES
+            if inherited.get(key) is not True]
+        if missing_inherited:
+            raise RuntimeError(
+                "inherited final launcher/audit gates are absent: "
+                + ", ".join(missing_inherited))
 
         from lawmax21 import observatory_protocol as protocol
         from lawmax21 import observatory_genome_causal_ablation_hardening as causal
@@ -140,6 +158,7 @@ def main():
             "observatory_causal_failure_classification_hardening.install",
             "observatory_causal_axis_attribution_hardening.install",
             "observatory_causal_attribution_scope_hardening.install",
+            "observatory_causal_definition_semantics_hardening.install",
             "observatory_genome_causal_ablation_hardening.install",
             "observatory_causal_dossier_hardening.install",
             "observatory_supremacy_dossier_overlay.install",
@@ -161,15 +180,44 @@ def main():
             "genome_causal_ablation_replication_passed",
             "genome_causal_ablation_crown_passed"),
             "causal genome implementation")
+
+        evaluator_routing = _text(
+            "executable-orchestrator/lawmax21/"
+            "observatory_evaluator_routing_hardening.py")
+        _require(evaluator_routing, (
+            "def _process_receipt",
+            '"evaluator_returncode": result.returncode',
+            '"evaluator_stdout_tail"',
+            '"evaluator_stderr_tail"',
+            'report["candidate_sha256"]',
+            "atomic_write_json(out, report)"),
+            "bounded specialized evaluator process receipts")
+        formal_routing = _text(
+            "executable-orchestrator/lawmax21/"
+            "observatory_formal_streaming_routing.py")
+        _require(formal_routing, (
+            '"evaluator_returncode": result.returncode',
+            '"evaluator_stdout_tail"',
+            '"evaluator_stderr_tail"',
+            'report["candidate_sha256"]',
+            '"observatory_formal_arena_v3.py"',
+            "atomic_write_json(out, report)"),
+            "streaming formal evaluator process receipts")
+
         failure_classifier = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_causal_failure_classification_hardening.py")
         _require(failure_classifier, (
             "_INFRASTRUCTURE_MARKERS",
+            "_CANDIDATE_FAILURE_MARKERS",
+            "_STRUCTURED_FAILURE_FIELDS",
             "infrastructure failure is non-evidence",
             "candidate_sha256", "evaluator_returncode",
+            "evaluator_stdout_tail", "evaluator_stderr_tail",
+            '"failure_origin": "candidate"',
             "candidate-specific diagnostic evidence"),
             "causal failure classification")
+
         axis_attribution = _text(
             "executable-orchestrator/lawmax21/"
             "observatory_causal_axis_attribution_hardening.py")
@@ -191,6 +239,18 @@ def main():
             "failure-specific evidence only",
             "axis._attribution = attribution"),
             "failure-scoped causal attribution")
+        definition_semantics = _text(
+            "executable-orchestrator/lawmax21/"
+            "observatory_causal_definition_semantics_hardening.py")
+        _require(definition_semantics, (
+            "def _definition_axis_support",
+            "definition_vocabulary_sha256_inputs",
+            "matched_source_axis_tokens",
+            "source_semantic_support",
+            "whole_receipt_searched",
+            "axis._attribution = attribution"),
+            "cited-definition semantic attribution")
+
         contract = _text(
             "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md")
         _require(contract, (
@@ -216,9 +276,11 @@ def main():
             "executable-orchestrator/lawmax21/"
             "observatory_causal_dossier_hardening.py")
         _require(causal_dossier, (
+            "def _attribution_valid",
             "all_ablation_mutations_destroyed_claimed_behavior",
             "axis_specific_failure_attributed",
-            "axis_specific_tasks",
+            "cited_definition_semantics_checked",
+            "whole_receipt_searched",
             "negative_controls_passed",
             "genome_causal_ablation_replication",
             "genome_causal_ablation_crown",
@@ -245,6 +307,8 @@ def main():
             "genome_causal_ablation_crown_passed",
             "negative_controls_passed",
             "causal_failure_observed",
+            "failure_origin",
+            "infrastructure_failure_excluded",
             "evaluator_receipt_sha256"),
             "causal Docker E2E verifier")
         axis_e2e = _text(
@@ -253,29 +317,40 @@ def main():
         _require(axis_e2e, (
             "axis_specific_failure_attributed",
             "matched_dimensions",
-            "matched_axis_or_group_tokens",
+            "matched_axis_failure_tokens",
+            "matched_group_path_tokens",
+            "definition_vocabulary_sha256_inputs",
+            "source_semantic_support",
             "whole_receipt_searched",
+            "cited_definition_semantics_checked",
             "axis_specific_causal_attribution_required",
             "all_tasks_axis_specifically_attributed"),
             "axis-specific Docker E2E verifier")
+
         provider = _text(
             "executable-orchestrator/tools/"
             "prove_complete_observatory_protocol_causal_provider_hardened.py")
         _require(provider, (
-            "_genome_provider_popen",
+            "def _is_exact_core_provider",
+            "def _genome_provider_popen",
+            "_PROVIDER_ROUTE",
+            'int(_PROVIDER_ROUTE.get("count", 0)) != 1',
             "mock_observatory_protocol_server.py",
             "mock_observatory_causal_server.py",
-            "observatory_causal_failure_classification_hardening.py",
-            "CORE.subprocess.Popen",
-            "Real-provider endpoints are never affected"),
-            "causal-aware local-provider route")
+            '"substitutions_observed"',
+            '"real_provider_routes_modified": False',
+            "base.CORE.subprocess.Popen = _genome_provider_popen",
+            "base.CORE.verify_protocol = _verify"),
+            "causal-aware local-provider execution route")
         causal_provider = _text(
             "executable-orchestrator/tools/mock_observatory_causal_server.py")
         _require(causal_provider, (
             "mock_observatory_genome_server.py",
+            "OVERRIDES",
             "governance_evolution_model",
             "apply_change",
-            "hidden semantic scenario"),
+            "Production",
+            "causal mock citation drift"),
             "causal-aware local provider")
         final_entry = _text(
             "executable-orchestrator/tools/"
@@ -284,7 +359,8 @@ def main():
             "prove_observatory_protocol_static_v5.py",
             "prove_complete_observatory_protocol_axis_hardened",
             "causal_genome_ablation_bound",
-            "axis_specific_causal_attribution_bound"),
+            "axis_specific_causal_attribution_bound",
+            "failure_scoped_causal_attribution_bound"),
             "authoritative causal proof entrypoint")
         stable = _text(
             "executable-orchestrator/tools/run_observatory_proof.py")
@@ -301,9 +377,12 @@ def main():
             "modules_imported": imported,
             "causal_terminal_conditions": sorted(CAUSAL_CONDITIONS),
             "causal_phases": list(causal.CAUSAL_LABELS),
+            "final_audit_v3_identity_binding_verified": True,
+            "bounded_evaluator_process_witnesses_verified": True,
             "auditor_specific_definition_set_ablation": True,
             "axis_specific_causal_attribution_verified": True,
             "failure_scoped_attribution_verified": True,
+            "cited_definition_semantics_verified": True,
             "inert_negative_controls_required": True,
             "exact_mutated_source_receipts_required": True,
             "infrastructure_failure_exclusion_verified": True,
@@ -311,6 +390,7 @@ def main():
             "causal_genome_ablation_bound": True,
             "genome_aware_local_provider_verified": True,
             "causal_aware_local_provider_verified": True,
+            "causal_local_provider_execution_route_verified": True,
             "authoritative_causal_e2e_verified": True,
             "inherited_static_report_sha256":
                 _sha256(PREVIOUS_REPORT),
