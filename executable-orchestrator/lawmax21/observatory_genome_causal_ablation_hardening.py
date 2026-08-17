@@ -1,15 +1,17 @@
 """Causal source-ablation proof for controlled Observatory genome realization.
 
-Citation existence is necessary but not sufficient: a model may point to a real function, invariant
-and passing report even when the cited definition is behaviorally irrelevant. This hardening runs
-after the source-bound and cross-auditor validators. During independent replication and final crown
-it deterministically renames the complete set of definitions cited for every axis/artifact pair,
-reruns the corresponding hidden or fault evaluator against the mutated exact source bytes, and
-requires the mutation to destroy at least one hard property.
+Citation existence is necessary but not sufficient: a model can cite a real function, invariant and
+passing report even when the definition is behaviorally irrelevant. After the source-bound and
+cross-auditor validators, this module tests every finalist during independent replication and the
+final incumbent during crown.
 
-Infrastructure refusal, missing output or source-hash drift never counts as a successful ablation.
-Qualification remains citation/evidence based so the broad initial field is affordable; every
-finalist and the final incumbent must pass the complete causal campaign with fresh evaluator seeds.
+For each auditor, controlled axis, required evidence group and cited source artifact it renames the
+complete auditor-specific definition set in the exact candidate bytes and reruns the corresponding
+hidden or fault evaluator with a fresh deterministic seed. The claimed mechanism is causal only when
+the exact mutation destroys at least one hard property. A semantically inert dead-definition control
+is run for every artifact first; if that control fails, the ablation environment is invalid and no
+causal credit is awarded. Infrastructure refusal, missing output and source-hash drift never count as
+successful ablation.
 """
 from __future__ import annotations
 
@@ -22,6 +24,7 @@ from types import MethodType
 
 from . import observatory_crown_overlay as crown
 from . import observatory_distributed_overlay as distributed
+from . import observatory_escalation as escalation
 from . import observatory_formal_overlay as formal
 from . import observatory_genome_realization_overlay as genome
 from . import observatory_interoperability_overlay as interop
@@ -32,6 +35,11 @@ from .handlers import A
 
 CAUSAL_LABELS = ("replication", "crown")
 REQUIRED_AXIS_COUNT = 13
+CAUSAL_SUPREMACY_KEYS = (
+    "genome_causal_ablation_replication_passed",
+    "genome_causal_ablation_crown_passed",
+)
+CAUSAL_SEARCH_KEYS = ("genome_causal_ablation_replication_passed",)
 
 
 def _runtime_path(ctx, relative):
@@ -39,7 +47,8 @@ def _runtime_path(ctx, relative):
         ctx.runtime, *str(relative).replace("\\", "/").split("/")))
     runtime = os.path.abspath(ctx.runtime)
     if path != runtime and not path.startswith(runtime + os.sep):
-        raise RuntimeError("causal-ablation evidence escapes runtime: " + str(relative))
+        raise RuntimeError(
+            "causal-ablation evidence escapes runtime: " + str(relative))
     return path
 
 
@@ -60,7 +69,8 @@ def _artifact_path(ctx, cid, artifact):
         return interop._path(ctx, cid, interop.PERSPECTIVES[0][0])
     if artifact == "interoperability_B":
         return interop._path(ctx, cid, interop.PERSPECTIVES[1][0])
-    raise RuntimeError("unsupported causal-ablation artifact: " + str(artifact))
+    raise RuntimeError(
+        "unsupported causal-ablation artifact: " + str(artifact))
 
 
 def _perspective(artifact):
@@ -110,10 +120,22 @@ def _mutated_source(source, symbols, identity):
     missing = sorted(set(symbols) - renamer.found)
     if missing:
         raise RuntimeError(
-            "causal ablation could not locate AST definitions: " + ", ".join(missing))
+            "causal ablation could not locate AST definitions: "
+            + ", ".join(missing))
     mutated = ast.unparse(tree) + "\n"
     compile(mutated, "<genome-causal-ablation>", "exec")
     return mutated
+
+
+def _control_source(source, identity):
+    marker = "__observatory_inert_control_" + hashlib.sha256(
+        identity.encode("utf-8")).hexdigest()[:16]
+    augmented = (
+        source.rstrip() + "\n\n"
+        + f"def {marker}():\n"
+        + f"    return {identity!r}\n")
+    return _mutated_source(
+        augmented, [marker], identity + "|negative-control")
 
 
 def _tasks(report):
@@ -121,13 +143,23 @@ def _tasks(report):
     obligations = set()
     auditors = report.get("auditors") or []
     if len(auditors) != 2:
-        raise RuntimeError("causal ablation requires exactly two validated genome auditors")
+        raise RuntimeError(
+            "causal ablation requires exactly two validated genome auditors")
+    auditor_ids = []
     for auditor in auditors:
-        auditor_id = str(auditor.get("auditor_id") or auditor.get("auditor") or "")
+        auditor_id = str(
+            auditor.get("auditor_id") or auditor.get("auditor") or "")
+        if not auditor_id or auditor_id in auditor_ids:
+            raise RuntimeError(
+                "causal ablation requires two distinct auditor identities")
+        auditor_ids.append(auditor_id)
         raw = auditor.get("report") or {}
-        by_axis = {row.get("axis"): row for row in raw.get("axis_reviews") or []}
+        by_axis = {
+            row.get("axis"): row
+            for row in raw.get("axis_reviews") or []}
         if set(by_axis) != set(genome.oroles.GENOME_FIELDS):
-            raise RuntimeError("causal ablation received an incomplete auditor axis map")
+            raise RuntimeError(
+                "causal ablation received an incomplete auditor axis map")
         for axis in genome.oroles.GENOME_FIELDS:
             row = by_axis[axis]
             required_groups = tuple(genome.REQUIRED_GROUPS[axis])
@@ -138,16 +170,15 @@ def _tasks(report):
                 group = genome._artifact_group(artifact)
                 if group not in required_groups or not symbol:
                     continue
-                key = (axis, group, artifact)
+                key = (auditor_id, axis, group, artifact)
                 task = tasks.setdefault(key, {
+                    "auditor_id": auditor_id,
                     "axis": axis,
                     "group": group,
                     "artifact": artifact,
                     "symbols": set(),
-                    "auditors": set(),
                 })
                 task["symbols"].add(symbol)
-                task["auditors"].add(auditor_id)
                 seen_groups.add(group)
             missing = sorted(set(required_groups) - seen_groups)
             if missing:
@@ -155,19 +186,21 @@ def _tasks(report):
                     f"causal ablation {auditor_id}/{axis} lacks cited groups: "
                     + ", ".join(missing))
             for group in required_groups:
-                obligations.add((axis, group))
+                obligations.add((auditor_id, axis, group))
+
     ordered = []
     for key in sorted(tasks):
         row = tasks[key]
         ordered.append({
+            "auditor_id": row["auditor_id"],
             "axis": row["axis"],
             "group": row["group"],
             "artifact": row["artifact"],
             "symbols": sorted(row["symbols"]),
-            "auditors": sorted(row["auditors"]),
         })
     expected = {
-        (axis, group)
+        (auditor_id, axis, group)
+        for auditor_id in auditor_ids
         for axis in genome.oroles.GENOME_FIELDS
         for group in genome.REQUIRED_GROUPS[axis]
     }
@@ -175,7 +208,7 @@ def _tasks(report):
         missing = sorted(expected - obligations)
         raise RuntimeError(
             "causal ablation obligation map is incomplete: " + repr(missing))
-    return ordered, expected
+    return ordered, expected, tuple(auditor_ids)
 
 
 def _semantic_passes(ctx, report):
@@ -206,7 +239,8 @@ def _semantic_passes(ctx, report):
         elif direction == "lower" and value - 1e-12 > bound:
             violated.append(key)
     if not checked:
-        raise RuntimeError("semantic ablation report exposed no hard comparable dimensions")
+        raise RuntimeError(
+            "semantic ablation report exposed no hard comparable dimensions")
     return not violated, {
         "checked_hard_dimensions": checked,
         "violated_hard_dimensions": violated,
@@ -215,13 +249,16 @@ def _semantic_passes(ctx, report):
 
 def _specialized_passes(report):
     if not report.get("evidence_path"):
-        raise RuntimeError("specialized ablation evaluator produced no persisted evidence path")
+        raise RuntimeError(
+            "specialized ablation evaluator produced no persisted evidence path")
     status = report.get("status")
     if status not in ("PASS", "OK", "FAIL"):
         raise RuntimeError(
             "specialized ablation evaluator was invalidated/refused: "
             + str(report.get("reason", status)))
-    passed = status in ("PASS", "OK") and report.get("passed", True) is not False
+    passed = (
+        status in ("PASS", "OK")
+        and report.get("passed", True) is not False)
     return passed, {
         "status": status,
         "passed_field": report.get("passed"),
@@ -230,36 +267,24 @@ def _specialized_passes(report):
     }
 
 
-def _run_task(ctx, cid, label, task):
-    identity = sha256_obj({
-        "candidate_id": cid,
-        "label": label,
-        "axis": task["axis"],
-        "group": task["group"],
-        "artifact": task["artifact"],
-        "symbols": task["symbols"],
-    })
-    temp_id = "OBS-ABL-" + identity[:24]
-    run_label = "genome-ablation-" + label + "-" + identity[:12]
-    artifact = task["artifact"]
-    original_path = _artifact_path(ctx, cid, artifact)
-    if not os.path.isfile(original_path):
-        raise RuntimeError("causal-ablation source disappeared: " + original_path)
-    source = open(original_path, encoding="utf-8").read()
-    mutated = _mutated_source(source, task["symbols"], identity)
-
+def _evaluate_source(ctx, cid, label, artifact, source, identity, kind):
+    temp_id = "OBS-ABL-" + hashlib.sha256(
+        f"{kind}|{identity}".encode("utf-8")).hexdigest()[:24]
+    run_label = (
+        "genome-" + kind + "-" + label + "-"
+        + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:12])
+    if temp_id in ctx.candidates:
+        raise RuntimeError(
+            "causal-ablation temporary candidate collision: " + temp_id)
     temp_path = _artifact_path(ctx, temp_id, artifact)
     with open(temp_path, "w", encoding="utf-8") as handle:
-        handle.write(mutated)
-    mutated_sha = sha256_file(temp_path)
-    if temp_id in ctx.candidates:
-        raise RuntimeError("causal-ablation temporary candidate collision: " + temp_id)
+        handle.write(source)
+    source_sha = sha256_file(temp_path)
     candidate = copy.deepcopy(ctx.candidates[cid])
     if artifact == "semantic":
-        candidate["source"] = mutated
+        candidate["source"] = source
     ctx.candidates[temp_id] = candidate
     ctx.scores[temp_id] = {}
-
     try:
         if artifact == "semantic":
             evaluation = ctx.measure_hidden(temp_id, "qualification")
@@ -270,7 +295,8 @@ def _run_task(ctx, cid, label, task):
             observed_pass, diagnostics = _specialized_passes(evaluation)
         elif artifact == "distributed":
             evaluation = distributed._run(
-                ctx, temp_id, run_label, distributed.DISTRIBUTED_QUAL_EVENTS)
+                ctx, temp_id, run_label,
+                distributed.DISTRIBUTED_QUAL_EVENTS)
             observed_pass, diagnostics = _specialized_passes(evaluation)
         elif artifact == "scale":
             evaluation = scale._run(
@@ -288,88 +314,166 @@ def _run_task(ctx, cid, label, task):
                 interop.QUAL_CASES, candidate_path=temp_path)
             observed_pass, diagnostics = _specialized_passes(evaluation)
         else:
-            raise RuntimeError("unsupported causal-ablation artifact: " + artifact)
+            raise RuntimeError(
+                "unsupported causal-ablation artifact: " + artifact)
     finally:
         ctx.candidates.pop(temp_id, None)
         ctx.scores.pop(temp_id, None)
 
     evidence_relative = evaluation.get("evidence_path")
     if not evidence_relative:
-        raise RuntimeError("causal ablation has no persisted evaluator receipt")
+        raise RuntimeError(
+            "causal ablation has no persisted evaluator receipt")
     evidence_path = _runtime_path(ctx, evidence_relative)
     if not os.path.isfile(evidence_path):
-        raise RuntimeError("causal-ablation evaluator receipt disappeared")
-    if evaluation.get("candidate_sha256") != mutated_sha:
         raise RuntimeError(
-            f"causal ablation {task['axis']}/{artifact}: evaluator receipt is not bound "
+            "causal-ablation evaluator receipt disappeared")
+    if evaluation.get("candidate_sha256") != source_sha:
+        raise RuntimeError(
+            f"causal ablation {artifact}: evaluator receipt is not bound "
             "to the exact mutated source bytes")
-
     return {
-        "task_id": identity,
-        "axis": task["axis"],
-        "group": task["group"],
-        "artifact": artifact,
-        "auditors": task["auditors"],
-        "renamed_definitions": task["symbols"],
-        "mutated_source_path": os.path.relpath(
+        "temporary_candidate_id": temp_id,
+        "source_path": os.path.relpath(
             temp_path, ctx.runtime).replace("\\", "/"),
-        "mutated_source_sha256": mutated_sha,
+        "source_sha256": source_sha,
         "evaluator_receipt_path": evidence_relative,
         "evaluator_receipt_sha256": sha256_file(evidence_path),
         "observed_candidate_pass": bool(observed_pass),
-        "causal_failure_observed": not bool(observed_pass),
         "diagnostics": diagnostics,
     }
 
 
+def _run_control(ctx, cid, label, artifact):
+    identity = sha256_obj({
+        "candidate_id": cid,
+        "label": label,
+        "artifact": artifact,
+        "kind": "inert-negative-control",
+    })
+    original_path = _artifact_path(ctx, cid, artifact)
+    if not os.path.isfile(original_path):
+        raise RuntimeError(
+            "causal-ablation control source disappeared: " + original_path)
+    source = open(original_path, encoding="utf-8").read()
+    controlled = _control_source(source, identity)
+    evaluated = _evaluate_source(
+        ctx, cid, label, artifact, controlled, identity, "control")
+    if not evaluated["observed_candidate_pass"]:
+        raise RuntimeError(
+            f"causal-ablation negative control failed for {cid}/{label}/{artifact}; "
+            "source rewriting or evaluator routing is not a valid causal environment")
+    return {
+        "control_id": identity,
+        "artifact": artifact,
+        "inert_definition_renamed": True,
+        "control_passed": True,
+        **evaluated,
+    }
+
+
+def _run_task(ctx, cid, label, task):
+    identity = sha256_obj({
+        "candidate_id": cid,
+        "label": label,
+        "auditor_id": task["auditor_id"],
+        "axis": task["axis"],
+        "group": task["group"],
+        "artifact": task["artifact"],
+        "symbols": task["symbols"],
+    })
+    artifact = task["artifact"]
+    original_path = _artifact_path(ctx, cid, artifact)
+    if not os.path.isfile(original_path):
+        raise RuntimeError(
+            "causal-ablation source disappeared: " + original_path)
+    source = open(original_path, encoding="utf-8").read()
+    mutated = _mutated_source(source, task["symbols"], identity)
+    evaluated = _evaluate_source(
+        ctx, cid, label, artifact, mutated, identity, "ablation")
+    return {
+        "task_id": identity,
+        "auditor_id": task["auditor_id"],
+        "axis": task["axis"],
+        "group": task["group"],
+        "artifact": artifact,
+        "renamed_definitions": task["symbols"],
+        "causal_failure_observed": not evaluated["observed_candidate_pass"],
+        **evaluated,
+    }
+
+
 def _campaign(ctx, cid, label, genome_report):
-    tasks, obligations = _tasks(genome_report)
-    results = [_run_task(ctx, cid, label, task) for task in tasks]
+    tasks, obligations, auditor_ids = _tasks(genome_report)
+    artifacts = sorted({task["artifact"] for task in tasks})
+    controls = [
+        _run_control(ctx, cid, label, artifact)
+        for artifact in artifacts]
+    results = [
+        _run_task(ctx, cid, label, task)
+        for task in tasks]
+
     by_obligation = defaultdict(list)
     for result in results:
-        by_obligation[(result["axis"], result["group"])].append(result)
+        by_obligation[(
+            result["auditor_id"],
+            result["axis"],
+            result["group"])].append(result)
     verified_obligations = sorted(
         [list(key) for key in obligations
          if by_obligation.get(key)
-         and all(row["causal_failure_observed"] for row in by_obligation[key])])
+         and all(row["causal_failure_observed"]
+                 for row in by_obligation[key])])
     verified_axes = sorted(
         axis for axis in genome.oroles.GENOME_FIELDS
-        if all([axis, group] in verified_obligations
-               for group in genome.REQUIRED_GROUPS[axis]))
+        if all(
+            [auditor_id, axis, group] in verified_obligations
+            for auditor_id in auditor_ids
+            for group in genome.REQUIRED_GROUPS[axis]))
     passed = (
         len(verified_axes) == REQUIRED_AXIS_COUNT
         and len(verified_obligations) == len(obligations)
-        and all(row["causal_failure_observed"] for row in results))
+        and all(row["causal_failure_observed"] for row in results)
+        and all(row["control_passed"] for row in controls))
+
+    path = A(
+        ctx, "architecture",
+        f"genome-causal-ablation-{label}-{cid}.json")
+    relative = os.path.relpath(
+        path, ctx.runtime).replace("\\", "/")
     artifact = {
         "status": "PASS" if passed else "FAIL",
         "passed": passed,
         "candidate_id": cid,
         "label": label,
+        "auditor_ids": list(auditor_ids),
         "required_axis_count": REQUIRED_AXIS_COUNT,
         "verified_axis_count": len(verified_axes),
         "verified_axes": verified_axes,
-        "required_axis_group_obligations": len(obligations),
-        "verified_axis_group_obligations": len(verified_obligations),
+        "required_auditor_axis_group_obligations": len(obligations),
+        "verified_auditor_axis_group_obligations":
+            len(verified_obligations),
         "tasks_executed": len(results),
+        "negative_controls_executed": len(controls),
+        "negative_controls_passed": all(
+            row["control_passed"] for row in controls),
         "all_mutations_source_bound": all(
-            bool(row.get("mutated_source_sha256"))
+            bool(row.get("source_sha256"))
             and bool(row.get("evaluator_receipt_sha256"))
-            for row in results),
-        "all_mutations_destroyed_claimed_behavior": all(
+            for row in results + controls),
+        "all_ablation_mutations_destroyed_claimed_behavior": all(
             row["causal_failure_observed"] for row in results),
+        "controls": controls,
         "tasks": results,
+        "evidence_path": relative,
         "proof_boundary": (
-            "Definition-set renaming under the signed qualification evaluators proves causal "
-            "dependence only for the exact cited source, hidden corpora, fault workloads and "
-            "controlled axis/group obligations. It is not an unbounded theorem about all future "
-            "deployments or all semantically equivalent rewrites."),
+            "Auditor-specific definition-set renaming under the signed qualification evaluators "
+            "proves causal dependence only for the exact cited source bytes, hidden corpora, fault "
+            "workloads and controlled auditor/axis/group obligations. Passing inert controls prove "
+            "that AST round-tripping and source mutation alone do not cause failure. This is not an "
+            "unbounded theorem about all future deployments or semantically equivalent rewrites."),
     }
-    path = A(
-        ctx, "architecture",
-        f"genome-causal-ablation-{label}-{cid}.json")
     atomic_write_json(path, artifact)
-    artifact["evidence_path"] = os.path.relpath(
-        path, ctx.runtime).replace("\\", "/")
     artifact["evidence_sha256"] = sha256_file(path)
     return artifact
 
@@ -379,6 +483,7 @@ def install(ctx, handlers):
         return dict(handlers)
     original_audit = genome._audit
     original_passes = genome._passes
+    original_conditions = ctx.esc._supremacy_conditions
     original_summary = ctx.esc.supremacy_summary
 
     def audit(context, candidate_id, label):
@@ -391,15 +496,20 @@ def install(ctx, handlers):
                 "path": causal["evidence_path"],
                 "sha256": causal["evidence_sha256"],
                 "tasks_executed": causal["tasks_executed"],
+                "negative_controls_executed":
+                    causal["negative_controls_executed"],
+                "negative_controls_passed":
+                    causal["negative_controls_passed"],
                 "verified_axis_count": causal["verified_axis_count"],
-                "verified_axis_group_obligations":
-                    causal["verified_axis_group_obligations"],
+                "verified_auditor_axis_group_obligations":
+                    causal["verified_auditor_axis_group_obligations"],
             }
             if not causal["passed"]:
                 report["status"] = "FAIL"
                 report["passed"] = False
                 report["all_axes_realized"] = False
-                report["verified_axis_count"] = causal["verified_axis_count"]
+                report["verified_axis_count"] = causal[
+                    "verified_axis_count"]
             path = A(
                 context, "architecture",
                 f"genome-realization-{label}-{candidate_id}.json")
@@ -417,32 +527,72 @@ def install(ctx, handlers):
                 report.get("causal_ablation_passed") is True
                 and int(evidence.get("verified_axis_count", 0))
                 == REQUIRED_AXIS_COUNT
-                and int(evidence.get("tasks_executed", 0)) > 0)
+                and int(evidence.get("tasks_executed", 0)) > 0
+                and int(evidence.get(
+                    "negative_controls_executed", 0)) > 0
+                and evidence.get("negative_controls_passed") is True)
         return True
 
-    def summary(self):
-        result = original_summary()
+    def conditions(self):
+        result = original_conditions()
         incumbent = self.s.get("incumbent")
         scores = (ctx.scores.get(incumbent) or {}) if incumbent else {}
-        replication = scores.get("genome_realization_replication") or {}
+        replication = scores.get(
+            "genome_realization_replication") or {}
         crown_report = scores.get("genome_realization_crown") or {}
         result.update({
-            "genome_causal_ablation_required_labels": list(CAUSAL_LABELS),
             "genome_causal_ablation_replication_passed": bool(
                 replication.get("causal_ablation_passed") is True),
             "genome_causal_ablation_crown_passed": bool(
                 crown_report.get("causal_ablation_passed") is True),
+        })
+        return result
+
+    def summary(self):
+        result = original_summary()
+        result.update(conditions(self))
+        incumbent = self.s.get("incumbent")
+        scores = (ctx.scores.get(incumbent) or {}) if incumbent else {}
+        replication = scores.get(
+            "genome_realization_replication") or {}
+        crown_report = scores.get("genome_realization_crown") or {}
+        result.update({
+            "genome_causal_ablation_required_labels":
+                list(CAUSAL_LABELS),
             "genome_causal_ablation_replication_tasks": int((
                 replication.get("causal_ablation_evidence") or {}).get(
                     "tasks_executed", 0)),
             "genome_causal_ablation_crown_tasks": int((
                 crown_report.get("causal_ablation_evidence") or {}).get(
                     "tasks_executed", 0)),
+            "genome_causal_ablation_replication_controls": int((
+                replication.get("causal_ablation_evidence") or {}).get(
+                    "negative_controls_executed", 0)),
+            "genome_causal_ablation_crown_controls": int((
+                crown_report.get("causal_ablation_evidence") or {}).get(
+                    "negative_controls_executed", 0)),
         })
         return result
 
     genome._audit = audit
     genome._passes = passes
+    ctx.esc._supremacy_conditions = MethodType(conditions, ctx.esc)
     ctx.esc.supremacy_summary = MethodType(summary, ctx.esc)
+    for key in CAUSAL_SUPREMACY_KEYS:
+        if key not in escalation.SUPREMACY_KEYS:
+            escalation.SUPREMACY_KEYS.append(key)
+    for key in CAUSAL_SEARCH_KEYS:
+        if key not in escalation.SEARCH_SUPREMACY_KEYS:
+            escalation.SEARCH_SUPREMACY_KEYS.append(key)
+    schema = escalation.OBSERVATORY_PROOF_SCHEMA
+    conditions_schema = schema["properties"]["conditions"]
+    supremacy_schema = schema["properties"]["supremacy"]
+    for key in CAUSAL_SUPREMACY_KEYS:
+        if key not in conditions_schema["required"]:
+            conditions_schema["required"].append(key)
+        conditions_schema["properties"][key] = {"type": "boolean"}
+        if key not in supremacy_schema["required"]:
+            supremacy_schema["required"].append(key)
+        supremacy_schema["properties"][key] = {"type": "boolean"}
     genome._causal_ablation_hardening_installed = True
     return dict(handlers)
