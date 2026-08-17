@@ -14,6 +14,7 @@ from . import observatory_prior_art_hardening_overlay
 from . import observatory_scale_hardening
 from . import observatory_semantic_evidence_binding_hardening
 from . import observatory_shared_corpus_hardening
+from . import observatory_supremacy_dossier_overlay
 
 
 def install(ctx, handlers):
@@ -49,10 +50,12 @@ def install(ctx, handlers):
     observatory_prior_art_hardening_overlay.install(ctx, handlers)
 
     # Build the complete semantic/durable/distributed/scale/formal/interoperability/search stack,
-    # then add cross-model and executable-genome gates around the same state-machine handlers.
+    # then add cross-model, executable-genome and deterministic final-dossier gates around the same
+    # signed state-machine handlers.
     out = base.install(ctx, handlers)
     out = observatory_cross_model_overlay.install(ctx, out)
     out = observatory_genome_realization_overlay.install(ctx, out)
+    out = observatory_supremacy_dossier_overlay.install(ctx, out)
 
     # Hard minima become active only after the corresponding report exists; once active they remain
     # ordinary fail-closed Pareto gates.
