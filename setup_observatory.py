@@ -2,9 +2,11 @@
 """Local owner/setup ceremony for the National Legal Observatory tournament.
 
 Zero paid calls. Builds and calibrates profile-specific evaluation assets and freezes the owner's
-budget plus provider billing schedule into the signed D01 decision before any API key is used.
+budget, provider billing schedule and exact mission/evaluator contract into signed decisions before
+any API key is used.
 """
 import argparse
+import hashlib
 import os
 import secrets
 import shutil
@@ -18,9 +20,6 @@ EVAL = os.path.join(ROOT, "private-evaluator", "evaluator")
 SECRETS = os.path.join(ROOT, "private-evaluator", "owner-held-secrets")
 PROFILE = os.path.join(ROOT, "profiles", "national-observatory")
 
-# Official DeepSeek V4-Pro USD schedule verified against the provider's Models & Pricing page
-# on 2026-08-17. It is copied into the owner-signed D01 decision and becomes part of request
-# identity, so a run cannot silently switch price semantics after the ceremony.
 V4_PRO_PRICE_SCHEDULE = {
     "model": "deepseek-v4-pro",
     "currency": "USD",
@@ -38,6 +37,27 @@ def run(argv):
     if r.returncode != 0:
         raise RuntimeError(f"FAILED: {' '.join(argv)}\n{r.stdout}\n{r.stderr}")
     return r
+
+
+def sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def mission_binding():
+    return {
+        "target": "National Legal Observatory — canonical Greek legal information infrastructure",
+        "all_twelve_layers_required": True,
+        "no_silent_legally_material_loss": True,
+        "publication_channels": ["human", "api", "linked_data", "eli", "public_sector", "ai"],
+        "charter_sha256": sha256_file(os.path.join(PROFILE, "OBJECTIVE-CHARTER.md")),
+        "master_system_sha256": sha256_file(os.path.join(PROFILE, "MASTER-SYSTEM-PROMPT.md")),
+        "pareto_sha256": sha256_file(os.path.join(PROFILE, "PARETO-DIMENSIONS.json")),
+        "evaluator_contract_sha256": sha256_file(os.path.join(PROFILE, "EVALUATOR-CONTRACT.md")),
+    }
 
 
 def decisions(budget_usd, tokens, calls, days):
@@ -63,8 +83,7 @@ def decisions(budget_usd, tokens, calls, days):
             "max_stagnant_windows": 4, "best_of_n": 4, "revision_rounds": 2}},
         "D08_OFFMACHINE_BACKUP": {"decided": True,
             "value": "encrypted off-machine copy of signed log, checkpoints and final evidence"},
-        "D09_ROW0_TARGET": {"decided": True,
-            "value": "Observatory profile target is all twelve executable layers; no lower row is a final crown"},
+        "D09_ROW0_TARGET": {"decided": True, "value": mission_binding()},
         "D10_CS01_FIXTURE_LICENCE": {"decided": True,
             "value": "not used by Observatory profile; synthetic replay fixtures only"},
         "D11_CHALLENGER_RESERVE": {"decided": True, "value": {
@@ -124,6 +143,7 @@ def main(argv=None):
     os.remove(unsigned)
     print(f"· signed Observatory decisions for {a.run_id}")
     print("· frozen V4-Pro USD provider price schedule into D01")
+    print("· bound Charter/System/Pareto/Evaluator hashes into owner-signed D09")
 
     visible = os.path.join(ROOT, "benchmark", "observatory-visible-suite.json")
     observatory_harness.build_visible_suite(visible)
@@ -174,6 +194,7 @@ def main(argv=None):
     print(f"run-id: {a.run_id}")
     print(f"budget: USD {a.budget_usd}, tokens {a.tokens}, calls {a.calls}, days {a.days}")
     print("provider pricing: V4-Pro hit=$0.003625/M miss=$0.435/M output=$0.87/M")
+    print("mission: zero silent legally-material loss + canonical human/API/linked-data/ELI/public-sector/AI publication")
     print("No DeepSeek/API call was made.")
     return 0
 
