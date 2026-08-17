@@ -2,7 +2,7 @@
 """Local owner/setup ceremony for the National Legal Observatory tournament.
 
 Zero paid calls. Builds and calibrates profile-specific evaluation assets and freezes the owner's
-budget, provider billing schedule and exact mission/evaluator/supremacy contract into signed
+budget, provider billing schedule and exact mission/evaluator/supremacy/systems contract into signed
 decisions before any API key is used.
 """
 import argparse
@@ -55,12 +55,14 @@ def mission_binding():
         "supremacy_search_required": True,
         "no_first_answer_privilege": True,
         "public_supremacy_case_required": True,
+        "durable_systems_arena_required": True,
         "publication_channels": ["human", "api", "linked_data", "eli", "public_sector", "ai"],
         "charter_sha256": sha256_file(os.path.join(PROFILE, "OBJECTIVE-CHARTER.md")),
         "master_system_sha256": sha256_file(os.path.join(PROFILE, "MASTER-SYSTEM-PROMPT.md")),
         "pareto_sha256": sha256_file(os.path.join(PROFILE, "PARETO-DIMENSIONS.json")),
         "evaluator_contract_sha256": sha256_file(os.path.join(PROFILE, "EVALUATOR-CONTRACT.md")),
         "supremacy_contract_sha256": sha256_file(os.path.join(PROFILE, "SUPREMACY-CONTRACT.md")),
+        "systems_contract_sha256": sha256_file(os.path.join(PROFILE, "SYSTEMS-CONTRACT.md")),
     }
 
 
@@ -147,7 +149,7 @@ def main(argv=None):
     os.remove(unsigned)
     print(f"· signed Observatory decisions for {a.run_id}")
     print("· frozen V4-Pro USD provider price schedule into D01")
-    print("· bound Charter/System/Pareto/Evaluator/Supremacy hashes into owner-signed D09")
+    print("· bound Charter/System/Pareto/Evaluator/Supremacy/Systems hashes into owner-signed D09")
 
     visible = os.path.join(ROOT, "benchmark", "observatory-visible-suite.json")
     observatory_harness.build_visible_suite(visible)
@@ -200,6 +202,7 @@ def main(argv=None):
     print("provider pricing: V4-Pro hit=$0.003625/M miss=$0.435/M output=$0.87/M")
     print("mission: zero silent legally-material loss + canonical human/API/linked-data/ELI/public-sector/AI publication")
     print("supremacy: search forest + structural genomes + falsification + recombination + lower-bound/public case required")
+    print("durability: independent crash/corruption/restart/large-rebuild systems arena required")
     print("No DeepSeek/API call was made.")
     return 0
 
