@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Route the authoritative causal E2E through the complete genome-aware localhost provider.
 
-The readable core proof starts ``mock_observatory_protocol_server.py``. Genome-realization and causal
+The readable core proof starts ``mock_observatory_protocol_server.py``. Genome realization and causal
 ablation require the final extension chain in ``mock_observatory_genome_server.py``. This wrapper
-rewrites only that one local-provider command and passes every evaluator, Git and owner-signature
+rewrites only that one localhost-provider command and passes every evaluator, Git and owner-signature
 subprocess through unchanged. Real-provider endpoints are never affected.
 """
 from __future__ import annotations
@@ -12,6 +12,11 @@ import os
 
 import prove_complete_observatory_protocol_causal_hardened as base
 
+PROVIDER_ROUTING_FILE = (
+    "executable-orchestrator/tools/"
+    "prove_complete_observatory_protocol_causal_provider_hardened.py")
+base.CAUSAL_FILES.add(PROVIDER_ROUTING_FILE)
+base.CORE.REQUIRED_PROTOCOL_FILES.add(PROVIDER_ROUTING_FILE)
 _ORIGINAL_POPEN = base.CORE.subprocess.Popen
 
 
