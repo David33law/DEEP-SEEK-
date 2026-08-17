@@ -88,8 +88,8 @@ def main():
             "return base.install(ctx, handlers)"),
             "final audit-v3")
         _require(identity, (
-            'role.startswith("genome-realization-auditor-")',
-            'ticket.rsplit("::", 1)[-1]',
+            'str(role).startswith("genome-realization-auditor-")',
+            'str(ticket).rsplit("::", 1)[-1]',
             '("CANDIDATE ID", candidate_id)',
             "ctx.ask = MethodType(ask, ctx)"),
             "genome candidate-identity binding")
