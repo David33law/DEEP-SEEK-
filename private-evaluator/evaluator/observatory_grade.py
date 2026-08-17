@@ -6,7 +6,7 @@ from collections import defaultdict
 
 DIAGNOSTIC_CLASSES = (
     "PASS", "CANDIDATE_ERROR", "SHAPE_INVALID", "SEMANTIC_MISMATCH",
-    "PROVENANCE_INCOMPLETE", "REPLAY_NONDETERMINISTIC",
+    "PROVENANCE_INCOMPLETE", "PUBLICATION_INCONSISTENT", "REPLAY_NONDETERMINISTIC",
 )
 
 
@@ -46,6 +46,30 @@ def _nonempty(keys, got):
     return all(isinstance(got.get(k), list) and len(got[k]) > 0 for k in keys)
 
 
+def _projection_ok(spec, got):
+    """Verify that declared publication channels are projections of this exact canonical cut."""
+    if not isinstance(got, dict):
+        return False
+    projection = got.get("projection")
+    if not isinstance(projection, dict):
+        return False
+    required_channels = set(spec.get("channels", []))
+    actual_channels = projection.get("channels")
+    if not isinstance(actual_channels, list) or not required_channels.issubset(set(actual_channels)):
+        return False
+    for key in ("canonical_id", "status", "legal_time", "knowledge_time"):
+        expected = spec.get(key)
+        if expected is not None and projection.get(key) != expected:
+            return False
+    # Canonical id/status in the projection must also agree with the authoritative top-level
+    # publication result, so a channel manifest can never describe a second legal truth.
+    if projection.get("canonical_id") != got.get("canonical_id"):
+        return False
+    if projection.get("status") != got.get("status"):
+        return False
+    return True
+
+
 def grade_session(scenario, responses):
     """Return measured dimension scores and per-step diagnostics."""
     steps = scenario["steps"]
@@ -83,6 +107,8 @@ def grade_session(scenario, responses):
             cls, detail = "SEMANTIC_MISMATCH", f"required jurisprudence link {step['link']!r}"[:500]
         if cls == "PASS" and step.get("nonempty") and not _nonempty(step["nonempty"], got):
             cls, detail = "SEMANTIC_MISMATCH", f"expected nonempty {step['nonempty']!r}"
+        if cls == "PASS" and step.get("projection_required") and not _projection_ok(step["projection_required"], got):
+            cls, detail = "PUBLICATION_INCONSISTENT", "publication channels do not preserve one canonical id/status/time cut"
 
         if step.get("pair") and cls == "PASS":
             if not isinstance(got, dict) or not isinstance(got.get("state_root"), str) or not got.get("state_root"):
