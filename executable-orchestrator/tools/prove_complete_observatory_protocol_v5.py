@@ -2,7 +2,7 @@
 """Authoritative protocol-v5 proof with causal controlled-genome realization.
 
 Runs portable-owner static closure, causal static closure and then the causal-hardened production-
-container E2E proof through the complete genome-aware localhost provider. The E2E still uses the real
+container E2E proof through the complete causal-aware localhost provider. The E2E still uses the real
 runner/state-machine/API shape, performs crash/resume and every owner gate, and makes zero real
 provider calls.
 """
@@ -49,8 +49,10 @@ CAUSAL_STATIC_GATES = (
     "auditor_specific_definition_set_ablation",
     "inert_negative_controls_required",
     "exact_mutated_source_receipts_required",
+    "infrastructure_failure_exclusion_verified",
     "causal_dossier_direct_indexing_required",
     "genome_aware_local_provider_verified",
+    "causal_aware_local_provider_verified",
     "authoritative_causal_e2e_verified",
 )
 
@@ -125,7 +127,8 @@ def main(argv=None):
         report["authoritative_entrypoint"] = (
             "prove_complete_observatory_protocol_v5.py")
         report["causal_genome_ablation_bound"] = True
-        report["genome_aware_local_provider_used"] = True
+        report["causal_aware_local_provider_used"] = True
+        report["infrastructure_failure_cannot_earn_causal_credit"] = True
         with open(E2E_REPORT, "w", encoding="utf-8") as handle:
             json.dump(report, handle, ensure_ascii=False,
                       indent=1, sort_keys=True)
