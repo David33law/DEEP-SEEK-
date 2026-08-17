@@ -1,9 +1,4 @@
-"""Apply the owner-signed Observatory workload policy to evaluator overlays.
-
-Production constants come from ``observatory_protocol.PRODUCTION_WORKLOADS``. The reduced profile is
-available only when the local zero-cost proof process explicitly sets OBSERVATORY_ZERO_COST_PROOF=1;
-the launcher separately refuses that environment on any non-local provider endpoint.
-"""
+"""Apply the owner-signed Observatory workload policy to evaluator overlays."""
 from . import observatory_distributed_overlay as distributed
 from . import observatory_formal_overlay as formal
 from . import observatory_interoperability_overlay as interoperability
@@ -35,23 +30,25 @@ def snapshot():
         "distributed": {
             "qualification": distributed.DISTRIBUTED_QUAL_EVENTS,
             "replication": distributed.DISTRIBUTED_REPLICATION_EVENTS,
-            "crown": distributed.DISTRIBUTED_CROWN_EVENTS,
-        },
+            "crown": distributed.DISTRIBUTED_CROWN_EVENTS},
         "scale": {
             "qualification": scale.SCALE_QUAL_EVENTS,
             "replication": scale.SCALE_REPLICATION_EVENTS,
             "crown": scale.SCALE_CROWN_EVENTS,
             "partitions": scale.SCALE_PARTITIONS,
-            "batch": scale.SCALE_BATCH,
-        },
+            "batch": scale.SCALE_BATCH},
         "formal": {
             "qualification_depth": formal.FORMAL_QUAL_DEPTH,
             "replication_depth": formal.FORMAL_REPLICATION_DEPTH,
-            "crown_depth": formal.FORMAL_CROWN_DEPTH,
-        },
+            "crown_depth": formal.FORMAL_CROWN_DEPTH},
         "interoperability": {
             "qualification_cases": interoperability.QUAL_CASES,
             "replication_cases": interoperability.REPLICATION_CASES,
-            "crown_cases": interoperability.CROWN_CASES,
-        },
-    }
+            "crown_cases": interoperability.CROWN_CASES},
+        "cross_model": {
+            "qualification_histories": protocol.workload(
+                "cross_model", "qualification_histories"),
+            "replication_histories": protocol.workload(
+                "cross_model", "replication_histories"),
+            "crown_histories": protocol.workload(
+                "cross_model", "crown_histories")}}
