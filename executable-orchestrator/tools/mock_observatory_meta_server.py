@@ -2,10 +2,10 @@
 """Contract-rich extension of the zero-cost Observatory mock.
 
 The base mock continues to exercise existing production roles. This wrapper adds responses for
-mechanical coverage, meta-search, taxonomy consensus, authoritative prior-art challenge and
-independent dry-wave closure. It deliberately injects one controlled ``other`` claim through G96
-and one prior-art-derived architecture challenger. It proves control flow and schema binding, never
-architecture quality or third-party endorsement.
+diverse implementation search, semantic revision, mechanical coverage, meta-search, taxonomy
+consensus, authoritative prior-art challenge and independent dry-wave closure. It deliberately
+injects one controlled ``other`` claim through G96 and one prior-art-derived architecture challenger.
+It proves control flow and schema binding, never architecture quality or third-party endorsement.
 """
 import importlib.util
 import json
@@ -113,6 +113,23 @@ def ontology_lineage(prompt):
             "the taxonomy adjudicators must determine whether it is merely the existing hybrid class."),
     }
     return obj
+
+
+def implementation_variant(role):
+    suffix = re.sub(r"[^A-Za-z0-9_-]+", "-", role)
+    source = base.reference_source() + (
+        "\n\n# zero-cost implementation-search variant: " + suffix + "\n"
+        "def _implementation_search_variant_marker():\n"
+        f"    return {suffix!r}\n")
+    return {
+        "candidate_id": "MOCK-DIVERSE",
+        "family": "mock-diverse-implementation",
+        "mechanism": "architecture-preserving independent implementation",
+        "rationale": (
+            "The control proof needs behaviorally equivalent but source-distinct implementations so "
+            "the production diversity and selection path is mechanically exercised."),
+        "files": [{"path": "candidate.py", "content": source}],
+    }
 
 
 def meta_critic(prompt, tag):
@@ -246,6 +263,9 @@ def closure_auditor(prompt, tag):
 def answer(prompt):
     role_match = re.search(r"^ROLE:\s*(.+)$", prompt, re.M)
     role = role_match.group(1).strip() if role_match else "unknown"
+    if role.startswith("implementation-diversity-") \
+            or role == "semantic-implementation-reviser":
+        return implementation_variant(role)
     if role == "architecture-search-independent" and base.context_text(prompt, "targeted obligations"):
         return targeted_lineage(prompt)
     if role == "architecture-search-independent" and re.search(
