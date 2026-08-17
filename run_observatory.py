@@ -35,6 +35,7 @@ from lawmax21.budget import BudgetLedger  # noqa: E402
 from lawmax21.client import Client, HttpTransport  # noqa: E402
 from lawmax21.eventlog import EventLog, LogTampered  # noqa: E402
 from lawmax21.signing import generate_private, load_private, load_public  # noqa: E402
+from lawmax21.canonical import sha256_file  # noqa: E402
 from lawmax21 import states as states_module  # noqa: E402
 
 PROFILE = profiles.resolve("national-observatory")
@@ -45,13 +46,9 @@ OBSERVATORY_REQUEST_DEFAULTS = {
     "reasoning_effort": "max",
 }
 OBSERVATORY_DEFAULT_MAX_TOKENS = 384000
-# V4-Pro/MAX calls can legitimately run for minutes. Production therefore waits rather than
-# treating a long inference as a transport failure, and it never automatically re-POSTs an
-# ambiguous request. DeepSeek does not document an idempotency key for /chat/completions; a
-# timeout after the provider accepted a request could otherwise turn one signed budget action
-# into multiple provider charges. Local proof still exercises the same one-attempt path.
 OBSERVATORY_HTTP_TIMEOUT_SECONDS = 1800
 OBSERVATORY_TECHNICAL_RETRIES = 1
+REQUIRED_PUBLICATION_CHANNELS = {"human", "api", "linked_data", "eli", "public_sector", "ai"}
 
 
 def _is_local_endpoint(endpoint):
@@ -90,12 +87,41 @@ def _validate_signed_provider_budget(D, model):
     return schedule
 
 
+def _validate_signed_mission(D, root):
+    mission = D.d.get("D09_ROW0_TARGET")
+    if not isinstance(mission, dict):
+        raise observatory_preflight.PreflightFailed(
+            "Observatory D09 must be the structured signed mission binding")
+    if mission.get("all_twelve_layers_required") is not True:
+        raise observatory_preflight.PreflightFailed("signed D09 does not require all twelve layers")
+    if mission.get("no_silent_legally_material_loss") is not True:
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 does not forbid silent legally-material loss")
+    if not REQUIRED_PUBLICATION_CHANNELS.issubset(set(mission.get("publication_channels") or [])):
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 does not bind all required national publication channels")
+
+    profile = os.path.join(root, "profiles", "national-observatory")
+    expected = {
+        "charter_sha256": sha256_file(os.path.join(profile, "OBJECTIVE-CHARTER.md")),
+        "master_system_sha256": sha256_file(os.path.join(profile, "MASTER-SYSTEM-PROMPT.md")),
+        "pareto_sha256": sha256_file(os.path.join(profile, "PARETO-DIMENSIONS.json")),
+        "evaluator_contract_sha256": sha256_file(os.path.join(profile, "EVALUATOR-CONTRACT.md")),
+    }
+    drift = [k for k, v in expected.items() if mission.get(k) != v]
+    if drift:
+        raise observatory_preflight.PreflightFailed(
+            "signed D09 mission contract has drifted from current files: " + ", ".join(drift))
+    return mission
+
+
 def observatory_build_context(root, runtime, run_id, mode, endpoint, model, key_env, backend,
                               canonical_repo, corpus_root, run_key_path):
     P = observatory_paths(root, runtime)
     owner_pub = load_public(P["owner_pub"])
     D = dec.load(P["decisions"], owner_pub, run_id)
     schedule = _validate_signed_provider_budget(D, model)
+    _validate_signed_mission(D, root)
 
     run_key = load_private(run_key_path) if os.path.exists(run_key_path) else generate_private(run_key_path)
     log = EventLog(os.path.join(runtime, "state", "events.jsonl"), signer=run_key)
@@ -132,7 +158,14 @@ def install_overlay():
     base._paths = observatory_paths
     base.build_context = observatory_build_context
     base.preflight.run = observatory_preflight.run
+    # Profile-local rich schemas. This process is the Observatory launcher; ordinary LAWMAX
+    # processes continue to import the historical schemas untouched.
     roles.PROPOSAL_SCHEMA = observatory_roles.PROPOSAL_SCHEMA
+    roles.BUILD_SCHEMA = observatory_roles.BUILD_SCHEMA
+    roles.CEILING_SCHEMA = observatory_roles.CEILING_SCHEMA
+    roles.SYNTHESIS_SCHEMA = observatory_roles.SYNTHESIS_SCHEMA
+    roles.MIGRATION_SCHEMA = observatory_roles.MIGRATION_SCHEMA
+    roles.AUDIT_SCHEMA = observatory_roles.AUDIT_SCHEMA
 
 
 def main(argv=None):
@@ -187,6 +220,7 @@ def main(argv=None):
                     "owner public key missing; run setup_observatory.py before production preflight")
             D = dec.load(P["decisions"], pub, a.run_id)
             schedule = _validate_signed_provider_budget(D, a.model)
+            mission = _validate_signed_mission(D, ROOT)
             report = observatory_preflight.run(
                 ROOT, ORCH, a.runtime, require_vault=True, owner_public=pub, backend=a.backend)
             report["signed_provider_budget"] = {
@@ -196,6 +230,7 @@ def main(argv=None):
                 "price_schedule": schedule,
                 "decisions_sha256": D.sha256(),
             }
+            report["signed_mission"] = mission
         except (observatory_preflight.PreflightFailed, dec.DecisionsRejected) as exc:
             print(str(exc))
             return base.EXIT_PREFLIGHT
