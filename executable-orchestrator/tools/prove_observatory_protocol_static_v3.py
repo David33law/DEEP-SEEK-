@@ -3,11 +3,11 @@
 
 This proof is independent of the runtime tournament. It first executes the inherited complete static
 proof, then verifies the protocol-v5 additions as one connected, owner-bindable mechanism: strict
-one-file source generation, independently diversified genome auditors, exact source-bound semantic
-and specialized evaluator receipts, executable controlled-genome realization, phase-aware hard
-gates, an unbounded real-provider round policy with stagnation escalation, final overlay order, the
-canonical localhost provider and the authoritative v5 E2E entrypoint. It compiles/imports code but
-makes no provider call and executes no candidate.
+one-file source generation, independently diversified and citation-map-independent genome auditors,
+exact source-bound semantic and specialized evaluator receipts, executable controlled-genome
+realization, phase-aware hard gates, an unbounded real-provider round policy with stagnation
+escalation, final overlay order, the canonical localhost provider and the authoritative v5 E2E
+entrypoint. It compiles/imports code but makes no provider call and executes no candidate.
 """
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ REQUIRED_MODULES = (
     "lawmax21.observatory_semantic_evidence_binding_hardening",
     "lawmax21.observatory_genome_realization_overlay",
     "lawmax21.observatory_genome_evidence_binding_hardening",
+    "lawmax21.observatory_genome_cross_auditor_hardening",
     "lawmax21.observatory_phase_gate_hardening",
     "lawmax21.observatory_preflight_v5",
 )
@@ -40,6 +41,7 @@ REQUIRED_FILES = {
     "executable-orchestrator/lawmax21/observatory_semantic_evidence_binding_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_realization_overlay.py",
     "executable-orchestrator/lawmax21/observatory_genome_evidence_binding_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_genome_cross_auditor_hardening.py",
     "executable-orchestrator/tools/mock_observatory_protocol_server.py",
     "executable-orchestrator/tools/prove_observatory_protocol_static_v3.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol.py",
@@ -102,6 +104,7 @@ def main() -> int:
         from lawmax21 import observatory_genome_realization_overlay as genome
         from lawmax21 import observatory_genome_evidence_binding_hardening as evidence_binding
         from lawmax21 import observatory_genome_auditor_diversity_hardening as auditor_diversity
+        from lawmax21 import observatory_genome_cross_auditor_hardening as cross_auditor
         from lawmax21 import observatory_semantic_evidence_binding_hardening as semantic_binding
         from lawmax21 import observatory_phase_gate_hardening as phase
         from lawmax21 import observatory_preflight_v2 as preflight_core
@@ -182,6 +185,9 @@ def main() -> int:
                     "genome-realization-auditor-B"]["temperature"] != 0.35:
             raise RuntimeError(
                 "genome auditors no longer use distinct inference profiles")
+        if cross_auditor.MIN_DIFFERING_AXIS_MAPS != 4:
+            raise RuntimeError(
+                "cross-auditor citation-map independence threshold drifted")
         if not callable(getattr(semantic_binding, "install", None)):
             raise RuntimeError(
                 "semantic source-binding hardening is not installable")
@@ -244,6 +250,7 @@ def main() -> int:
             "observatory_scale_hardening.install",
             "observatory_cross_model_workload_hardening.install",
             "observatory_genome_evidence_binding_hardening.install",
+            "observatory_genome_cross_auditor_hardening.install",
             "observatory_prior_art_hardening_overlay.install",
             "base.install",
             "observatory_cross_model_overlay.install",
@@ -298,6 +305,17 @@ def main() -> int:
                 raise RuntimeError(
                     "genome evidence binding lacks: " + token)
 
+        cross_source = _text(
+            "executable-orchestrator/lawmax21/"
+            "observatory_genome_cross_auditor_hardening.py")
+        for token in (
+                "MIN_DIFFERING_AXIS_MAPS = 4",
+                "auditor_citation_maps_independent",
+                "genome._audit = audit"):
+            if token not in cross_source:
+                raise RuntimeError(
+                    "cross-auditor hardening lacks: " + token)
+
         provider = _text(
             "executable-orchestrator/tools/"
             "mock_observatory_protocol_server.py")
@@ -345,6 +363,8 @@ def main() -> int:
                 "executable-orchestrator/lawmax21/"
                 "observatory_genome_evidence_binding_hardening.py",
                 "executable-orchestrator/lawmax21/"
+                "observatory_genome_cross_auditor_hardening.py",
+                "executable-orchestrator/lawmax21/"
                 "observatory_semantic_evidence_binding_hardening.py",
                 "executable-orchestrator/tools/"
                 "mock_observatory_protocol_server.py"):
@@ -355,10 +375,11 @@ def main() -> int:
                 "unbounded_production_rounds_required",
                 "stagnation_escalates_search_required",
                 'mission.get("production_max_rounds") != 0',
-                'round_policy.get("unbounded") is not True'):
+                'round_policy.get("unbounded") is not True',
+                "auditor_citation_maps_independent"):
             if token not in hardened:
                 raise RuntimeError(
-                    "hardened E2E does not prove round policy: " + token)
+                    "hardened E2E does not prove final policy: " + token)
 
         stable = _text(
             "executable-orchestrator/tools/run_observatory_proof.py")
@@ -383,6 +404,7 @@ def main() -> int:
             "semantic_source_receipts_bound": True,
             "source_bound_evidence_required": True,
             "auditor_inference_diversity_required": True,
+            "cross_auditor_citation_independence_required": True,
             "unbounded_production_rounds_bound": True,
             "stagnation_escalation_bound": True,
             "final_overlay_order_verified": True,
