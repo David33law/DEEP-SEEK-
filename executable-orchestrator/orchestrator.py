@@ -11,7 +11,9 @@ is the same code that runs against DeepSeek.
 
 The escalation loop is the shape of the run: propose, build, measure, attack, and only
 stop when a ceiling has been PROVEN. Stopping for budget or time is allowed, and it
-produces BEST_DISCOVERED_SO_FAR — never COMMITTED.
+produces BEST_DISCOVERED_SO_FAR — never COMMITTED. A max-rounds value of zero means
+there is no round cap; stagnation in the National Observatory escalates search rather
+than being misreported as a terminal ceiling.
 """
 import argparse
 import json
@@ -98,6 +100,24 @@ def build_context(root, runtime, run_id, mode, endpoint, model, key_env, backend
     return ctx, machine, log, ledger, D
 
 
+def _record_stagnation_escalation(ctx, round_number, exc):
+    """Persist stagnation as a search signal, never as proof that the ceiling was reached."""
+    if not hasattr(ctx.esc, "s"):
+        return
+    signals = ctx.esc.s.setdefault("stagnation_signals", [])
+    row = {
+        "round": int(round_number),
+        "reason": str(exc),
+        "response": "continue-successor-radical-novelty-meta-search",
+        "utc": utc(),
+    }
+    if not signals or signals[-1] != row:
+        signals.append(row)
+    flush = getattr(ctx.esc, "_flush", None)
+    if callable(flush):
+        flush()
+
+
 def run(root, runtime, run_id, mode, endpoint, model, key_env, backend, canonical_repo,
         corpus_root, max_rounds, crash_after=None, skip_preflight_vault=False):
     os.makedirs(runtime, exist_ok=True)
@@ -111,6 +131,8 @@ def run(root, runtime, run_id, mode, endpoint, model, key_env, backend, canonica
         root, runtime, run_id, mode, endpoint, model, key_env, backend,
         canonical_repo, corpus_root, os.path.join(P["secrets"], f"RUN-{run_id}.key"))
 
+    if not isinstance(max_rounds, int) or max_rounds < 0:
+        raise ValueError("max_rounds must be zero (unbounded) or a positive integer")
     started = time.monotonic()
     deadline = started + D.budget["wall_clock_days"] * 86400
     done = 0
@@ -134,8 +156,10 @@ def run(root, runtime, run_id, mode, endpoint, model, key_env, backend, canonica
                     cont, why = ctx.esc.must_continue()
                     if rs >= 1 and not cont:
                         break                       # ceiling proven → exit to TAIL via HESA
-                    if rs >= max_rounds:
-                        ctx.esc.stop("round-ceiling")
+                    # Zero is an explicit unbounded policy. A finite cap remains a resource
+                    # backstop and can produce only BEST_DISCOVERED_SO_FAR.
+                    if max_rounds > 0 and rs >= max_rounds:
+                        ctx.esc.stop("round-resource-backstop")
                         break
                     if time.monotonic() > deadline:
                         ctx.esc.stop("wall-clock")
@@ -159,8 +183,14 @@ def run(root, runtime, run_id, mode, endpoint, model, key_env, backend, canonica
                         if ctx.frontier.non_dominated() else 0.0,
                         D.thresholds["progress_min_delta"], D.thresholds["max_stagnant_windows"])
                 except StagnationDetected as e:
-                    ctx.esc.stop(f"stagnation: {e}")
-                    break
+                    # For the National Observatory, stagnant scalar score is a trigger for wider
+                    # structural search, not a terminal condition. Novelty/meta/closure still decide
+                    # whether the attainable design space is dry.
+                    if getattr(ctx, "profile_id", "") == "national-observatory":
+                        _record_stagnation_escalation(ctx, ctx.round, e)
+                    else:
+                        ctx.esc.stop(f"stagnation: {e}")
+                        break
 
         _, done = machine.run_linear(TAIL, crash_after=crash_after, done=done)
 
@@ -212,7 +242,8 @@ def main(argv=None):
                                                                os.path.join(ROOT, "evidence-vault", "lawmax-current")))
     ap.add_argument("--corpus-root", default=None,
                     help="what the model must demonstrably read (default: the immutable package)")
-    ap.add_argument("--max-rounds", type=int, default=4)
+    ap.add_argument("--max-rounds", type=int, default=4,
+                    help="0 means unbounded; a positive value is only a resource backstop")
     ap.add_argument("--crash-after", type=int, default=None, help="crash-safety drill")
     ap.add_argument("--allow-incomplete-vault", action="store_true",
                     help="preflight only; recorded in the report and never allowed for a real launch")
