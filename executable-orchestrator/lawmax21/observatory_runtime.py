@@ -2,13 +2,17 @@
 
 It inherits generic persistence, model-call, worktree and candidate-install machinery from the
 LAWMAX Context, but constructs its own frontier/escalation objects BEFORE resume state is loaded.
+Observatory model calls deliberately transmit the COMPLETE response schema: the historical shared
+Context truncated schema hints to 6K characters, which is incompatible with supremacy-search
+schemas and could make a correct rich response locally unparseable for rules the model never saw.
 """
 import hashlib
+import json
 import os
 import subprocess
 import sys
 
-from .canonical import read_json
+from .canonical import canonical_bytes, read_json, sha256_bytes
 from .frontier import Frontier
 from .handlers import Context as BaseContext, A
 from .patch import WorktreeManager
@@ -32,8 +36,6 @@ class ObservatoryContext(BaseContext):
     def __init__(self, root, runtime, run_id, client, ledger, log, decisions, owner_public,
                  evaluator_dir, bank_dir, key_path, canonical_repo, suite_path, backend,
                  mode, corpus_root, profile, cp1_evidence, prior_cp2):
-        # Mirror BaseContext's field contract without calling its constructor: the base
-        # constructor would instantiate LAWMAX dimensions/escalation before profile resume.
         self.mode = mode
         self.corpus_root = corpus_root
         self.root = root
@@ -82,6 +84,24 @@ class ObservatoryContext(BaseContext):
         _, self._sealed_rels = sealed.partition(root)
         self._sealed_fp = sealed.fingerprints(root, self._sealed_rels)
         self._load_arena()
+
+    # ---------------------------------------------------------------- model call
+    def ask(self, role, ticket, task, context_blocks, schema, line="main", temperature=0.0):
+        """Observatory-specific call seat with a COMPLETE schema hint.
+
+        Identity/accounting/sealed-evidence semantics remain the same as BaseContext.ask(). Only
+        the historical 6K schema truncation is removed. With a 1M-context V4-Pro research model,
+        hiding validator requirements from the model is an avoidable source of paid-call failure.
+        """
+        from . import roles, sealed
+        ctx_sha = sha256_bytes(canonical_bytes([list(b) for b in context_blocks]))
+        schema_hint = json.dumps(schema, ensure_ascii=False)
+        prompt = roles.build_prompt(role, task, context_blocks, schema_hint)
+        sealed.assert_clean(prompt, self._sealed_fp, where=f"builder prompt for {role}")
+        lid, obj, replayed, usage = self.client.call(
+            role, ticket, ctx_sha, [{"role": "user", "content": prompt}],
+            response_schema=schema, line=line, temperature=temperature)
+        return lid, obj, replayed, usage
 
     def credit_integration_if_attested(self):
         return False
@@ -154,8 +174,6 @@ class ObservatoryContext(BaseContext):
             demo.append("L10")
         if self._ge(s, "replay_determinism", 1.0) and self._ge(s, "recovery_success", 1.0):
             demo.append("L11")
-        # L12 is deliberately withheld here. It is awarded only by the independent runtime
-        # extension probe in measure_evolvability().
         return demo
 
     def screen_axioms(self, cid, hidden_rep):
@@ -198,8 +216,6 @@ class ObservatoryContext(BaseContext):
         dims["trusted_kernel_complexity"] = self.obs_harness.source_complexity(c["source"])
         dims["external_model_dependence"] = 0.0
         dims["migration_cost"] = float(min(4, max(1, len(c.get("files_written", [])))))
-        # Compatibility alias used by the shared progress window. It is NOT in the Observatory
-        # Pareto manifest, so it cannot affect dominance.
         dims["legal_capability"] = float(dims.get(self.profile.primary_dimension, 0.0))
         return dims
 
@@ -217,9 +233,6 @@ class ObservatoryContext(BaseContext):
         return field
 
     def measure_evolvability(self, cid):
-        """Runtime extension without editing candidate.py: the evaluator registers a fresh,
-        run-specific change type and checks that apply_change dispatches it through the new
-        handler. This is a mechanical plugin/growth test, not a source-code heuristic."""
         c = self.candidates[cid]
         seed = hashlib.sha256(f"obs-extension|{self.run_id}|{cid}".encode()).hexdigest()
         kind = "EXT_" + seed[:16].upper()
