@@ -3,9 +3,10 @@
 
 The inherited proof still owns exact-clone setup, owner ceremony, production-container isolation,
 crash/resume, owner gates, every architecture arena, novelty closure, terminal-negative proof,
-portable owner-signature verification and the deterministic supremacy dossier. This extension adds
-independent verification of every replication/crown causal mutant, inert negative control and exact
-source/evaluator receipt. It never contacts the real provider.
+portable owner-signature verification and the deterministic supremacy dossier. This extension
+independently reopens every replication/crown mutant and inert control, verifies exact source and
+process receipts, excludes infrastructure failures, and requires each destructive result to be
+attributed to the controlled axis for which it was cited. It never contacts the real provider.
 """
 from __future__ import annotations
 
@@ -20,9 +21,15 @@ CAUSAL_CONDITIONS = {
     "genome_causal_ablation_crown_passed",
 }
 CAUSAL_FILES = {
+    "executable-orchestrator/lawmax21/observatory_audit_v3.py",
+    "executable-orchestrator/lawmax21/observatory_genome_realization_hardening.py",
     "executable-orchestrator/lawmax21/observatory_genome_causal_ablation_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_causal_failure_classification_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_causal_axis_attribution_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_audit_hardening.py",
     "executable-orchestrator/lawmax21/observatory_causal_dossier_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_evaluator_routing_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_formal_streaming_routing.py",
     "executable-orchestrator/tools/prove_observatory_protocol_static_v5.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_causal_hardened.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_v5.py",
@@ -120,7 +127,25 @@ def _verify_causal_campaign(runtime, incumbent, label):
         if os.path.getsize(source_path) < 20:
             raise RuntimeError(
                 f"causal genome {label} {kind}: mutant source is implausibly small")
+        artifact = row.get("artifact")
+        diagnostics = row.get("diagnostics") or {}
+        if artifact != "semantic":
+            if not isinstance(persisted.get("evaluator_returncode"), int):
+                raise RuntimeError(
+                    f"causal genome {label} {kind}: specialized process receipt is absent")
+            if diagnostics.get("infrastructure_failure_excluded") is not True \
+                    or diagnostics.get("candidate_source_receipt_verified") is not True:
+                raise RuntimeError(
+                    f"causal genome {label} {kind}: infrastructure/source classification absent")
+            expected_origin = (
+                "none-control-passed" if kind == "negative-control"
+                else "candidate")
+            if diagnostics.get("failure_origin") != expected_origin:
+                raise RuntimeError(
+                    f"causal genome {label} {kind}: wrong failure origin")
+        return persisted
 
+    specialized_witnesses = 0
     for control in controls:
         if control.get("control_passed") is not True \
                 or control.get("observed_candidate_pass") is not True \
@@ -128,16 +153,28 @@ def _verify_causal_campaign(runtime, incumbent, label):
             raise RuntimeError(
                 f"causal genome {label}: inert negative control failed")
         verify_execution(control, "negative-control")
+        if control.get("artifact") != "semantic":
+            specialized_witnesses += 1
+    attributed = 0
     for task in tasks:
+        attribution = task.get("attribution") or {}
         if task.get("auditor_id") not in auditors \
                 or not task.get("axis") \
                 or not task.get("group") \
                 or not task.get("renamed_definitions") \
                 or task.get("causal_failure_observed") is not True \
-                or task.get("observed_candidate_pass") is not False:
+                or task.get("observed_candidate_pass") is not False \
+                or task.get("axis_specific_failure_attributed") is not True \
+                or not attribution.get("mode"):
             raise RuntimeError(
-                f"causal genome {label}: load-bearing task did not falsify")
+                f"causal genome {label}: load-bearing task lacks axis attribution")
         verify_execution(task, "ablation")
+        attributed += 1
+        if task.get("artifact") != "semantic":
+            specialized_witnesses += 1
+    if attributed != len(tasks):
+        raise RuntimeError(
+            f"causal genome {label}: not every task was axis-attributed")
     return {
         "genome_report_path": genome_relative,
         "genome_report_sha256": CORE.sha256_file(genome_path),
@@ -145,7 +182,9 @@ def _verify_causal_campaign(runtime, incumbent, label):
         "causal_report_sha256": receipt["sha256"],
         "auditors": auditors,
         "tasks": len(tasks),
+        "axis_specific_failure_attributions": attributed,
         "negative_controls": len(controls),
+        "specialized_process_witnesses": specialized_witnesses,
         "verified_axis_count": causal["verified_axis_count"],
         "verified_auditor_axis_group_obligations": causal[
             "verified_auditor_axis_group_obligations"],
@@ -181,8 +220,8 @@ def _verify(repo, runtime, source_head, preflight, launch):
             raise RuntimeError("terminal causal condition failed: " + key)
     incumbent = verified["incumbent"]
     campaigns = {
-        label: _verify_causal_campaign(runtime, incumbent, label)
-        for label in ("replication", "crown")}
+        phase: _verify_causal_campaign(runtime, incumbent, phase)
+        for phase in ("replication", "crown")}
 
     audit = verified["audit"]
     controlled = (audit.get("campaigns") or {}).get(
@@ -208,15 +247,15 @@ def _verify(repo, runtime, source_head, preflight, launch):
         row.get("path"): row
         for row in dossier.get("evidence_index") or []
         if isinstance(row, dict) and row.get("path")}
-    for label, campaign in campaigns.items():
-        receipt = causal_dossier.get(label) or {}
+    for phase, campaign in campaigns.items():
+        receipt = causal_dossier.get(phase) or {}
         if receipt.get("status") != "PASS" \
                 or receipt.get("evidence_path") != campaign[
                     "causal_report_path"] \
                 or receipt.get("evidence_sha256") != campaign[
                     "causal_report_sha256"]:
             raise RuntimeError(
-                f"supremacy dossier does not bind causal {label} campaign")
+                f"supremacy dossier does not bind causal {phase} campaign")
         for relative in (
                 campaign["genome_report_path"],
                 campaign["causal_report_path"]):
@@ -224,7 +263,7 @@ def _verify(repo, runtime, source_head, preflight, launch):
             path = _runtime_path(runtime, relative)
             if not row or row.get("sha256") != CORE.sha256_file(path):
                 raise RuntimeError(
-                    f"supremacy dossier evidence index omits causal {label}: "
+                    f"supremacy dossier evidence index omits causal {phase}: "
                     + relative)
     if (dossier.get("search_closure") or {}).get(
             "causal_genome_replication") != "PASS" \
@@ -234,6 +273,8 @@ def _verify(repo, runtime, source_head, preflight, launch):
             "supremacy dossier causal closure summary is incomplete")
 
     verified["causal_genome_ablation_verified"] = campaigns
+    verified["axis_specific_causal_attribution_verified"] = True
+    verified["infrastructure_failure_exclusion_reverified"] = True
     return verified
 
 
