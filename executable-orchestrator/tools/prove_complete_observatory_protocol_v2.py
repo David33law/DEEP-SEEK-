@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Final proof entrypoint: extended static proof followed by hardened full v4 E2E."""
+"""Final proof entrypoint: protocol-v5 static proof followed by hardened full v5 E2E."""
 import json
 import os
 import subprocess
@@ -12,30 +12,48 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 STATIC = os.path.join(HERE, "prove_observatory_protocol_static_v2.py")
 STATIC_REPORT = os.path.join(ROOT, "proof", "observatory-protocol-static.json")
 E2E_REPORT = os.path.join(ROOT, "proof", "complete-observatory-protocol-e2e.json")
+PROTOCOL = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5"
 
 
 def main(argv=None):
-    result = subprocess.run([sys.executable, STATIC], capture_output=True,
-                            text=True, timeout=1800,
-                            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+    result = subprocess.run(
+        [sys.executable, STATIC],
+        capture_output=True,
+        text=True,
+        timeout=1800,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
     if result.returncode != 0:
-        print(result.stdout); print(result.stderr, file=sys.stderr)
+        print(result.stdout)
+        print(result.stderr, file=sys.stderr)
         return result.returncode
     static = json.load(open(STATIC_REPORT, encoding="utf-8"))
-    if static.get("status") != "PASS" or static.get("final_static_extension") != "PASS":
-        print(json.dumps(static, ensure_ascii=False, indent=1)); return 1
+    required = (
+        static.get("status") == "PASS"
+        and static.get("final_static_extension") == "PASS"
+        and static.get("protocol_version") == PROTOCOL
+        and static.get("executable_genome_realization_bound") is True
+        and static.get("genome_realization_routing_verified") is True)
+    if not required:
+        print(json.dumps(static, ensure_ascii=False, indent=1))
+        return 1
     code = base.main(argv)
     if os.path.isfile(E2E_REPORT):
         e2e = json.load(open(E2E_REPORT, encoding="utf-8"))
         e2e["static_protocol_proof"] = {
             "status": static.get("status"),
             "final_static_extension": static.get("final_static_extension"),
+            "protocol_version": static.get("protocol_version"),
+            "executable_genome_realization_bound": static.get(
+                "executable_genome_realization_bound"),
+            "genome_realization_routing_verified": static.get(
+                "genome_realization_routing_verified"),
             "protocol_bundle_sha256": static.get("protocol_bundle_sha256"),
             "protocol_files": static.get("protocol_files"),
             "python_files_compiled": static.get("python_files_compiled"),
             "report_sha256": base.sha256_file(STATIC_REPORT)}
         with open(E2E_REPORT, "w", encoding="utf-8") as handle:
-            json.dump(e2e, handle, ensure_ascii=False, indent=1, sort_keys=True)
+            json.dump(e2e, handle, ensure_ascii=False,
+                      indent=1, sort_keys=True)
     return code
 
 
