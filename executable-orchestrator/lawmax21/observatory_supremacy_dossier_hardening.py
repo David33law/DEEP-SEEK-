@@ -3,11 +3,13 @@
 The crown/search dossier is incomplete if it can be detached from the exact CP1 target, pre-frontier
 CP2 quarantine, hidden-bank commitment, signed event log, budget ledger or owner-gate subjects. This
 wrapper extends the deterministic dossier builder before its handler is installed, verifies those
-facts mechanically and hashes the exact persisted bytes into the same evidence index.
+facts mechanically and hashes immutable snapshots of the exact persisted bytes into the same evidence
+index.
 """
 from __future__ import annotations
 
 import os
+import tempfile
 
 from . import observatory_supremacy_dossier_overlay as dossier
 from .canonical import atomic_write_json, read_json
@@ -24,6 +26,35 @@ def _add(ctx, path, label, rows, parsed, require_pass=False):
     rows.append(row)
     parsed[label] = obj
     return row, obj
+
+
+def _snapshot_bytes(source, destination):
+    """Create an atomic immutable receipt for bytes that will legitimately change later."""
+    source = os.path.abspath(source)
+    destination = os.path.abspath(destination)
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+    with open(source, "rb") as handle:
+        payload = handle.read()
+    fd, temporary = tempfile.mkstemp(
+        prefix=".signed-log-snapshot-", dir=os.path.dirname(destination))
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, destination)
+        try:
+            directory_fd = os.open(os.path.dirname(destination), os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except OSError:
+            pass
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return destination
 
 
 def install(_ctx, handlers):
@@ -63,8 +94,15 @@ def install(_ctx, handlers):
             "owner_migration_subject", rows, parsed)
         _add(context, A(context, "budget", "ledger.json"),
              "provider_budget_ledger", rows, parsed)
-        _add(context, A(context, "state", "events.jsonl"),
-             "signed_event_log_before_audit", rows, parsed)
+
+        # The signed log receives the INDEPENDENT_AUDIT and terminal transitions after this handler
+        # returns. Hashing its live path would therefore create a self-invalidating dossier. Snapshot
+        # the already verified pre-audit prefix and hash that immutable receipt instead.
+        live_log = A(context, "state", "events.jsonl")
+        log_snapshot = _snapshot_bytes(
+            live_log, A(context, "audit", "signed-event-log-before-audit.jsonl"))
+        log_row, _ = _add(
+            context, log_snapshot, "signed_event_log_before_audit", rows, parsed)
 
         preflight = parsed["protocol_preflight"] or {}
         if preflight.get("ok") is not True:
@@ -86,6 +124,10 @@ def install(_ctx, handlers):
             raise RuntimeError(
                 "supremacy dossier: signed event log failed verification: "
                 + str(log_reason))
+        with open(live_log, "rb") as live, open(log_snapshot, "rb") as snapshot:
+            if live.read() != snapshot.read():
+                raise RuntimeError(
+                    "supremacy dossier: event-log snapshot differs before audit transition")
         if not context.ledger.within_ceiling():
             raise RuntimeError("supremacy dossier: provider ledger exceeds signed ceiling")
         ledger = parsed["provider_budget_ledger"] or {}
@@ -127,6 +169,8 @@ def install(_ctx, handlers):
             "prior_cp2_quarantined_until_independent_frontier": True,
             "hidden_bank_committed": True,
             "signed_event_log_verified": True,
+            "signed_event_log_snapshot_path": log_row["path"],
+            "signed_event_log_snapshot_sha256": log_row["sha256"],
             "signed_event_log_events_before_audit": event_count,
             "signed_event_log_reason": log_reason,
             "provider_budget_within_owner_ceiling": True,
