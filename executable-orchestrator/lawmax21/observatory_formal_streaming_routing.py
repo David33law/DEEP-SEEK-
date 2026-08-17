@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 from . import observatory_formal_overlay as formal
-from .canonical import read_json
+from .canonical import atomic_write_json, read_json
 from .handlers import A
 
 
@@ -46,6 +46,7 @@ def _run(ctx, cid, perspective, label, depth, candidate_path=None):
     report["candidate_sha256"] = _sha256_file(path)
     report["shared_hidden_corpus_id"] = hashlib.sha256(
         corpus.encode()).hexdigest()
+    atomic_write_json(out, report)
     return report
 
 
