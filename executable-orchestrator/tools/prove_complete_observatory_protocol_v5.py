@@ -48,6 +48,7 @@ CAUSAL_STATIC_GATES = (
     "causal_genome_ablation_bound",
     "auditor_specific_definition_set_ablation",
     "axis_specific_causal_attribution_verified",
+    "failure_scoped_attribution_verified",
     "inert_negative_controls_required",
     "exact_mutated_source_receipts_required",
     "infrastructure_failure_exclusion_verified",
@@ -129,6 +130,7 @@ def main(argv=None):
             "prove_complete_observatory_protocol_v5.py")
         report["causal_genome_ablation_bound"] = True
         report["axis_specific_causal_attribution_bound"] = True
+        report["failure_scoped_causal_attribution_bound"] = True
         report["causal_aware_local_provider_used"] = True
         report["infrastructure_failure_cannot_earn_causal_credit"] = True
         with open(E2E_REPORT, "w", encoding="utf-8") as handle:
