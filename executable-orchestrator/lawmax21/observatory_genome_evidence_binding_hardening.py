@@ -1,16 +1,20 @@
-"""Require every genome-realization evidence citation to bind the exact current source bytes.
+"""Require every genome-realization evidence citation to bind exact current source bytes.
 
-The model-facing auditor may cite only passing candidate reports whose recorded candidate SHA-256
-matches the semantic/systems/distributed/scale/formal/interoperability source census. Generic
-manifests, stale pre-selection reports and failed revisions are removed before prompting and cannot
-satisfy a controlled-axis obligation.
+The auditor may cite only passing reports whose recorded candidate SHA-256 matches the current source
+census. Generic manifests, stale pre-selection reports and failed revisions are removed before the
+prompt. A declaration also fails when all thirteen architecture axes collapse onto a handful of
+generic entrypoints: each auditor must expose a mechanically diverse definition map.
 """
+from collections import Counter
+
 from . import observatory_genome_realization_overlay as genome
 
 
 _REQUIRED = {
     group for groups in genome.REQUIRED_GROUPS.values() for group in groups
 }
+MIN_UNIQUE_DEFINITION_CITATIONS = 8
+MAX_AXES_PER_DEFINITION = 4
 
 
 def _expected(census):
@@ -64,8 +68,14 @@ def install(_ctx, handlers):
         expected = _expected(census)
         by_axis = {
             row.get("axis"): row for row in report.get("axis_reviews") or []}
+        definition_use = Counter()
         for axis, validated_axis in zip(genome.oroles.GENOME_FIELDS, validated):
             row = by_axis[axis]
+            axis_pairs = set()
+            for citation in row.get("source_symbols") or []:
+                pair = (citation.get("artifact"), citation.get("symbol"))
+                axis_pairs.add(pair)
+                definition_use[pair] += 1
             for reference in row.get("evidence_refs") or []:
                 evidence_row = evidence[reference]
                 group = evidence_row.get("group")
@@ -78,6 +88,28 @@ def install(_ctx, handlers):
                         f"{candidate_id}/{axis}: cited evidence is stale or "
                         f"bound to another {group} source")
             validated_axis["source_bound_evidence"] = True
+            validated_axis["distinct_definition_citations"] = len(axis_pairs)
+
+        if len(definition_use) < MIN_UNIQUE_DEFINITION_CITATIONS:
+            raise RuntimeError(
+                f"{candidate_id}: genome auditor collapsed thirteen axes onto only "
+                f"{len(definition_use)} distinct AST definitions; "
+                f"{MIN_UNIQUE_DEFINITION_CITATIONS} required")
+        overused = sorted(
+            f"{artifact}:{symbol}={count}"
+            for (artifact, symbol), count in definition_use.items()
+            if count > MAX_AXES_PER_DEFINITION)
+        if overused:
+            raise RuntimeError(
+                f"{candidate_id}: generic definition citation overuse: "
+                + ", ".join(overused))
+        for validated_axis in validated:
+            validated_axis["auditor_definition_diversity"] = {
+                "unique_definition_citations": len(definition_use),
+                "maximum_axes_per_definition": max(definition_use.values()),
+                "minimum_unique_required": MIN_UNIQUE_DEFINITION_CITATIONS,
+                "maximum_reuse_allowed": MAX_AXES_PER_DEFINITION,
+            }
         return validated
 
     genome._evidence_catalog = evidence_catalog
