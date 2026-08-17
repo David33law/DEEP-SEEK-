@@ -1,13 +1,14 @@
 """Profile-specific independent audit for the National Legal Observatory.
 
-Prior-art falsification, active novelty, meta-search, hardening, taxonomy completion and
-search-integrity are installed here because this is the final profile layer. They wrap the complete
-crown search while remaining inside the same signed state machine and final independent audit.
+Diverse implementation search, prior-art falsification, active novelty, meta-search, hardening,
+taxonomy completion and search integrity are installed here because this is the final profile layer.
+They wrap the complete crown search inside the same signed state machine and final independent audit.
 """
 
 from .canonical import atomic_write_json
 from .handlers import A, tree_hash
-from . import (observatory_meta_hardening_overlay, observatory_meta_search_overlay,
+from . import (observatory_implementation_search_overlay,
+               observatory_meta_hardening_overlay, observatory_meta_search_overlay,
                observatory_novelty_overlay, observatory_prior_art_overlay,
                observatory_search_integrity_overlay,
                observatory_taxonomy_completion_overlay)
@@ -19,8 +20,9 @@ observatory_novelty_overlay.NOVELTY_BUILD_LIMIT = 100_000
 
 
 def install(ctx, handlers):
-    """Install prior art → novelty → meta → hardening → taxonomy → integrity → audit."""
-    out = observatory_prior_art_overlay.install(ctx, handlers)
+    """Install implementation search → prior art → novelty/meta closure → audit."""
+    out = observatory_implementation_search_overlay.install(ctx, handlers)
+    out = observatory_prior_art_overlay.install(ctx, out)
     out = observatory_novelty_overlay.install(ctx, out)
     out = observatory_meta_search_overlay.install(ctx, out)
     out = observatory_meta_hardening_overlay.install(ctx, out)
@@ -48,6 +50,21 @@ def install(ctx, handlers):
                 "endpoint": ctx.client.t.endpoint,
                 "model": ctx.client.t.model,
                 "price_schedule": dict(ctx.client.prices),
+            },
+            "implementation_search": {
+                "groups": supremacy.get("implementation_search_groups", 0),
+                "current_candidates": supremacy.get(
+                    "implementation_search_current_candidates", 0),
+                "minimum_distinct_sources": supremacy.get(
+                    "implementation_minimum_distinct_sources", 0),
+                "semantic_revision_limit": supremacy.get(
+                    "semantic_revision_limit", 0),
+                "diversity_proven": supremacy.get(
+                    "implementation_diversity_proven", False),
+                "semantic_search_closed": supremacy.get(
+                    "semantic_implementation_search_closed", False),
+                "hidden_cases_disclosed_to_reviser": False,
+                "aggregate_diagnostics_only": True,
             },
             "authoritative_prior_art_challenge": {
                 "manifest": "PUBLIC-PRIOR-ART-MANIFEST.json",
