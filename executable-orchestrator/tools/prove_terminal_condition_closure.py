@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-"""Negative proof that every signed Observatory terminal condition is load-bearing.
-
-Builds the exact production context without a provider call, validates the real COMMITTED artifact
-against the dynamically extended schema, then mutates and deletes every required condition and
-supremacy boolean. Every mutation must be rejected by the actual semantic guard or schema validator.
-"""
+"""Negative proof that every signed Observatory terminal condition is load-bearing."""
 import argparse
 import copy
 import json
 import os
+import shutil
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ORCH = os.path.dirname(HERE)
@@ -54,19 +51,17 @@ def main(argv=None):
     os.environ["OBSERVATORY_CP1_EVIDENCE"] = os.path.abspath(args.cp1_evidence)
     os.environ["OBSERVATORY_PRIOR_CP2"] = os.path.abspath(args.prior_cp2)
     os.environ["DEEPSEEK_API_KEY"] = "terminal-proof-local-placeholder"
-
+    context_runtime = tempfile.mkdtemp(prefix="obs-terminal-context-")
     result = {"proof": "observatory-terminal-condition-closure-v1",
               "provider_calls": 0, "status": "FAIL"}
     try:
         observatory_launcher.install_overlay()
-        run_key = os.path.join(ROOT, "private-evaluator", "owner-held-secrets",
-                               f"RUN-{args.run_id}.key")
+        run_key = os.path.join(context_runtime, "RUN-TERMINAL-PROOF.key")
         observatory_launcher.build_context(
-            ROOT, os.path.abspath(args.runtime), args.run_id, "LAUNCH",
-            args.endpoint, "deepseek-v4-pro", "DEEPSEEK_API_KEY", "subprocess",
+            ROOT, context_runtime, args.run_id, "LAUNCH", args.endpoint,
+            "deepseek-v4-pro", "DEEPSEEK_API_KEY", "subprocess",
             os.path.abspath(args.canonical_repo),
             observatory_launcher.PROFILE.master_system_path(ROOT), run_key)
-
         summary = read_json(os.path.join(args.runtime, "reports", "run_summary.json"))
         artifact = summary["escalation"]
         committed_schema = states.SCHEMAS["COMMITTED"]
@@ -118,18 +113,17 @@ def main(argv=None):
             mutated = copy.deepcopy(artifact); mutate(mutated)
             structural.append(_expect_guard_failure(guard, mutated, label))
 
-        result.update({
-            "status": "PASS",
+        result.update({"status": "PASS",
             "schema_required_conditions": conditions_required,
             "schema_required_supremacy": supremacy_required,
             "condition_negative_witnesses": condition_mutations,
             "supremacy_negative_witnesses": supremacy_mutations,
             "structural_negative_witnesses": structural,
-            "all_required_fields_fail_closed": True,
-        })
+            "all_required_fields_fail_closed": True})
     except Exception as exc:
         result["reason"] = str(exc)
     finally:
+        shutil.rmtree(context_runtime, ignore_errors=True)
         os.environ.pop("DEEPSEEK_API_KEY", None)
         os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
         atomic_write_json(args.out, result)
