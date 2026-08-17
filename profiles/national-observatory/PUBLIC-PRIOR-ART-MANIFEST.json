@@ -1,0 +1,241 @@
+{
+  "manifest_version": "1.0",
+  "verified_date": "2026-08-17",
+  "policy": {
+    "purpose": "Challenge an already-independent executable Observatory frontier with authoritative public standards and primary research patterns that may expose missed architecture families or proof obligations.",
+    "opened_only_after_independent_frontier": true,
+    "prior_cp2_independent": true,
+    "no_source_preselects_architecture": true,
+    "all_source_ids_must_be_assessed": true,
+    "constructible_gap_requires_executable_challenger": true,
+    "protocol_or_evaluator_gap_blocks_supremacy": true,
+    "external_endorsement_inference_forbidden": true,
+    "content_policy": "The owner-signed manifest freezes source identity, status, version and challenge claims. It does not copy normative documents and does not claim that a standard proves the Observatory architecture."
+  },
+  "sources": [
+    {
+      "source_id": "EU-ELI-ONTOLOGY-1.5",
+      "authority": "Publications Office of the European Union",
+      "kind": "official_legal_interoperability_standard",
+      "status": "latest ontology release identified by the official EU Vocabularies catalogue",
+      "version": "1.5",
+      "url": "https://op.europa.eu/en/web/eu-vocabularies/model/-/resource/dataset/eli",
+      "load_bearing_claims": [
+        "Legislation requires stable web identification and a common exchange data model usable by official publishers and other organisations.",
+        "The model separates FRBR-style legal resources and supports machine-readable cross-border metadata exchange.",
+        "A national canonical layer must interoperate without allowing the ELI projection to become a second writable truth seat."
+      ],
+      "challenge_axes": ["canonical_authority_seat", "identity_model", "publication_topology", "governance_evolution_model"]
+    },
+    {
+      "source_id": "EU-ELI-IMPACT-1.0",
+      "authority": "Publications Office of the European Union",
+      "kind": "official_legal_change_model",
+      "status": "official ELI extension",
+      "version": "1.0",
+      "url": "https://op.europa.eu/en/web/eu-vocabularies/eli",
+      "load_bearing_claims": [
+        "Legal publication needs a formal model for analysing how modifying acts affect original or consolidated legislation.",
+        "The impact model extends beyond text replacement and can represent effects arising from court decisions.",
+        "A winning architecture must show whether its normative-effect calculus can project to ELI impact semantics without semantic loss."
+      ],
+      "challenge_axes": ["normative_effect_model", "temporal_model", "publication_topology"]
+    },
+    {
+      "source_id": "EU-ECLI",
+      "authority": "Council of the European Union and Publications Office of the European Union",
+      "kind": "official_case_law_identifier",
+      "status": "operational European case-law identifier framework",
+      "version": "Council Conclusions 2011/C 127/01 and current EUR-Lex implementation guidance",
+      "url": "https://eur-lex.europa.eu/content/help/eurlex-content/ecli.html",
+      "load_bearing_claims": [
+        "Judicial decisions need uniform stable identifiers to support access, citation, search and linking across jurisdictions.",
+        "Case-law identity is not the same object as legislation identity or the version of legislation applicable to the decision.",
+        "A national Observatory must reconcile domestic identifiers and ECLI while retaining exact temporal links to authority versions."
+      ],
+      "challenge_axes": ["identity_model", "temporal_model", "publication_topology"]
+    },
+    {
+      "source_id": "OASIS-AKOMA-NTOSO-1.0",
+      "authority": "OASIS LegalDocumentML Technical Committee",
+      "kind": "official_legal_document_standard",
+      "status": "OASIS Standard",
+      "version": "1.0",
+      "url": "https://docs.oasis-open.org/legaldocml/akn-core/v1.0/akn-core-v1.0-part1-vocabulary.html",
+      "load_bearing_claims": [
+        "Machine-readable legal documents require explicit structure, metadata and stable references to amendable substructures.",
+        "Document, expression and manifestation identity must not be collapsed.",
+        "Point-in-time consolidation and publication should be derivable from preserved structured legal content rather than maintained as an untraceable second corpus."
+      ],
+      "challenge_axes": ["identity_model", "state_derivation_model", "temporal_model", "publication_topology"]
+    },
+    {
+      "source_id": "OASIS-AKOMA-NTOSO-NAMING-1.0",
+      "authority": "OASIS LegalDocumentML Technical Committee",
+      "kind": "official_legal_identifier_standard",
+      "status": "OASIS Standard",
+      "version": "1.0",
+      "url": "https://docs.oasis-open.org/legaldocml/akn-nc/v1.0/akn-nc-v1.0.html",
+      "load_bearing_claims": [
+        "Legal identifiers should be meaningful, permanent and derived from invariant properties.",
+        "References commonly target precise hierarchical legal substructures and must remain stable across expressions and manifestations.",
+        "A canonical identity scheme must distinguish stable legal-object identity from version and content identity."
+      ],
+      "challenge_axes": ["identity_model", "canonical_authority_seat"]
+    },
+    {
+      "source_id": "OASIS-LEGALRULEML-1.0",
+      "authority": "OASIS LegalRuleML Technical Committee",
+      "kind": "official_legal_rule_exchange_standard",
+      "status": "OASIS Committee Specification",
+      "version": "1.0",
+      "url": "https://docs.oasis-open.org/legalruleml/legalruleml-core-spec/v1.0/cs02/legalruleml-core-spec-v1.0-cs02.html",
+      "load_bearing_claims": [
+        "Legal rules carry temporal, deontic, authority and provenance annotations that cannot be represented as undifferentiated text.",
+        "A legal-rule representation should support normalization, external ontology references and linked-data mapping without making one serialization the canonical legal truth.",
+        "The Observatory effect model must show a deterministic, governed relationship between source evidence, rule interpretation and exchange projections."
+      ],
+      "challenge_axes": ["normative_effect_model", "state_derivation_model", "provenance_proof_model", "publication_topology"]
+    },
+    {
+      "source_id": "W3C-PROV-O-2013",
+      "authority": "World Wide Web Consortium",
+      "kind": "web_standard_provenance",
+      "status": "W3C Recommendation",
+      "version": "30 April 2013",
+      "url": "https://www.w3.org/TR/prov-o/",
+      "load_bearing_claims": [
+        "Interoperable provenance needs explicit entities, activities, agents and qualified derivation relationships.",
+        "Domain-specific provenance may specialize a common model but must remain exchangeable and independently interpretable.",
+        "A winning architecture must prove that every public assertion can be reconstructed through preserved evidence and declared transformations."
+      ],
+      "challenge_axes": ["provenance_proof_model", "publication_topology"]
+    },
+    {
+      "source_id": "W3C-SHACL-2017",
+      "authority": "World Wide Web Consortium",
+      "kind": "web_standard_graph_validation",
+      "status": "W3C Recommendation",
+      "version": "20 July 2017",
+      "url": "https://www.w3.org/TR/shacl/",
+      "load_bearing_claims": [
+        "RDF publication needs machine-checkable shape and constraint validation rather than schema claims by convention.",
+        "Graph constraints, target selection and validation results must be explicit and reproducible.",
+        "A linked-data projection must be validated as a projection of canonical state, not trusted as an independent authority store."
+      ],
+      "challenge_axes": ["publication_topology", "provenance_proof_model", "trusted_core_topology"]
+    },
+    {
+      "source_id": "IETF-RFC9162-CT-V2",
+      "authority": "Internet Engineering Task Force",
+      "kind": "transparency_log_protocol",
+      "status": "Experimental RFC",
+      "version": "RFC 9162, December 2021",
+      "url": "https://www.rfc-editor.org/rfc/rfc9162.html",
+      "load_bearing_claims": [
+        "Append-only public logs require independently verifiable inclusion and consistency proofs, signed tree heads and explicit merge-delay behavior.",
+        "A log does not itself establish semantic correctness; monitors and admission criteria are separate responsibilities.",
+        "The Observatory must distinguish evidence transparency from canonical legal-effect computation and defend against split-view publication."
+      ],
+      "challenge_axes": ["provenance_proof_model", "consistency_commit_model", "replication_distribution_model", "publication_topology"]
+    },
+    {
+      "source_id": "TUF-SPEC-1.0.35",
+      "authority": "The Update Framework project, CNCF",
+      "kind": "trusted_update_and_governance_specification",
+      "status": "latest stable 1.0 series identified by the official TUF specification index",
+      "version": "1.0.35",
+      "url": "https://theupdateframework.github.io/specification/",
+      "load_bearing_claims": [
+        "Long-lived trusted distribution needs role separation, threshold signatures, revocation, root continuity, rollback/freeze resistance and consistent snapshots.",
+        "The root of trust and delegated authority must evolve without relying on one permanently online key.",
+        "Observatory rule packs, schemas, releases and trust anchors need an explicit governed succession and recovery model."
+      ],
+      "challenge_axes": ["governance_evolution_model", "trusted_core_topology", "publication_topology", "provenance_proof_model"]
+    },
+    {
+      "source_id": "GOOGLE-TRILLIAN-GENERAL-TRANSPARENCY",
+      "authority": "Google open-source project",
+      "kind": "reference_transparency_architecture",
+      "status": "maintenance mode; official project recommends newer tiled-log approaches for new deployments",
+      "version": "1.7.x project line",
+      "url": "https://github.com/google/trillian",
+      "load_bearing_claims": [
+        "A general transparency core must be separated from application-specific admission, canonicalization and external interfaces.",
+        "Scalable transparency can be multi-tenant and distributed while retaining inclusion and consistency proofs.",
+        "The Observatory should test whether transparency is a subordinate proof service, an authority seat or a dangerous conflation of the two."
+      ],
+      "challenge_axes": ["canonical_authority_seat", "provenance_proof_model", "scaling_partition_model", "trusted_core_topology"]
+    },
+    {
+      "source_id": "MSR-IRONFLEET-2015",
+      "authority": "Microsoft Research and SOSP",
+      "kind": "primary_formal_distributed_systems_research",
+      "status": "peer-reviewed research",
+      "version": "SOSP 2015",
+      "url": "https://www.microsoft.com/en-us/research/publication/ironfleet-proving-practical-distributed-systems-correct/",
+      "load_bearing_claims": [
+        "Practical distributed systems can combine state-machine refinement with implementation verification to prove safety and liveness.",
+        "Testing a single-node substitute cannot establish the distributed claims of a replicated or sharded architecture.",
+        "A finalist whose genome relies on consensus, federation or distributed commit needs a machine-checkable model and an executable partition/fault campaign."
+      ],
+      "challenge_axes": ["replication_distribution_model", "consistency_commit_model", "trusted_core_topology"]
+    },
+    {
+      "source_id": "MIT-FSCQ-CHL-2016",
+      "authority": "MIT CSAIL and USENIX",
+      "kind": "primary_crash_correctness_research",
+      "status": "peer-reviewed open research",
+      "version": "USENIX ATC 2016 / SOSP 2015 work",
+      "url": "https://www.usenix.org/conference/atc16/technical-sessions/presentation/chen_haogang",
+      "load_bearing_claims": [
+        "Crash correctness requires specifications that include crashes, recovery procedures and states at different abstraction layers.",
+        "Ordinary success tests do not prove recovery under arbitrary crash points.",
+        "An Observatory authority store must make crash/recovery obligations load-bearing and externally checkable."
+      ],
+      "challenge_axes": ["consistency_commit_model", "state_derivation_model", "trusted_core_topology"]
+    },
+    {
+      "source_id": "MIT-PERENNIAL-GROVE",
+      "authority": "MIT PDOS",
+      "kind": "primary_concurrent_crash_distributed_verification",
+      "status": "active research and mechanized proof framework",
+      "version": "current Perennial/Grove project line as of manifest date",
+      "url": "https://github.com/mit-pdos/perennial",
+      "load_bearing_claims": [
+        "Concurrency, crashes, recovery and distributed-node failures can be verified in one program-logic framework.",
+        "A durable implementation and its recovery procedure must be related to the declared abstract state, not merely survive sampled tests.",
+        "A finalist claiming a tiny or verified trusted core must identify exactly which implementation/proof components remain trusted."
+      ],
+      "challenge_axes": ["trusted_core_topology", "consistency_commit_model", "replication_distribution_model"]
+    },
+    {
+      "source_id": "USENIX-SQUIRRELFS-2024",
+      "authority": "USENIX OSDI",
+      "kind": "primary_type_checked_crash_safety_research",
+      "status": "peer-reviewed open research",
+      "version": "OSDI 2024",
+      "url": "https://www.usenix.org/conference/osdi24/presentation/leblanc",
+      "load_bearing_claims": [
+        "Crash-safety obligations may be enforced through a typed implementation discipline rather than a separate monolithic proof.",
+        "The architecture search must compare proof styles and trusted boundaries, not assume one formal-method family is universally superior.",
+        "A simpler compiler-enforced design is a valid challenger when it preserves the same measured legal and durability invariants."
+      ],
+      "challenge_axes": ["trusted_core_topology", "state_derivation_model", "governance_evolution_model"]
+    },
+    {
+      "source_id": "EU-CDM-4.16.1",
+      "authority": "Publications Office of the European Union",
+      "kind": "operational_legal_metadata_ontology",
+      "status": "latest version identified by the official EU Vocabularies catalogue",
+      "version": "4.16.1",
+      "url": "https://op.europa.eu/en/web/eu-vocabularies/model/-/resource/dataset/cdm",
+      "load_bearing_claims": [
+        "Operational legal publication uses a formal ontology spanning official journals, legislation, case law, preparatory acts, expressions and manifestations.",
+        "A national architecture must account for multilingual and multiformat legal publication and institutional entities without copying the EU model as its canonical internal truth.",
+        "Interchange mappings must be versioned, testable and reversible."
+      ],
+      "challenge_axes": ["identity_model", "publication_topology", "governance_evolution_model"]
+    }
+  ]
+}
