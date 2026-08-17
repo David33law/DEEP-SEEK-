@@ -1,15 +1,16 @@
-"""Bind causal attribution to the semantics of the cited AST definitions.
+"""Require axis-specific behavioral failure in addition to cited-definition diagnostics.
 
-A removed function name in an exception is not axis evidence when one broad function was cited for
-many unrelated classes. This hardening parses the exact mutated source, recovers the bodies of the
-renamed definitions and requires their AST identifiers/string literals to contain axis-relevant
-semantic vocabulary unless the hidden evaluator independently exposes a relevant hard dimension or
-failed axis-specific test signature. Replication and crown check counts are reproduced from persisted
-campaign files in the terminal summary.
+A removed definition name, axis vocabulary in its AST body, or a failed test from the same broad
+artifact group is useful diagnostic context but is not causal proof for a particular controlled axis.
+This hardening binds every cited body to deterministic AST hashes, records its semantic vocabulary,
+and grants causal credit only when the hidden evaluator independently exposes an axis-specific hard
+dimension or failure signature. Group-only paths and definition-name exceptions never suffice.
 """
 from __future__ import annotations
 
 import ast
+import hashlib
+import json
 import re
 from types import MethodType
 
@@ -20,6 +21,15 @@ from .canonical import read_json
 
 
 _NORMALIZE = re.compile(r"[^a-z0-9_]+")
+
+
+def _lexemes(value):
+    normalized = _NORMALIZE.sub(" ", str(value).lower())
+    result = set()
+    for token in normalized.split():
+        result.add(token)
+        result.update(part for part in token.split("_") if part)
+    return result
 
 
 def _node_vocabulary(node):
@@ -35,9 +45,10 @@ def _node_vocabulary(node):
             values.append(item.arg)
         elif isinstance(item, ast.Constant) and isinstance(item.value, str):
             values.append(item.value)
-    normalized = " ".join(
-        _NORMALIZE.sub(" ", str(value).lower()) for value in values)
-    return normalized
+    lexemes = set()
+    for value in values:
+        lexemes.update(_lexemes(value))
+    return sorted(lexemes)
 
 
 def _definition_axis_support(context, task, result):
@@ -47,6 +58,7 @@ def _definition_axis_support(context, task, result):
     tree = ast.parse(source)
     symbols = [str(value) for value in task.get("symbols") or []]
     vocabularies = {}
+    body_hashes = {}
     for node in ast.walk(tree):
         if not isinstance(node, (
                 ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -58,17 +70,29 @@ def _definition_axis_support(context, task, result):
                 and node.name.endswith("_" + symbol))), None)
         if matched:
             vocabularies[matched] = _node_vocabulary(node)
+            body_hashes[matched] = hashlib.sha256(
+                ast.dump(node, annotate_fields=True,
+                         include_attributes=False).encode("utf-8")).hexdigest()
     missing = sorted(set(symbols) - set(vocabularies))
     if missing:
         raise RuntimeError(
             "axis attribution could not recover mutated definition bodies: "
             + ", ".join(missing))
-    tokens = tuple(axis.AXIS_TOKENS.get(task["axis"], ()))
+    axis_tokens = set()
+    for token in axis.AXIS_TOKENS.get(task["axis"], ()):
+        axis_tokens.update(_lexemes(token))
     matched = sorted({
-        token for text in vocabularies.values()
-        for token in tokens if token in text})
+        token for values in vocabularies.values()
+        for token in axis_tokens if token in set(values)})
+    vocabulary_receipt = json.dumps(
+        {key: vocabularies[key] for key in sorted(vocabularies)},
+        ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return {
         "definition_vocabulary_sha256_inputs": sorted(vocabularies),
+        "definition_body_sha256": {
+            key: body_hashes[key] for key in sorted(body_hashes)},
+        "definition_vocabulary_sha256": hashlib.sha256(
+            vocabulary_receipt.encode("utf-8")).hexdigest(),
         "matched_source_axis_tokens": matched,
         "source_semantic_support": bool(matched),
     }
@@ -78,22 +102,33 @@ def _campaign_state(context, report):
     receipt = (report or {}).get("causal_ablation_evidence") or {}
     relative = receipt.get("path")
     if not relative:
-        return {"checked": False, "tasks": 0, "failure_scoped": 0}
+        return {"checked": False, "tasks": 0, "failure_scoped": 0,
+                "behavioral": 0}
     try:
         campaign = read_json(causal._runtime_path(context, relative))
     except Exception:
-        return {"checked": False, "tasks": 0, "failure_scoped": 0}
+        return {"checked": False, "tasks": 0, "failure_scoped": 0,
+                "behavioral": 0}
     tasks = campaign.get("tasks") or []
-    checked = sum(
+    failure_scoped = sum(
         1 for task in tasks
         if (task.get("attribution") or {}).get(
             "definition_vocabulary_sha256_inputs")
         and (task.get("attribution") or {}).get(
+            "definition_vocabulary_sha256")
+        and (task.get("attribution") or {}).get(
             "whole_receipt_searched") is False)
+    behavioral = sum(
+        1 for task in tasks
+        if (task.get("attribution") or {}).get(
+            "behavioral_axis_evidence") is True)
     return {
-        "checked": bool(tasks and checked == len(tasks)),
+        "checked": bool(
+            tasks and failure_scoped == len(tasks)
+            and behavioral == len(tasks)),
         "tasks": len(tasks),
-        "failure_scoped": checked,
+        "failure_scoped": failure_scoped,
+        "behavioral": behavioral,
     }
 
 
@@ -127,16 +162,15 @@ def install(ctx, handlers):
                 "violated_hard_dimensions") or [])
             expected = axis.SEMANTIC_DIMENSIONS.get(claimed_axis, set())
             matched_dimensions = sorted(violated & expected)
-            attributed = bool(
-                matched_dimensions
-                or (removed_named
-                    and source_support["source_semantic_support"]))
-            return attributed, {
+            behavioral = bool(matched_dimensions)
+            return behavioral, {
                 "mode": "semantic-hard-dimension",
                 "expected_dimensions": sorted(expected),
                 "violated_dimensions": sorted(violated),
                 "matched_dimensions": matched_dimensions,
+                "behavioral_axis_evidence": behavioral,
                 "removed_definition_named": removed_named,
+                "removed_definition_name_is_sufficient": False,
                 **source_support,
                 "failure_payload_fields": sorted(payload),
                 "whole_receipt_searched": False,
@@ -148,22 +182,18 @@ def install(ctx, handlers):
             token for token in axis_tokens if token in failure_text)
         matched_group_paths = sorted(
             token for token in group_tokens if token in failed_path_text)
-        path_evidence = bool(failed_tests or failed_directed
-                             or receipt.get("failures")
-                             or receipt.get("counterexamples"))
-        attributed = bool(
-            matched_axis_failure
-            or (path_evidence and matched_group_paths)
-            or (removed_named
-                and source_support["source_semantic_support"]))
-        return attributed, {
+        behavioral = bool(matched_axis_failure)
+        return behavioral, {
             "mode": "specialized-failure-signature",
+            "behavioral_axis_evidence": behavioral,
             "removed_definition_named": removed_named,
+            "removed_definition_name_is_sufficient": False,
             **source_support,
             "failed_test_paths": failed_tests,
             "failed_directed_paths": failed_directed,
             "matched_axis_failure_tokens": matched_axis_failure,
             "matched_group_path_tokens": matched_group_paths,
+            "group_path_is_sufficient": False,
             "matched_axis_or_group_tokens": sorted(set(
                 matched_axis_failure + matched_group_paths)),
             "counterexample_count": len(
@@ -183,6 +213,7 @@ def install(ctx, handlers):
             ctx, scores.get("genome_realization_crown") or {})
         result.update({
             "genome_definition_semantic_attribution_required": True,
+            "genome_axis_behavioral_failure_required": True,
             "genome_definition_semantic_replication_checked":
                 replication["checked"],
             "genome_definition_semantic_crown_checked": crown["checked"],
@@ -190,9 +221,13 @@ def install(ctx, handlers):
                 replication["tasks"],
             "genome_definition_semantic_replication_failure_scoped":
                 replication["failure_scoped"],
+            "genome_definition_semantic_replication_behavioral":
+                replication["behavioral"],
             "genome_definition_semantic_crown_tasks": crown["tasks"],
             "genome_definition_semantic_crown_failure_scoped":
                 crown["failure_scoped"],
+            "genome_definition_semantic_crown_behavioral":
+                crown["behavioral"],
         })
         return result
 
