@@ -32,6 +32,8 @@ MISSION_FLAGS = {
     "legal_interoperability_required": True,
     "cross_model_consistency_required": True,
     "executable_genome_realization_required": True,
+    "causal_genome_ablation_required": True,
+    "causal_genome_negative_controls_required": True,
     "authoritative_prior_art_challenge_required": True,
     "active_novelty_saturation_required": True,
     "meta_search_required": True,
@@ -57,6 +59,7 @@ SEARCH_POLICY = {
     "formal_models_required": 2,
     "interoperability_implementations_required": 2,
     "genome_realization_auditors_required": 2,
+    "genome_causal_ablation_phases_required": 2,
     "production_max_rounds": 0,
     "stagnation_response": "continue-successor-radical-novelty-meta-search",
 }
