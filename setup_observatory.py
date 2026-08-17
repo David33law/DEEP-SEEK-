@@ -2,8 +2,8 @@
 """Local owner/setup ceremony for the National Legal Observatory tournament.
 
 Zero paid calls. Builds and calibrates profile-specific evaluation assets and freezes the owner's
-budget, provider billing schedule and exact mission/evaluator/supremacy/systems/novelty contracts
-into signed decisions before any API key is used.
+budget, provider billing schedule, exact mission contracts and exact research-runner identity into
+signed decisions before any API key is used.
 """
 import argparse
 import hashlib
@@ -40,6 +40,22 @@ NOVELTY_METHODS = [
     "G96-ontology-and-taxonomy-challenge",
 ]
 
+PROTOCOL_FILES = [
+    "run_observatory.py",
+    "setup_observatory.py",
+    "executable-orchestrator/orchestrator.py",
+    "executable-orchestrator/lawmax21/observatory_roles.py",
+    "executable-orchestrator/lawmax21/observatory_runtime.py",
+    "executable-orchestrator/lawmax21/observatory_supremacy_overlay.py",
+    "executable-orchestrator/lawmax21/observatory_crown_overlay.py",
+    "executable-orchestrator/lawmax21/observatory_novelty_overlay.py",
+    "executable-orchestrator/lawmax21/observatory_escalation.py",
+    "executable-orchestrator/lawmax21/observatory_audit.py",
+    "private-evaluator/evaluator/observatory_systems_arena.py",
+    "executable-orchestrator/tools/run_observatory_proof.py",
+    "executable-orchestrator/tools/prove_active_novelty_saturation.py",
+]
+
 
 def run(argv):
     r = subprocess.run([sys.executable] + argv, capture_output=True, text=True)
@@ -48,11 +64,30 @@ def run(argv):
     return r
 
 
+def git_value(*args):
+    r = subprocess.run(["git", "-C", ROOT, *args], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} failed: {r.stderr.strip()}")
+    return r.stdout.strip()
+
+
 def sha256_file(path):
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
+    return h.hexdigest()
+
+
+def protocol_bundle_sha256():
+    h = hashlib.sha256()
+    for rel in PROTOCOL_FILES:
+        path = os.path.join(ROOT, *rel.split("/"))
+        if not os.path.isfile(path):
+            raise RuntimeError(f"research protocol file missing: {rel}")
+        h.update(rel.encode("utf-8"))
+        h.update(b"\0")
+        h.update(bytes.fromhex(sha256_file(path)))
     return h.hexdigest()
 
 
@@ -69,6 +104,10 @@ def mission_binding():
         "novelty_dry_waves_required": 3,
         "novelty_methods": list(NOVELTY_METHODS),
         "publication_channels": ["human", "api", "linked_data", "eli", "public_sector", "ai"],
+        "runner_head": git_value("rev-parse", "HEAD"),
+        "runner_tree": git_value("rev-parse", "HEAD^{tree}"),
+        "research_protocol_bundle_sha256": protocol_bundle_sha256(),
+        "research_protocol_files": list(PROTOCOL_FILES),
         "charter_sha256": sha256_file(os.path.join(PROFILE, "OBJECTIVE-CHARTER.md")),
         "master_system_sha256": sha256_file(os.path.join(PROFILE, "MASTER-SYSTEM-PROMPT.md")),
         "pareto_sha256": sha256_file(os.path.join(PROFILE, "PARETO-DIMENSIONS.json")),
@@ -165,6 +204,7 @@ def main(argv=None):
     os.remove(unsigned)
     print(f"· signed Observatory decisions for {a.run_id}")
     print("· frozen V4-Pro USD provider price schedule into D01")
+    print("· bound exact runner HEAD/tree and research protocol bundle into owner-signed D09")
     print("· bound Charter/System/Pareto/Evaluator/Supremacy/Systems/Novelty hashes into owner-signed D09")
 
     visible = os.path.join(ROOT, "benchmark", "observatory-visible-suite.json")
@@ -214,6 +254,7 @@ def main(argv=None):
 
     print("\nOBSERVATORY SETUP: PASS")
     print(f"run-id: {a.run_id}")
+    print(f"runner-head: {git_value('rev-parse', 'HEAD')}")
     print(f"budget: USD {a.budget_usd}, tokens {a.tokens}, calls {a.calls}, days {a.days}")
     print("provider pricing: V4-Pro hit=$0.003625/M miss=$0.435/M output=$0.87/M")
     print("mission: zero silent legally-material loss + canonical human/API/linked-data/ELI/public-sector/AI publication")
