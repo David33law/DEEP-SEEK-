@@ -3,7 +3,8 @@
 
 The underlying driver retains the readable owner-gate, crash/resume and artifact-verification flow.
 This layer forces the production container backend, requires every final protocol-v5 route in the
-owner-signed census, verifies streaming formal crowns, and independently rechecks source-bound,
+owner-signed census, proves that real-provider runs forbid a finite round cap and treat stagnation as
+search escalation, verifies streaming formal crowns, and independently rechecks source-bound,
 diversified executable-genome qualification, replication and crown evidence. It never contacts the
 real DeepSeek endpoint.
 """
@@ -24,6 +25,8 @@ base.EXPECTED_NEW_CONDITIONS.update(GENOME_CONDITIONS)
 base.REQUIRED_PROTOCOL_FILES.update({
     "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md",
     "private-evaluator/evaluator/observatory_formal_arena_v3.py",
+    "executable-orchestrator/orchestrator.py",
+    "executable-orchestrator/lawmax21/observatory_launcher.py",
     "executable-orchestrator/lawmax21/observatory_build_schema_hardening.py",
     "executable-orchestrator/lawmax21/observatory_semantic_evidence_binding_hardening.py",
     "executable-orchestrator/lawmax21/observatory_formal_streaming_routing.py",
@@ -106,9 +109,21 @@ def _verify(repo, runtime, source_head, preflight, launch):
             "executable_genome_realization_required",
             "strict_executable_source_schema_required",
             "bounded_candidate_output_required",
-            "terminal_negative_proof_required"):
+            "terminal_negative_proof_required",
+            "unbounded_production_rounds_required",
+            "stagnation_escalates_search_required"):
         if mission.get(flag) is not True:
             raise RuntimeError("signed protocol-v5 mission flag missing: " + flag)
+    if mission.get("production_max_rounds") != 0:
+        raise RuntimeError("owner-signed mission permits a finite production round cap")
+    if mission.get("stagnation_response") != \
+            "continue-successor-radical-novelty-meta-search":
+        raise RuntimeError("owner-signed stagnation response is not search escalation")
+    round_policy = preflight.get("round_policy") or {}
+    if round_policy.get("max_rounds") != 0 \
+            or round_policy.get("unbounded") is not True \
+            or round_policy.get("finite_cap_allowed_for_real_provider") is not False:
+        raise RuntimeError("preflight did not prove the unbounded production round policy")
 
     mission_files = set(mission.get("research_protocol_files") or [])
     missing = sorted(base.REQUIRED_PROTOCOL_FILES - mission_files)
@@ -164,6 +179,8 @@ def _verify(repo, runtime, source_head, preflight, launch):
             "independent audit did not reproduce genome-realization closure")
 
     verified["exact_candidate_backend"] = "container"
+    verified["unbounded_production_round_policy_verified"] = True
+    verified["stagnation_escalation_policy_verified"] = True
     verified["streaming_formal_crown_verified"] = True
     verified["genome_realization_verified"] = {
         label: {
