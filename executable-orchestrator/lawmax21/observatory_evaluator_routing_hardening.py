@@ -9,7 +9,7 @@ from . import observatory_distributed_overlay as distributed
 from . import observatory_formal_overlay as formal
 from . import observatory_interoperability_overlay as interop
 from . import observatory_scale_overlay as scale
-from .canonical import read_json
+from .canonical import atomic_write_json, read_json
 from .handlers import A
 
 
@@ -33,6 +33,7 @@ def _finish(ctx, out, result, path):
     report["candidate_path"] = os.path.relpath(
         path, ctx.runtime).replace("\\", "/")
     report["candidate_sha256"] = _sha256_file(path)
+    atomic_write_json(out, report)
     return report
 
 
@@ -113,6 +114,7 @@ def _formal(ctx, cid, perspective, label, depth, candidate_path=None):
     report = _finish(ctx, out, result, path)
     report["shared_hidden_corpus_id"] = hashlib.sha256(
         corpus.encode()).hexdigest()
+    atomic_write_json(out, report)
     return report
 
 
@@ -135,6 +137,7 @@ def _interop(ctx, cid, perspective, label, cases, candidate_path=None):
     report = _finish(ctx, out, result, path)
     report["shared_hidden_corpus_id"] = hashlib.sha256(
         corpus.encode()).hexdigest()
+    atomic_write_json(out, report)
     return report
 
 
