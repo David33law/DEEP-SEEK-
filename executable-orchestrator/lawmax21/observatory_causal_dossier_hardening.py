@@ -1,10 +1,9 @@
 """Bind replication/crown causal genome-ablation receipts into the deterministic dossier.
 
-The genome-realization report contains the causal receipt hash, but the final public dossier also
-indexes the exact causal campaign bytes directly. This wrapper independently rehashes every mutated
-source and evaluator receipt, checks evaluator-to-source identity, inert controls, auditor obligations,
-failure-scoped axis attribution, cited-definition semantics and load-bearing failures, then adds
-replication and crown receipts to the evidence index.
+The final public dossier independently rehashes every mutant source and evaluator receipt, verifies
+process/source identity, inert controls, auditor obligations and failure-scoped attribution, and now
+requires an axis-specific behavioral failure for every task. Definition names, source vocabulary and
+group-only test paths remain diagnostics; none can independently earn causal credit.
 """
 from __future__ import annotations
 
@@ -46,24 +45,40 @@ def _verify_execution(ctx, label, row, kind):
         raise RuntimeError(
             f"supremacy dossier: causal genome {label} {kind} evaluator "
             "is not bound to the exact mutated source bytes")
+    if row.get("artifact") != "semantic":
+        diagnostics = row.get("diagnostics") or {}
+        if not isinstance(evaluator.get("evaluator_returncode"), int) \
+                or diagnostics.get("infrastructure_failure_excluded") is not True \
+                or diagnostics.get("candidate_source_receipt_verified") is not True:
+            raise RuntimeError(
+                f"supremacy dossier: causal genome {label} {kind} lacks "
+                "specialized process/source classification")
+        expected_origin = (
+            "none-control-passed" if kind == "negative-control"
+            else "candidate")
+        if diagnostics.get("failure_origin") != expected_origin:
+            raise RuntimeError(
+                f"supremacy dossier: causal genome {label} {kind} has "
+                "the wrong failure origin")
 
 
 def _attribution_valid(attribution):
     if attribution.get("whole_receipt_searched") is not False \
-            or not attribution.get("definition_vocabulary_sha256_inputs"):
+            or not attribution.get("definition_vocabulary_sha256_inputs") \
+            or len(str(attribution.get(
+                "definition_vocabulary_sha256") or "")) != 64 \
+            or not attribution.get("definition_body_sha256") \
+            or attribution.get("behavioral_axis_evidence") is not True \
+            or attribution.get(
+                "removed_definition_name_is_sufficient") is not False:
         return False
-    source_support = attribution.get("source_semantic_support") is True
-    removed_named = attribution.get("removed_definition_named") is True
     mode = attribution.get("mode")
     if mode == "semantic-hard-dimension":
-        return bool(
-            attribution.get("matched_dimensions")
-            or (removed_named and source_support))
+        return bool(attribution.get("matched_dimensions"))
     if mode == "specialized-failure-signature":
         return bool(
             attribution.get("matched_axis_failure_tokens")
-            or attribution.get("matched_group_path_tokens")
-            or (removed_named and source_support))
+            and attribution.get("group_path_is_sufficient") is False)
     return False
 
 
@@ -125,6 +140,7 @@ def _verify(ctx, incumbent, label):
                 f"supremacy dossier: causal genome {label} inert control failed")
         _verify_execution(ctx, label, row, "negative-control")
     attributed = 0
+    behavioral = 0
     for row in tasks:
         attribution = row.get("attribution") or {}
         if row.get("auditor_id") not in auditors \
@@ -137,13 +153,14 @@ def _verify(ctx, incumbent, label):
                 or not _attribution_valid(attribution):
             raise RuntimeError(
                 f"supremacy dossier: causal genome {label} task did not "
-                "falsify an axis-specific, definition-grounded claim")
+                "falsify an axis-specific behavioral claim")
         _verify_execution(ctx, label, row, "ablation")
         attributed += 1
-    if attributed != len(tasks):
+        behavioral += 1
+    if attributed != len(tasks) or behavioral != len(tasks):
         raise RuntimeError(
             f"supremacy dossier: causal genome {label} attribution count drift")
-    return genome_path, causal_path, causal, attributed
+    return genome_path, causal_path, causal, attributed, behavioral
 
 
 def install(_ctx, handlers):
@@ -160,7 +177,7 @@ def install(_ctx, handlers):
         existing = {row.get("path") for row in rows}
         receipts = {}
         for label in LABELS:
-            genome_path, causal_path, causal, attributed = _verify(
+            genome_path, causal_path, causal, attributed, behavioral = _verify(
                 context, incumbent, label)
             for evidence_path, evidence_label in (
                     (genome_path, f"genome_realization_{label}"),
@@ -178,8 +195,12 @@ def install(_ctx, handlers):
                 "status": causal["status"],
                 "tasks_executed": causal["tasks_executed"],
                 "axis_specific_tasks": attributed,
+                "axis_behavioral_failures": behavioral,
                 "axis_specific_failure_attribution": True,
+                "axis_specific_behavioral_failure_required": True,
                 "cited_definition_semantics_checked": True,
+                "removed_definition_name_is_sufficient": False,
+                "group_failure_path_is_sufficient": False,
                 "whole_receipt_searched": False,
                 "negative_controls_executed":
                     causal["negative_controls_executed"],
@@ -196,10 +217,14 @@ def install(_ctx, handlers):
             "causal_genome_replication"] = "PASS"
         artifact.setdefault("search_closure", {})[
             "axis_specific_causal_replication"] = "PASS"
+        artifact.setdefault("search_closure", {})[
+            "axis_behavioral_causal_replication"] = "PASS"
         artifact.setdefault("crown_summary", {})[
             "causal_genome_crown"] = "PASS"
         artifact.setdefault("crown_summary", {})[
             "axis_specific_causal_crown"] = "PASS"
+        artifact.setdefault("crown_summary", {})[
+            "axis_behavioral_causal_crown"] = "PASS"
         atomic_write_json(path, artifact)
         return path, artifact
 
