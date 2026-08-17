@@ -4,7 +4,8 @@
 The inherited proof already verifies exact mutated source bytes, evaluator receipts, inert controls,
 portable owner signatures, every arena and the deterministic dossier. This extension additionally
 requires every causal task to fail for a mechanically persisted reason relevant to the controlled
-axis and artifact group rather than from an unrelated candidate defect or successful receipt metadata.
+axis and artifact group rather than from an unrelated candidate defect, successful receipt metadata
+or a broad cited definition whose own AST body contains no axis semantics.
 """
 from __future__ import annotations
 
@@ -19,6 +20,8 @@ AXIS_FILES = {
     "observatory_causal_axis_attribution_hardening.py",
     "executable-orchestrator/lawmax21/"
     "observatory_causal_attribution_scope_hardening.py",
+    "executable-orchestrator/lawmax21/"
+    "observatory_causal_definition_semantics_hardening.py",
     "executable-orchestrator/tools/"
     "prove_complete_observatory_protocol_axis_hardened.py",
 }
@@ -63,23 +66,29 @@ def _verify_campaign(runtime, incumbent, label):
                 or task.get("causal_failure_observed") is not True \
                 or task.get("observed_candidate_pass") is not False \
                 or not details.get("mode") \
-                or details.get("whole_receipt_searched") is not False:
+                or details.get("whole_receipt_searched") is not False \
+                or not details.get("definition_vocabulary_sha256_inputs"):
             raise RuntimeError(
                 f"axis-specific causal {label}: unrelated, unattributed or "
-                f"whole-receipt-derived failure for {task.get('auditor_id')}/"
+                f"semantically unbound failure for {task.get('auditor_id')}/"
                 f"{task.get('axis')}/{task.get('group')}")
+        source_support = details.get("source_semantic_support") is True
         if details.get("mode") == "semantic-hard-dimension":
             if not details.get("matched_dimensions") \
-                    and details.get("removed_definition_named") is not True:
+                    and not (details.get("removed_definition_named") is True
+                             and source_support):
                 raise RuntimeError(
                     f"axis-specific causal {label}: semantic task has no "
-                    "matched hard dimension or removed-definition evidence")
+                    "matched hard dimension or semantically relevant removed definition")
         elif details.get("mode") == "specialized-failure-signature":
-            if not details.get("matched_axis_or_group_tokens") \
-                    and details.get("removed_definition_named") is not True:
+            if not details.get("matched_axis_failure_tokens") \
+                    and not details.get("matched_group_path_tokens") \
+                    and not (details.get("removed_definition_named") is True
+                             and source_support):
                 raise RuntimeError(
                     f"axis-specific causal {label}: specialized task has no "
-                    "axis/group failure signature")
+                    "axis failure signature, failed group path or semantically "
+                    "relevant removed definition")
         else:
             raise RuntimeError(
                 f"axis-specific causal {label}: unknown attribution mode "
@@ -90,6 +99,7 @@ def _verify_campaign(runtime, incumbent, label):
             "group": task.get("group"),
             "artifact": task.get("artifact"),
             "mode": details.get("mode"),
+            "source_semantic_support": source_support,
             "failure_payload_fields": details.get(
                 "failure_payload_fields") or [],
         })
@@ -103,6 +113,7 @@ def _verify_campaign(runtime, incumbent, label):
         "axis_specific_tasks": len(attributed),
         "attribution_modes": sorted({row["mode"] for row in attributed}),
         "whole_receipt_searched": False,
+        "cited_definition_semantics_checked": True,
     }
 
 
