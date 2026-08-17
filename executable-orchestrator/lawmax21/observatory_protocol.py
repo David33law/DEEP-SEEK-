@@ -24,6 +24,7 @@ MISSION_FLAGS = {
     "supremacy_search_required": True,
     "no_first_answer_privilege": True,
     "public_supremacy_case_required": True,
+    "deterministic_supremacy_dossier_required": True,
     "durable_systems_arena_required": True,
     "distributed_fault_arena_required": True,
     "national_scale_arena_required": True,
