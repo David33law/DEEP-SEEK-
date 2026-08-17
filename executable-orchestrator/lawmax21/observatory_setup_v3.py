@@ -4,7 +4,7 @@ import os
 from . import observatory_protocol
 from . import observatory_setup as core
 from . import observatory_setup_v2 as wrapper
-from .canonical import atomic_write_json, read_json
+from .canonical import atomic_write_json
 
 CAMPAIGNS = {
     "distributed": {
@@ -29,7 +29,7 @@ CAMPAIGNS = {
             "--batch-size", str(observatory_protocol.workload("scale", "batch"))]},
     "formal": {
         "reference": "benchmark/observatory_formal_reference_candidate.py",
-        "evaluator": "private-evaluator/evaluator/observatory_formal_arena_v2.py",
+        "evaluator": "private-evaluator/evaluator/observatory_formal_arena_v3.py",
         "report": "proof/formal-reference-calibration.json",
         "args": lambda: [
             "--expected-canonical-authority-seat", "evidence_set",
