@@ -10,9 +10,9 @@ not make meaningful:
    Exact family-name inequality is not evidence of design-space diversity.
 
 This overlay keeps the shared state machine intact while replacing only the affected Observatory
-handlers. Every builder now receives the COMPLETE blueprint, bound by a canonical SHA-256. The
-three blind explorers are followed by one CP2-blind outlier explorer that is explicitly shown the
-blind set and must challenge their shared structural assumptions.
+handlers. Every builder receives the COMPLETE blueprint, including its structural genome, bound by
+a canonical SHA-256. The blind explorers are followed by a CP2-blind outlier explorer that attacks
+shared structural assumptions.
 """
 import json
 import os
@@ -24,6 +24,7 @@ from .handlers import A
 
 BLUEPRINT_FIELDS = (
     "family",
+    "genome",
     "trusted_boundary",
     "mechanisms",
     "falsifiable_predictions",
@@ -35,8 +36,16 @@ BLUEPRINT_FIELDS = (
 
 def blueprint(proposal):
     """Canonical architecture content that must survive explorer -> builder handoff."""
-    return {k: proposal.get(k, [] if k in ("mechanisms", "falsifiable_predictions", "citations") else "")
-            for k in BLUEPRINT_FIELDS}
+    out = {}
+    for k in BLUEPRINT_FIELDS:
+        if k in ("mechanisms", "falsifiable_predictions", "citations"):
+            default = []
+        elif k == "genome":
+            default = {}
+        else:
+            default = ""
+        out[k] = proposal.get(k, default)
+    return out
 
 
 def blueprint_sha256(proposal):
@@ -60,38 +69,30 @@ def _proposal_for_spec(ctx, spec):
 def install(ctx, handlers):
     H = dict(handlers)
 
-    # ---------------------------------------------------------------- design-space search
     original_search = H["TARGET_ARCHITECTURE_SEARCH"]
 
     def target_search(machine):
-        # Preserve the already-proven blind search implementation as the first three calls.
         p = original_search(machine)
         artifact = read_json(p)
         blind = list(artifact.get("proposals", []))
         if len(blind) < 3:
             raise RuntimeError("Observatory blind search produced fewer than three proposals")
 
-        # A fourth proposal is deliberately NOT independent. Its purpose is to attack convergence
-        # among the blind explorers without seeing prior CP2. This is design-space red teaming,
-        # not another vote on the same attractor.
         blind_context = [{k: x.get(k) for k in (
-            "role", "family", "trusted_boundary", "mechanisms", "falsifiable_predictions",
-            "why_not_higher", "altitude_claimed")}
+            "role", "family", "genome", "trusted_boundary", "mechanisms",
+            "falsifiable_predictions", "why_not_higher", "altitude_claimed")}
             for x in blind]
         lid, idea, _, _ = ctx.ask(
             "architecture-outlier", "OBSERVATORY-ARCH-OUTLIER",
             "You are the design-space adversary after three independent blind explorers. Propose "
             "a COMPLETE whole-system National Legal Observatory architecture that attacks their "
             "shared structural assumptions. You remain blind to all prior CP2 architecture "
-            "conclusions. Do NOT merely rename an evidence-ledger/CAS/deterministic-projection "
-            "architecture if that is the common attractor. A credible outlier must differ from "
-            "the blind set in at least TWO load-bearing structural choices among: canonical "
-            "authority seat, state-derivation model, consistency/replication model, trusted-core "
-            "shape, temporal/effect representation, or proof/publication topology. Preserve the "
-            "Mission-v2 invariants: zero silent legally-material loss, bitemporal reconstruction, "
-            "deterministic trusted legal effect, doctrine isolation, proof-carrying provenance, "
-            "one canonical truth and human/API/linked-data/ELI/public-sector/AI publication. "
-            "why_not_higher must still state the evidence that limits the proposal.",
+            "conclusions. Do NOT merely rename the common attractor. A credible outlier must differ "
+            "on at least TWO load-bearing genome axes. Preserve the Mission-v2 invariants: zero "
+            "silent legally-material loss, bitemporal reconstruction, deterministic trusted legal "
+            "effect, doctrine isolation, proof-carrying provenance, one canonical truth and "
+            "human/API/linked-data/ELI/public-sector/AI publication. why_not_higher must state the "
+            "evidence that limits the proposal.",
             [("three CP2-blind architecture proposals",
               json.dumps(blind_context, ensure_ascii=False)[:120000])],
             roles.PROPOSAL_SCHEMA)
@@ -107,7 +108,6 @@ def install(ctx, handlers):
 
     H["TARGET_ARCHITECTURE_SEARCH"] = target_search
 
-    # ---------------------------------------------------------------- owner gate: sign exact complete blueprints
     def v0_reviewed(_m):
         proposals_path = A(ctx, "architecture", "proposals.json")
         props = read_json(proposals_path).get("proposals", [])
@@ -125,7 +125,7 @@ def install(ctx, handlers):
             } for x in props],
             "builder_handoff": "COMPLETE_BLUEPRINT_REQUIRED",
             "owner_review_requires": [
-                "review trusted-boundary differences, not family names alone",
+                "review genome/trusted-boundary differences, not family names alone",
                 "confirm the outlier attacks shared structural assumptions",
                 "confirm every approved blueprint will reach the builder in full",
             ],
@@ -135,7 +135,6 @@ def install(ctx, handlers):
 
     H["TARGET_ARCHITECTURE_v0_REVIEWED"] = v0_reviewed
 
-    # ---------------------------------------------------------------- discovery / complete handoff
     def architecture_discovery(_m):
         props = read_json(A(ctx, "architecture", "proposals.json"))["proposals"]
         candidates = []
@@ -144,7 +143,6 @@ def install(ctx, handlers):
             candidates.append({
                 "id": f"OBS-{i:02d}",
                 "family": prop["family"],
-                # Compatibility/reporting label only. It is NEVER the builder's architecture input.
                 "mechanism": mechanisms[0],
                 "proposal_logical_id": prop["logical_id"],
                 "blueprint_sha256": blueprint_sha256(prop),
@@ -166,25 +164,24 @@ def install(ctx, handlers):
         expected = spec.get("blueprint_sha256")
         if expected and expected != bp_sha:
             raise RuntimeError(f"{cid}: blueprint hash changed between discovery and build")
-        if not bp.get("trusted_boundary") or not bp.get("mechanisms"):
+        if not bp.get("genome") or not bp.get("trusted_boundary") or not bp.get("mechanisms"):
             raise RuntimeError(f"{cid}: incomplete architecture blueprint")
 
-        contract = open(os.path.join(ctx.profile_pkg, "EVALUATOR-CONTRACT.md"),
-                        encoding="utf-8").read()
+        contract = open(os.path.join(ctx.profile_pkg, "EVALUATOR-CONTRACT.md"), encoding="utf-8").read()
         bp_text = json.dumps(bp, ensure_ascii=False, sort_keys=True)
         _, obj, _, _ = ctx.ask(
             "builder", f"{ticket}::{cid}::r{ctx.round}::bp-{bp_sha[:16]}",
             f"Implement whole-system Observatory candidate {cid} from the COMPLETE architecture "
             f"blueprint supplied below (SHA-256 {bp_sha}). The blueprint is atomic design input: "
-            "do not reduce it to its first mechanism and do not silently drop trusted-boundary "
+            "do not reduce it to its first mechanism and do not silently drop genome, trusted-boundary "
             "requirements or mechanisms. Return candidate.py implementing ALL evaluator-required "
-            "operations and `register_change_handler(kind, fn)` as a real runtime extension "
-            "registry. The prototype has no filesystem/network/model access, so implement the "
-            "faithful executable semantic kernel of the blueprint inside that contract. Where a "
-            "national deployment mechanism cannot literally execute inside the isolated prototype, "
-            "preserve its semantics/invariants rather than replacing the architecture with a toy. "
-            "Trusted legal semantics must remain deterministic; ids, dates, texts and event kinds "
-            "must generalise; hard-coded fixtures are disqualifying.",
+            "operations and `register_change_handler(kind, fn)` as a real runtime extension registry. "
+            "The prototype has no filesystem/network/model access, so implement the faithful executable "
+            "semantic kernel of the blueprint inside that contract. Where a national deployment "
+            "mechanism cannot literally execute inside the isolated prototype, preserve its semantics "
+            "and invariants rather than replacing the architecture with a toy. Trusted legal semantics "
+            "must remain deterministic; ids, dates, texts and event kinds must generalise; hard-coded "
+            "fixtures are disqualifying.",
             [("COMPLETE ARCHITECTURE BLUEPRINT", bp_text),
              ("BLUEPRINT SHA256", bp_sha),
              ("Observatory executable contract", contract[:30000]),
@@ -198,6 +195,7 @@ def install(ctx, handlers):
         ctx.install_candidate(obj, kind)
         ctx.candidates[cid]["blueprint_sha256"] = bp_sha
         ctx.candidates[cid]["blueprint_mechanism_count"] = len(bp["mechanisms"])
+        ctx.candidates[cid]["genome"] = bp["genome"]
         ctx._save_arena()
         return obj, bp_sha
 
@@ -224,7 +222,6 @@ def install(ctx, handlers):
 
     H["CANDIDATE_BUILDING"] = candidate_building
 
-    # ---------------------------------------------------------------- successors must also receive their complete idea
     def challenger(kind, role, ticket, directive):
         def run(_m):
             ceiling_obj = read_json(A(ctx, "architecture", f"ceiling-round{ctx.round}.json"))
@@ -261,17 +258,12 @@ def install(ctx, handlers):
 
     H["SUCCESSOR_SEARCH"] = challenger(
         "successor", "future-scale-critic", "SUCCESSOR",
-        "Design a whole-system Observatory successor that breaks the measured bottleneck while "
-        "preserving every stronger measured property. Compose strong parts when compatible; do "
-        "not merely rename an existing family.")
+        "Design a whole-system Observatory successor that breaks the measured bottleneck while preserving every stronger measured property. Compose strong parts when compatible; do not merely rename an existing family.")
     H["RADICAL_CHALLENGER_SEARCH"] = challenger(
         "radical", "legal-capability-critic", "RADICAL",
-        "Design a radical whole-system Observatory architecture from a genuinely different, "
-        "preferably untried family. Challenge assumptions about canonical authority seat, identity, "
-        "time, effect, provenance, consistency and publication, not merely implementation language.")
+        "Design a radical whole-system Observatory architecture from a genuinely different, preferably untried family. Challenge assumptions about canonical authority seat, identity, time, effect, provenance, consistency and publication, not merely implementation language.")
     H["SIMPLIFICATION_CHALLENGE"] = challenger(
         "simplification", "simplification-critic", "SIMPLIFY",
-        "Design the simplest whole-system Observatory architecture that could match or dominate "
-        "the measured frontier. Complexity survives only if measurement proves it load-bearing.")
+        "Design the simplest whole-system Observatory architecture that could match or dominate the measured frontier. Complexity survives only if measurement proves it load-bearing.")
 
     return H
