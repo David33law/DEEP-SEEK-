@@ -2,7 +2,8 @@
 
 The ledger is currency-explicit. Historical LAWMAX runs retain their legacy ``eur`` contract;
 new profiles may use ``currency`` + ``amount`` without lying about the provider's billing unit.
-The only way to make a paid call is to hold a reservation, and successor budget remains fenced.
+Every new settlement is bound to its logical request id so crash recovery can prove that a
+recorded provider response was already charged and must never be re-sent.
 """
 import os
 
@@ -78,10 +79,19 @@ class BudgetLedger:
                 for k in ("tokens", self.money_key)}
 
     def within_ceiling(self):
-        """True only when token and monetary spend are both within the signed total limits."""
         return (float(self.state["spent"]["tokens"]) <= float(self.limits.get("tokens", 0) or 0)
                 and float(self.state["spent"][self.money_key])
                 <= float(self.limits.get(self.money_key, 0) or 0))
+
+    # -------------------------------------------------------- settlement state
+    def is_open(self, reservation_id):
+        self._reload()
+        return reservation_id in self.state.get("open_reservations", {})
+
+    def is_settled(self, reservation_id):
+        self._reload()
+        return any(e.get("reservation_id") == reservation_id
+                   for e in self.state.get("entries", []))
 
     # ----------------------------------------------------------- reservation
     def reserve(self, reservation_id, role, est_tokens, est_money, line="main"):
@@ -89,6 +99,9 @@ class BudgetLedger:
             self._reload()
             if reservation_id in self.state["open_reservations"]:
                 return self.state["open_reservations"][reservation_id]
+            if any(e.get("reservation_id") == reservation_id for e in self.state.get("entries", [])):
+                raise BudgetExhausted(
+                    f"logical request {reservation_id[:16]}… is already settled — refusing duplicate reservation")
             if self.limits.get("calls") and self.state["spent"]["calls"] >= self.limits["calls"]:
                 raise BudgetExhausted(f"call ceiling reached ({self.limits['calls']})")
             for key, est in (("tokens", est_tokens), (self.money_key, est_money)):
@@ -110,6 +123,11 @@ class BudgetLedger:
     def settle(self, reservation_id, actual_tokens, actual_money, usage=None):
         with file_lock(self.lock):
             self._reload()
+            # Idempotent crash recovery: if settlement was durably recorded but the caller
+            # crashed before writing its metadata, returning the existing spend is correct;
+            # charging it again would be false accounting.
+            if any(e.get("reservation_id") == reservation_id for e in self.state.get("entries", [])):
+                return self.state["spent"]
             rec = self.state["open_reservations"].pop(reservation_id, None)
             if rec is None:
                 raise BudgetExhausted(f"settle without reservation ({reservation_id[:16]}…)")
@@ -119,6 +137,7 @@ class BudgetLedger:
             self.state["spent"][self.money_key] += actual_money
             self.state["spent"]["calls"] += 1
             self.state["entries"].append({
+                "reservation_id": reservation_id,
                 "utc": utc(), "role": rec["role"], "line": rec["line"],
                 "currency": self.currency,
                 "estimated": {"tokens": rec["tokens"], self.money_key: rec[self.money_key]},
@@ -137,7 +156,7 @@ class BudgetLedger:
             return self.state["spent"]
 
     def release(self, reservation_id):
-        """Call failed: give the reservation back so a technical error costs nothing."""
+        """Call failed before an accepted provider response: give the reservation back."""
         with file_lock(self.lock):
             self._reload()
             rec = self.state["open_reservations"].pop(reservation_id, None)
@@ -148,7 +167,6 @@ class BudgetLedger:
 
     # ------------------------------------------------------- progress windows
     def close_window(self, window_id, best_score, min_delta, max_stagnant):
-        """Protocol 14: spending must buy progress. N flat windows force escalation."""
         with file_lock(self.lock):
             self._reload()
             w = self.state["progress_windows"]
