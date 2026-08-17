@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Local owner/setup ceremony for the National Legal Observatory tournament.
 
-Zero paid calls. Builds and calibrates the profile-specific visible/hidden evaluation assets,
-signs the same shared owner-decision contract, and leaves the existing LAWMAX runner intact.
+Zero paid calls. Builds and calibrates profile-specific evaluation assets and freezes the owner's
+budget plus provider billing schedule into the signed D01 decision before any API key is used.
 """
 import argparse
-import json
 import os
 import secrets
 import shutil
@@ -19,6 +18,20 @@ EVAL = os.path.join(ROOT, "private-evaluator", "evaluator")
 SECRETS = os.path.join(ROOT, "private-evaluator", "owner-held-secrets")
 PROFILE = os.path.join(ROOT, "profiles", "national-observatory")
 
+# Official DeepSeek V4-Pro USD schedule verified against the provider's Models & Pricing page
+# on 2026-08-17. It is copied into the owner-signed D01 decision and becomes part of request
+# identity, so a run cannot silently switch price semantics after the ceremony.
+V4_PRO_PRICE_SCHEDULE = {
+    "model": "deepseek-v4-pro",
+    "currency": "USD",
+    "input_cache_hit_per_mtok": 0.003625,
+    "input_cache_miss_per_mtok": 0.435,
+    "output_per_mtok": 0.87,
+    "require_cache_split": True,
+    "source": "https://api-docs.deepseek.com/quick_start/pricing",
+    "verified_date": "2026-08-17",
+}
+
 
 def run(argv):
     r = subprocess.run([sys.executable] + argv, capture_output=True, text=True)
@@ -27,10 +40,12 @@ def run(argv):
     return r
 
 
-def decisions(budget_eur, tokens, calls, days):
+def decisions(budget_usd, tokens, calls, days):
     return {
         "D01_BUDGET": {"decided": True, "value": {
-            "eur": float(budget_eur), "tokens": int(tokens), "calls": int(calls),
+            "currency": "USD", "amount": float(budget_usd),
+            "price_schedule": dict(V4_PRO_PRICE_SCHEDULE),
+            "tokens": int(tokens), "calls": int(calls),
             "wall_clock_days": int(days), "successor_reserve_fraction": 0.35}},
         "D02_HIDDEN_SET_AUTHORITY": {"decided": True,
             "value": "profile-specific encrypted hidden replay bank; grader hashes frozen at bank creation"},
@@ -75,7 +90,7 @@ def hard_minimum_failures(scores, spec):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-id", default="OBS-RUN-0001")
-    ap.add_argument("--budget-eur", type=float, default=500.0)
+    ap.add_argument("--budget-usd", type=float, default=500.0)
     ap.add_argument("--tokens", type=int, default=250_000_000)
     ap.add_argument("--calls", type=int, default=20_000)
     ap.add_argument("--days", type=int, default=30)
@@ -99,19 +114,16 @@ def main(argv=None):
     else:
         print("· owner key already present — reusing")
 
-    # Protocol 19 is generated from states.py and validate_package.py rejects a single-byte drift.
-    # Regenerate it BEFORE sealing the package so the manifest can never bless stale generated
-    # documentation. The historical LAWMAX package remains internally self-consistent after the
-    # local owner key and generated state-machine document are materialised.
     run([os.path.join(TOOLS, "generate_protocol19.py")])
     run([os.path.join(TOOLS, "make_manifest.py")])
 
     unsigned = os.path.join(ROOT, "observatory-decisions.unsigned.json")
-    atomic_write_json(unsigned, decisions(a.budget_eur, a.tokens, a.calls, a.days))
+    atomic_write_json(unsigned, decisions(a.budget_usd, a.tokens, a.calls, a.days))
     run([os.path.join(TOOLS, "owner_sign.py"), "--key", owner_key, "--run-id", a.run_id,
          "--decisions", unsigned, "--out", os.path.join(ROOT, "OWNER-DECISIONS.signed.json")])
     os.remove(unsigned)
     print(f"· signed Observatory decisions for {a.run_id}")
+    print("· frozen V4-Pro USD provider price schedule into D01")
 
     visible = os.path.join(ROOT, "benchmark", "observatory-visible-suite.json")
     observatory_harness.build_visible_suite(visible)
@@ -122,17 +134,16 @@ def main(argv=None):
         shutil.rmtree(bank)
     hidden_key = os.path.join(SECRETS, "OBSERVATORY-HIDDEN.key")
     if os.path.exists(hidden_key):
-        os.remove(hidden_key)  # new bank => new key; old bank is gone, so key reuse adds no value
+        os.remove(hidden_key)
     bank_seed = secrets.randbelow(2**31 - 2) + 1
-    r = run([os.path.join(EVAL, "observatory_bank_builder.py"), "--bank", bank,
-             "--key", hidden_key, "--seed", str(bank_seed),
-             "--qualification", str(a.qualification), "--replication", str(a.replication),
-             "--holdout", str(a.holdout)])
+    run([os.path.join(EVAL, "observatory_bank_builder.py"), "--bank", bank,
+         "--key", hidden_key, "--seed", str(bank_seed),
+         "--qualification", str(a.qualification), "--replication", str(a.replication),
+         "--holdout", str(a.holdout)])
     public = read_json(os.path.join(bank, "PUBLIC-commitment.json"))
     print(f"· sealed hidden bank: {public['merkle_root'][:16]}… "
           f"Q={public['counts']['qualification']} R={public['counts']['replication']} H={public['counts']['holdout']}")
 
-    # Calibration 1: visible reference must satisfy every hard dimension available there.
     reference = os.path.join(ROOT, "benchmark", "observatory_reference_candidate.py")
     src = open(reference, encoding="utf-8").read()
     suite = read_json(visible)
@@ -146,7 +157,6 @@ def main(argv=None):
         raise RuntimeError(f"visible causal-fidelity calibration failed: {fidelity}")
     print("· visible evaluator calibration PASS")
 
-    # Calibration 2: same reference through encrypted qualification bank + isolation canaries.
     out = os.path.join(ROOT, "proof", "observatory-hidden-calibration.json")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     run([os.path.join(EVAL, "observatory_evaluate.py"), "--bank", bank, "--key", hidden_key,
@@ -162,7 +172,8 @@ def main(argv=None):
 
     print("\nOBSERVATORY SETUP: PASS")
     print(f"run-id: {a.run_id}")
-    print(f"budget: EUR {a.budget_eur}, tokens {a.tokens}, calls {a.calls}, days {a.days}")
+    print(f"budget: USD {a.budget_usd}, tokens {a.tokens}, calls {a.calls}, days {a.days}")
+    print("provider pricing: V4-Pro hit=$0.003625/M miss=$0.435/M output=$0.87/M")
     print("No DeepSeek/API call was made.")
     return 0
 
@@ -170,7 +181,7 @@ def main(argv=None):
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # one terminal FAIL, no misleading trailing PASS
+    except Exception as exc:
         print("\nOBSERVATORY SETUP: FAIL")
         print(str(exc))
         sys.exit(1)
