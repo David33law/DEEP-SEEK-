@@ -1,4 +1,10 @@
-"""Route all specialized candidate evaluators through output-bounded v2 entrypoints."""
+"""Route all specialized candidate evaluators through output-bounded v2 entrypoints.
+
+Every dynamic specialized receipt is source-bound to the exact candidate and carries the bounded
+process witness.  Durable systems additionally receives the owner-signed forced-crash workload; the
+production route therefore cannot silently fall back to an evaluator default that differs from the
+signed mission.
+"""
 import hashlib
 import os
 import subprocess
@@ -8,6 +14,7 @@ from . import observatory_crown_overlay as crown
 from . import observatory_distributed_overlay as distributed
 from . import observatory_formal_overlay as formal
 from . import observatory_interoperability_overlay as interop
+from . import observatory_protocol as protocol
 from . import observatory_scale_overlay as scale
 from .canonical import atomic_write_json, read_json
 from .handlers import A
@@ -63,8 +70,16 @@ def _systems(ctx, cid, label, events):
         sys.executable,
         os.path.join(ctx.evaluator_dir, "observatory_systems_arena_v2.py"),
         "--candidate", path, "--out", out, "--seed", str(seed),
-        "--large-events", str(events)], capture_output=True, text=True)
-    return _finish(ctx, out, result, path)
+        "--large-events", str(events),
+        "--crash-events", str(protocol.workload("systems", "crash_events"))],
+        capture_output=True, text=True)
+    report = _finish(ctx, out, result, path)
+    report["owner_signed_large_events"] = int(events)
+    report["owner_signed_crash_events"] = protocol.workload(
+        "systems", "crash_events")
+    if report.get("evidence_path"):
+        atomic_write_json(out, report)
+    return report
 
 
 def _distributed(ctx, cid, label, events):
@@ -85,7 +100,13 @@ def _distributed(ctx, cid, label, events):
             ctx, cid, "consistency_commit_model"),
         "--seed", str(seed), "--large-events", str(events)],
         capture_output=True, text=True)
-    return _finish(ctx, out, result, path)
+    report = _finish(ctx, out, result, path)
+    report["owner_signed_large_events"] = int(events)
+    report["owner_signed_crash_event_floor"] = protocol.workload(
+        "distributed", "crash_event_floor")
+    if report.get("evidence_path"):
+        atomic_write_json(out, report)
+    return report
 
 
 def _scale(ctx, cid, label, events, candidate_path=None):
