@@ -7,7 +7,9 @@ container is confirmed absent before reopening the same state directory. Killing
 or killing an idle container after the operation completed, cannot earn crash evidence.
 
 Every declared authority/recovery file is also validated before fault injection: paths must be
-relative, remain inside the state directory, exist, and not alias one another.
+relative, remain inside the state directory, exist, and not alias one another. The crash injector's
+stdin text transport is explicitly UTF-8 so candidate Unicode cannot make Windows code-page settings
+part of the measured fault semantics.
 """
 from __future__ import annotations
 
@@ -152,7 +154,9 @@ def _safe_crash(runtime, source, state_dir, events, delay=0.01):
             stdin=subprocess.PIPE,
             stdout=output,
             stderr=subprocess.DEVNULL,
-            text=True)
+            text=True,
+            encoding="utf-8",
+            errors="strict")
         try:
             started = _wait_running(runtime, name, process)
             _CRASH["container_started"] = bool(started)
@@ -163,7 +167,7 @@ def _safe_crash(runtime, source, state_dir, events, delay=0.01):
                 process.stdin.write(_crash_body(source, events))
                 process.stdin.flush()
                 _CRASH["workload_delivered"] = True
-            except (BrokenPipeError, OSError):
+            except (BrokenPipeError, OSError, UnicodeError):
                 return False
 
             time.sleep(max(0.0, float(delay)))
@@ -240,6 +244,7 @@ def _bind_receipt(path):
         report = json.load(handle)
     report["whole_process_crash_evidence"] = dict(_CRASH)
     report["durable_manifest_evidence"] = dict(_MANIFEST)
+    report["transport_encoding"] = "utf-8"
     tests = report.setdefault("tests", {})
     crash_complete = all((
         _CRASH.get("container_started") is True,
@@ -285,7 +290,8 @@ def main():
         "whole_process_crash_evidence": report.get(
             "whole_process_crash_evidence"),
         "durable_manifest_evidence": report.get("durable_manifest_evidence"),
-    }, ensure_ascii=False, indent=1, sort_keys=True))
+        "transport_encoding": report.get("transport_encoding"),
+    }, ensure_ascii=True, indent=1, sort_keys=True))
     return code
 
 
@@ -294,5 +300,5 @@ if __name__ == "__main__":
         sys.exit(main())
     except Exception as exc:
         print(json.dumps({"status": "FAIL", "passed": False,
-                          "reason": str(exc)}, ensure_ascii=False, indent=1))
+                          "reason": str(exc)}, ensure_ascii=True, indent=1))
         sys.exit(1)
