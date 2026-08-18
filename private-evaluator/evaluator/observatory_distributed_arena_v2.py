@@ -28,7 +28,53 @@ import observatory_distributed_arena as base
 bounded_subprocess.install(base.subprocess)
 
 _ORIGINAL_SESSION = base._session
+_ORIGINAL_MANIFEST = base._manifest
 _BASELINE = {"elapsed_seconds": None, "events": None}
+_CRASH = {
+    "actual_container_kill_required": True,
+    "container_started": False,
+    "workload_delivered": False,
+    "runtime_kill_returncode": None,
+    "runtime_kill_succeeded": False,
+    "container_absent_before_recovery": False,
+    "cli_process_kill_counts_as_evidence": False,
+}
+
+
+def _inside(root, relative):
+    root = os.path.abspath(root)
+    path = os.path.abspath(os.path.join(
+        root, *str(relative).replace("\\", "/").split("/")))
+    if path == root or not path.startswith(root + os.sep):
+        raise RuntimeError("distributed authority path escapes cluster root: " + str(relative))
+    return path
+
+
+def _manifest(runtime, source, cluster_dir, expected_replication, expected_commit):
+    manifest = _ORIGINAL_MANIFEST(
+        runtime, source, cluster_dir, expected_replication, expected_commit)
+    cluster_files = manifest.get("cluster_authority_files")
+    if not isinstance(cluster_files, list) or not cluster_files:
+        raise RuntimeError("cluster_manifest requires cluster_authority_files")
+    declared = []
+    for relative in cluster_files:
+        parts = str(relative).replace("\\", "/").split("/")
+        if os.path.isabs(str(relative)) or ".." in parts:
+            raise RuntimeError("cluster authority files must be relative cluster paths")
+        path = _inside(cluster_dir, relative)
+        if not os.path.isfile(path):
+            raise RuntimeError("declared cluster authority file does not exist: " + str(relative))
+        declared.append(os.path.realpath(path))
+    for node_id, files in (manifest.get("node_authority_files") or {}).items():
+        for relative in files:
+            path = _inside(cluster_dir, relative)
+            if not os.path.isfile(path):
+                raise RuntimeError(
+                    f"declared node authority file does not exist: {node_id}/{relative}")
+            declared.append(os.path.realpath(path))
+    if len(declared) != len(set(declared)):
+        raise RuntimeError("distributed manifest aliases authority files")
+    return manifest
 
 
 def _is_baseline(commands):
@@ -107,13 +153,7 @@ def _force_remove(runtime, name):
 
 
 def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
-    """Crash the actual candidate container and prove that no writer survives.
-
-    Returning ``True`` means all of the following happened: the named candidate container reached
-    running state, the crash workload was delivered, the runtime successfully killed that container,
-    and the container was absent before the subsequent recovery session could start. Killing only
-    the CLI process never earns crash evidence.
-    """
+    """Crash the actual candidate container and prove that no writer survives."""
     os.makedirs(cluster_dir, exist_ok=True)
     name = "obs-dist-crash-" + uuid.uuid4().hex
     process = subprocess.Popen(
@@ -127,6 +167,7 @@ def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
     absent = False
     try:
         started = _wait_running(runtime, name, process)
+        _CRASH["container_started"] = bool(started)
         if not started:
             return False
 
@@ -134,6 +175,7 @@ def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
             process.stdin.write(base._body(source, [
                 {"op": "ingest_batch", "node_id": "n1", "events": events}]))
             process.stdin.flush()
+            _CRASH["workload_delivered"] = True
         except (BrokenPipeError, OSError):
             return False
 
@@ -144,7 +186,11 @@ def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
         kill = subprocess.run(
             [runtime, "kill", name], capture_output=True,
             text=True, timeout=30)
+        _CRASH["runtime_kill_returncode"] = int(kill.returncode)
+        _CRASH["runtime_kill_stdout_tail"] = (kill.stdout or "")[-1000:]
+        _CRASH["runtime_kill_stderr_tail"] = (kill.stderr or "")[-1000:]
         killed = kill.returncode == 0
+        _CRASH["runtime_kill_succeeded"] = bool(killed)
 
         try:
             process.wait(timeout=30)
@@ -160,6 +206,7 @@ def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
         absent = _wait_absent(runtime, name, timeout=30.0)
         if not absent:
             absent = _force_remove(runtime, name)
+        _CRASH["container_absent_before_recovery"] = bool(absent)
         return bool(started and killed and absent)
     finally:
         if process.stdin is not None:
@@ -188,7 +235,7 @@ def _out_argument():
         return None
 
 
-def _rewrite_throughput_receipt(path):
+def _rewrite_receipt(path):
     elapsed = _BASELINE.get("elapsed_seconds")
     events = _BASELINE.get("events")
     if not path or not os.path.isfile(path) or not elapsed or not events:
@@ -203,7 +250,18 @@ def _rewrite_throughput_receipt(path):
     report["throughput_measurement"] = (
         "first healthy 1000-event baseline session including canonical integrity, root, publication "
         "and close verification; excludes later injected fault campaigns")
-    temporary = path + ".throughput.tmp"
+    report["whole_process_crash_evidence"] = dict(_CRASH)
+    crash_test = (report.get("tests") or {}).get("whole_process_crash_recovery")
+    if crash_test is True and not all((
+            _CRASH.get("container_started") is True,
+            _CRASH.get("workload_delivered") is True,
+            _CRASH.get("runtime_kill_succeeded") is True,
+            _CRASH.get("container_absent_before_recovery") is True)):
+        report["status"] = "FAIL"
+        report["passed"] = False
+        report.setdefault("tests", {})["whole_process_crash_recovery"] = False
+        report["reason"] = "whole-process crash lacked actual-container kill evidence"
+    temporary = path + ".v2.tmp"
     with open(temporary, "w", encoding="utf-8") as handle:
         json.dump(report, handle, ensure_ascii=False, indent=1, sort_keys=True)
         handle.flush()
@@ -213,10 +271,13 @@ def _rewrite_throughput_receipt(path):
 
 
 def main():
+    base._manifest = _manifest
     base._session = _timed_session
     base._crash_process = _safe_crash_process
     code = base.main()
-    report = _rewrite_throughput_receipt(_out_argument())
+    report = _rewrite_receipt(_out_argument())
+    if report.get("status") != "PASS" or report.get("passed") is not True:
+        code = 1
     print(json.dumps({
         "distributed_v2_receipt_rewrite": "PASS",
         "baseline_events": report["baseline_events"],
@@ -225,6 +286,7 @@ def main():
         "campaign_elapsed_seconds": report["campaign_elapsed_seconds"],
         "whole_process_crash_recovery": (report.get("tests") or {}).get(
             "whole_process_crash_recovery"),
+        "whole_process_crash_evidence": report.get("whole_process_crash_evidence"),
     }, ensure_ascii=False, indent=1, sort_keys=True))
     return code
 
