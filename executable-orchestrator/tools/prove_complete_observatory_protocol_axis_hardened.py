@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Baseline-versus-mutant axis-probe extension of the causal protocol-v5 Docker E2E proof.
 
-The inherited proof verifies exact mutated source bytes, process/evaluator receipts, inert controls,
-portable owner signatures and every architecture arena. This final layer independently reopens each
-``observatory-axis-probe-v1`` baseline and mutant report, rehashes both reports and both source files,
-requires one shared probe identity, and verifies that the original passes while the exact mutant fails
-with candidate-origin axis behavior. It also proves that every probe report is indexed directly in the
-deterministic supremacy dossier. Diagnostic token matching or definition names cannot earn credit.
+The inherited proof verifies exact mutated source bytes, process receipts, inert controls, portable
+owner signatures and every architecture arena. This final layer reopens each
+``observatory-axis-probe-v1`` baseline and mutant report, rehashes both reports and source files,
+requires the exact v2 evaluator bytes from the disposable clone, and proves that the original passes
+while the exact mutant fails the same hidden probe. Every probe report is also required in the direct
+deterministic supremacy-dossier evidence index.
 """
 from __future__ import annotations
 
@@ -17,6 +17,9 @@ import prove_complete_observatory_protocol_causal_provider_hardened as previous
 
 CORE = previous.base.CORE
 PROBE_CONTRACT = "observatory-axis-probe-v1"
+PROBE_EVALUATOR = "observatory_axis_probe_arena_v2.py"
+PROBE_EVALUATOR_PATH = (
+    "private-evaluator/evaluator/" + PROBE_EVALUATOR)
 AXIS_FILES = {
     "executable-orchestrator/lawmax21/"
     "observatory_causal_axis_attribution_hardening.py",
@@ -27,6 +30,7 @@ AXIS_FILES = {
     "executable-orchestrator/lawmax21/"
     "observatory_causal_behavioral_probe_hardening.py",
     "private-evaluator/evaluator/observatory_axis_probe_arena.py",
+    PROBE_EVALUATOR_PATH,
     "executable-orchestrator/tools/"
     "prove_complete_observatory_protocol_axis_hardened.py",
 }
@@ -48,6 +52,16 @@ def _runtime_path(runtime, relative):
     if path != root and not path.startswith(root + os.sep):
         raise RuntimeError(
             "axis-probe E2E evidence escapes runtime: " + str(relative))
+    return path
+
+
+def _repo_path(repo, relative):
+    path = os.path.abspath(os.path.join(
+        repo, *str(relative).replace("\\", "/").split("/")))
+    root = os.path.abspath(repo)
+    if path != root and not path.startswith(root + os.sep):
+        raise RuntimeError(
+            "axis-probe E2E protocol file escapes repository: " + str(relative))
     return path
 
 
@@ -98,6 +112,7 @@ def _probe_report(runtime, task, details, variant):
             f"axis-probe {variant}: exact source receipt failed")
     identity = details.get("axis_probe_task_identity_sha256")
     if report.get("contract") != PROBE_CONTRACT \
+            or details.get("axis_probe_evaluator") != PROBE_EVALUATOR \
             or report.get("variant") != variant \
             or report.get("evidence_path") != relative \
             or report.get("axis") != task.get("axis") \
@@ -106,7 +121,7 @@ def _probe_report(runtime, task, details, variant):
             or report.get("seed") != details.get("axis_probe_seed") \
             or report.get("task_identity_sha256") != identity:
         raise RuntimeError(
-            f"axis-probe {variant}: probe/task identity drift")
+            f"axis-probe {variant}: evaluator/probe/task identity drift")
     checks = report.get("checks") or []
     if not checks or not all(
             isinstance(row, dict) and isinstance(row.get("passed"), bool)
@@ -156,6 +171,7 @@ def _probe_pair(runtime, task):
             or task.get("observed_candidate_pass") is not False \
             or details.get("mode") != "baseline-versus-mutant-axis-probe" \
             or details.get("axis_probe_contract") != PROBE_CONTRACT \
+            or details.get("axis_probe_evaluator") != PROBE_EVALUATOR \
             or details.get("same_axis_probe") is not True \
             or details.get("baseline_axis_probe_passed") is not True \
             or details.get("mutant_axis_probe_failed") is not True \
@@ -164,7 +180,7 @@ def _probe_pair(runtime, task):
                 "axis_probe_task_identity_sha256")) \
             or not _definition_receipt_valid(details):
         raise RuntimeError(
-            "axis-probe task lacks an authoritative behavioral pair")
+            "axis-probe task lacks an authoritative v2 behavioral pair")
     baseline = _probe_report(runtime, task, details, "baseline")
     mutant = _probe_report(runtime, task, details, "mutant")
     if baseline["probe_id"] != mutant["probe_id"] \
@@ -184,6 +200,8 @@ def _probe_pair(runtime, task):
         "axis": task.get("axis"),
         "group": task.get("group"),
         "artifact": task.get("artifact"),
+        "probe_contract": PROBE_CONTRACT,
+        "probe_evaluator": PROBE_EVALUATOR,
         "probe_id": baseline["probe_id"],
         "seed": baseline["seed"],
         "expected_sha256": baseline["expected_sha256"],
@@ -222,6 +240,7 @@ def _verify_campaign(runtime, incumbent, label):
         "axis_specific_tasks": len(pairs),
         "axis_behavioral_failures": len(pairs),
         "axis_probe_contract": PROBE_CONTRACT,
+        "axis_probe_evaluator": PROBE_EVALUATOR,
         "axis_probe_pairs": len(pairs),
         "axis_probe_reports": len(paths),
         "whole_receipt_searched": False,
@@ -264,6 +283,16 @@ def _verify(repo, runtime, source_head, preflight, launch):
             "signed protocol omitted axis-probe files: "
             + ", ".join(missing))
 
+    evaluator_path = _repo_path(repo, PROBE_EVALUATOR_PATH)
+    if not os.path.isfile(evaluator_path):
+        raise RuntimeError("hardened axis-probe evaluator is absent from clone")
+    evaluator_receipt = {
+        "name": PROBE_EVALUATOR,
+        "path": PROBE_EVALUATOR_PATH,
+        "sha256": CORE.sha256_file(evaluator_path),
+        "bytes": os.path.getsize(evaluator_path),
+    }
+
     incumbent = verified["incumbent"]
     campaigns = {
         label: _verify_campaign(runtime, incumbent, label)
@@ -283,6 +312,8 @@ def _verify(repo, runtime, source_head, preflight, launch):
             or causal_audit.get(
                 "axis_behavioral_probe_contract") != PROBE_CONTRACT \
             or causal_audit.get(
+                "axis_behavioral_probe_evaluator") != PROBE_EVALUATOR \
+            or causal_audit.get(
                 "all_tasks_have_baseline_mutant_probe_pairs") is not True \
             or causal_audit.get(
                 "all_tasks_axis_behaviorally_falsified") is not True \
@@ -293,11 +324,15 @@ def _verify(repo, runtime, source_head, preflight, launch):
             or causal_audit.get(
                 "group_failure_path_is_sufficient") is not False:
         raise RuntimeError(
-            "independent audit did not reproduce complete axis-probe pairs")
+            "independent audit did not reproduce v2 axis-probe pairs")
 
     dossier_path = os.path.join(
         runtime, "architecture", "OMEGA-SUPREMACY-DOSSIER.json")
     dossier = _read(dossier_path)
+    dossier_evaluator = dossier.get("axis_probe_evaluator") or {}
+    if dossier_evaluator != evaluator_receipt:
+        raise RuntimeError(
+            "supremacy dossier does not bind exact v2 axis-probe evaluator bytes")
     evidence_index = {
         row.get("path"): row
         for row in dossier.get("evidence_index") or []
@@ -307,6 +342,7 @@ def _verify(repo, runtime, source_head, preflight, launch):
         receipt = causal_dossier.get(label) or {}
         mapped = _dossier_pair_map(receipt)
         if receipt.get("axis_probe_contract") != PROBE_CONTRACT \
+                or receipt.get("axis_probe_evaluator") != evaluator_receipt \
                 or receipt.get(
                     "all_tasks_have_baseline_mutant_probe_pairs") is not True \
                 or int(receipt.get("axis_probe_pairs", 0)) != campaign[
@@ -315,10 +351,11 @@ def _verify(repo, runtime, source_head, preflight, launch):
                     "axis_probe_reports"] \
                 or len(mapped) != campaign["axis_probe_pairs"]:
             raise RuntimeError(
-                f"supremacy dossier does not bind all {label} axis-probe pairs")
+                f"supremacy dossier does not bind all {label} v2 axis-probe pairs")
         for pair in campaign["pairs"]:
             dossier_pair = mapped.get(pair["task_identity_sha256"]) or {}
             if dossier_pair.get("probe_contract") != PROBE_CONTRACT \
+                    or dossier_pair.get("probe_evaluator") != PROBE_EVALUATOR \
                     or dossier_pair.get("probe_id") != pair["probe_id"] \
                     or dossier_pair.get("seed") != pair["seed"] \
                     or dossier_pair.get("expected_sha256") != pair[
@@ -353,6 +390,7 @@ def _verify(repo, runtime, source_head, preflight, launch):
     verified["axis_specific_causal_attribution_verified"] = campaigns
     verified["axis_specific_behavioral_failure_verified"] = True
     verified["axis_probe_pairs_verified"] = campaigns
+    verified["axis_probe_evaluator_verified"] = evaluator_receipt
     verified["axis_probe_dossier_index_verified"] = True
     return verified
 
