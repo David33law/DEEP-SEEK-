@@ -5,6 +5,9 @@ The mission/protocol version remains Observatory Research Protocol 5. Static-v7 
 fault topology, the dynamic E2E passes through the actual-container fault verifier, and the final
 receipt requires both durable and distributed reference/crown evidence to prove death during an
 in-flight operation under exact owner-bound crash workloads. No real provider route is changed.
+
+The wrapper bootstraps the repository-local ``lawmax21`` package before importing any proof extension,
+so direct execution is independent of the caller's current working directory and PYTHONPATH.
 """
 from __future__ import annotations
 
@@ -12,11 +15,18 @@ import json
 import os
 import sys
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+ORCH = os.path.dirname(HERE)
+ROOT = os.path.dirname(ORCH)
+LAWMAX_PACKAGE = os.path.join(ORCH, "lawmax21", "__init__.py")
+if not os.path.isfile(LAWMAX_PACKAGE):
+    raise RuntimeError("protocol-v6 cannot locate lawmax21 package: " + LAWMAX_PACKAGE)
+if ORCH not in sys.path:
+    sys.path.insert(0, ORCH)
+
 import prove_complete_observatory_protocol_fault_hardened as fault_e2e
 import prove_complete_observatory_protocol_v5 as base
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
 STATIC_V7 = os.path.join(HERE, "prove_observatory_protocol_static_v7.py")
 STATIC_V7_REPORT = os.path.join(ROOT, "proof", "observatory-protocol-static-v7.json")
 E2E_REPORT = base.E2E_REPORT
@@ -43,6 +53,7 @@ REQUIRED_STATIC_V7_GATES = (
     "fault_mid_operation_crash_static_bound",
     "fault_exact_workloads_static_bound",
     "authoritative_fault_final_entry_static_bound",
+    "authoritative_entrypoint_standalone_import_static_bound",
 )
 
 
@@ -138,6 +149,7 @@ def main(argv=None):
         report["fault_injection_actual_container_bound"] = True
         report["fault_injection_mid_operation_bound"] = True
         report["fault_workloads_owner_bound"] = True
+        report["authoritative_entrypoint_standalone_import_bound"] = True
         report["systems_reference_calibration"] = systems_calibration
         report["distributed_reference_calibration"] = distributed_calibration
         report["systems_actual_container_crown"] = systems
