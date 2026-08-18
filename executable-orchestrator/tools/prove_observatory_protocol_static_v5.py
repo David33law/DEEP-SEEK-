@@ -3,10 +3,10 @@
 
 The inherited portable-owner proof remains responsible for the full Observatory protocol. This final
 extension verifies that every causal task is routed through the exact hardened
-``observatory_axis_probe_arena_v2.py`` seat, that the owner-signed protocol census includes its bytes,
-that semantic thresholds equal the signed Pareto minima, that formal commutativity is required only
-when claimed, and that audit, dossier, Docker E2E and final proof all bind the same evaluator.
-No provider call, candidate execution or owner mutation occurs here.
+``observatory_axis_probe_arena_v2.py`` seat, imports that seat to execute its fail-closed formal-probe
+patch, compares its semantic thresholds to the owner-signed Pareto contract, and requires audit,
+dossier, Docker E2E and final proof to bind the same evaluator bytes. No provider call, candidate
+execution or owner mutation occurs here.
 """
 from __future__ import annotations
 
@@ -103,6 +103,57 @@ def _ordered(text, tokens, label):
         raise RuntimeError(label + " order drifted")
 
 
+def _import_probe_v2():
+    evaluator_dir = os.path.join(
+        ROOT, "private-evaluator", "evaluator")
+    if evaluator_dir not in sys.path:
+        sys.path.insert(0, evaluator_dir)
+    importlib.invalidate_caches()
+    module = importlib.import_module(
+        "observatory_axis_probe_arena_v2")
+    if getattr(module, "main", None) is not getattr(
+            module.base, "main", None):
+        raise RuntimeError(
+            "v2 axis-probe entrypoint does not delegate to the patched base arena")
+    formal_probe = module.base.FORMAL_PROBE
+    for token in (
+            'check("derivation-replay-root"',
+            'manifest.get("commutative_independent_admissions") is True',
+            'check("derivation-order-claimed"',
+            'check("derivation-order-not-claimed"'):
+        if token not in formal_probe:
+            raise RuntimeError(
+                "v2 formal probe patch did not execute: " + token)
+    if 'check("derivation-order",' in formal_probe:
+        raise RuntimeError(
+            "v2 formal probe retained unconditional order convergence")
+    with open(
+            _path("profiles/national-observatory/PARETO-DIMENSIONS.json"),
+            encoding="utf-8") as handle:
+        rows = json.load(handle)
+    by_id = {
+        row.get("id"): row for row in rows
+        if isinstance(row, dict) and row.get("id")}
+    expected = {}
+    dimensions = sorted({
+        dimension
+        for values in module.base.SEMANTIC_DIMENSIONS.values()
+        for dimension in values})
+    for dimension in dimensions:
+        row = by_id.get(dimension) or {}
+        value = row.get("hard_minimum")
+        if row.get("direction") != "higher" \
+                or not isinstance(value, (int, float)):
+            raise RuntimeError(
+                "owner-signed Pareto contract lacks semantic hard minimum: "
+                + dimension)
+        expected[dimension] = float(value)
+    if module.SEMANTIC_HARD_MINIMA != expected:
+        raise RuntimeError(
+            "v2 semantic minima differ from owner-signed Pareto contract")
+    return module, expected
+
+
 def main():
     result = {
         "proof": "observatory-protocol-static-v5-axis-probe-v2-closure",
@@ -132,6 +183,8 @@ def main():
         imported = [
             importlib.import_module(name).__name__
             for name in REQUIRED_MODULES]
+        probe_module, signed_minima = _import_probe_v2()
+        imported.append(probe_module.__name__)
         if protocol.PROTOCOL_VERSION != PROTOCOL_VERSION:
             raise RuntimeError("wrong protocol version")
         for flag in (
@@ -226,11 +279,10 @@ def main():
         probe_v2 = _text(PROBE_EVALUATOR_PATH)
         _require(probe_v2, (
             "Contract-compatible hardening",
-            "SEMANTIC_HARD_MINIMA",
-            '"temporal_reconstruction_accuracy": 0.99',
-            '"canonical_identity_accuracy": 0.995',
-            '"jurisprudence_temporal_link_accuracy": 0.98',
-            '"provenance_completeness": 0.995',
+            "PARETO-DIMENSIONS.json",
+            "def _load_hard_minima",
+            "SEMANTIC_HARD_MINIMA = _load_hard_minima()",
+            "hard_minimum",
             "commutative_independent_admissions",
             "derivation-order-claimed",
             "derivation-order-not-claimed",
@@ -410,8 +462,10 @@ def main():
             "axis_specific_behavioral_failure_verified": True,
             "axis_probe_contract_verified": True,
             "axis_probe_evaluator_v2_verified": True,
+            "axis_probe_evaluator_imported": True,
             "axis_probe_evaluator_bytes_bound": True,
             "axis_probe_signed_hard_minima_verified": True,
+            "axis_probe_signed_hard_minima": signed_minima,
             "axis_probe_conditional_commutativity_verified": True,
             "axis_probe_task_identity_bound": True,
             "axis_probe_baseline_mutant_pair_required": True,
