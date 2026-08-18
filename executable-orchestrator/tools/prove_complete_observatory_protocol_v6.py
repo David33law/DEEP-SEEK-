@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Authoritative protocol-v6 proof wrapper for the protocol-v5 Observatory mission.
 
-The mission/protocol version remains Observatory Research Protocol 5. This proof seat advances the
-verification chain: static-v7 closes calibrated fault topology, the dynamic E2E passes through the
-actual-container fault verifier, and the final receipt requires durable reference calibration,
-durable crown and distributed crown to prove container death while the tested operation is still in
-flight. No real provider route is changed.
+The mission/protocol version remains Observatory Research Protocol 5. Static-v7 closes calibrated
+fault topology, the dynamic E2E passes through the actual-container fault verifier, and the final
+receipt requires both durable and distributed reference/crown evidence to prove death during an
+in-flight operation under exact owner-bound crash workloads. No real provider route is changed.
 """
 from __future__ import annotations
 
@@ -38,8 +37,11 @@ REQUIRED_STATIC_V7_GATES = (
     "distributed_authority_files_static_bound",
     "distributed_baseline_metric_static_bound",
     "distributed_atomic_batch_reference_static_bound",
-    "distributed_crash_floor_static_bound",
+    "distributed_crash_workload_static_bound",
     "fault_evaluator_production_routing_static_bound",
+    "fault_mid_operation_crash_static_bound",
+    "fault_exact_workloads_static_bound",
+    "authoritative_fault_final_entry_static_bound",
 )
 
 
@@ -84,22 +86,27 @@ def main(argv=None):
                 "static-v7 fault closure incomplete: " + ", ".join(missing))
 
         verification = report.get("protocol_verification") or {}
-        calibration = verification.get(
+        systems_calibration = verification.get(
             "systems_reference_calibration_verified") or {}
+        distributed_calibration = verification.get(
+            "distributed_reference_calibration_verified") or {}
         systems = verification.get(
             "systems_actual_container_crown_verified") or {}
         distributed = verification.get(
             "distributed_actual_container_crown_verified") or {}
         if verification.get("fault_injection_actual_container_verified") is not True \
                 or verification.get("fault_injection_mid_operation_verified") is not True \
-                or calibration.get("status") != "PASS" \
+                or verification.get("fault_workloads_owner_bound_verified") is not True \
+                or systems_calibration.get("status") != "PASS" \
+                or distributed_calibration.get("status") != "PASS" \
                 or systems.get("status") != "PASS" \
                 or distributed.get("status") != "PASS":
             raise RuntimeError(
-                "dynamic mid-operation actual-container fault verification is incomplete")
+                "dynamic mid-operation owner-bound fault verification is incomplete")
 
         for label, row in (
-                ("systems calibration", calibration),
+                ("systems calibration", systems_calibration),
+                ("distributed calibration", distributed_calibration),
                 ("systems crown", systems),
                 ("distributed crown", distributed)):
             crash = row.get("crash") or {}
@@ -124,15 +131,19 @@ def main(argv=None):
             "report_sha256": fault_e2e.sha256_file(STATIC_V7_REPORT),
         }
         report["systems_reference_calibration_bound"] = True
+        report["distributed_reference_calibration_bound"] = True
         report["systems_actual_container_crown_bound"] = True
         report["distributed_actual_container_crown_bound"] = True
         report["fault_injection_actual_container_bound"] = True
         report["fault_injection_mid_operation_bound"] = True
-        report["systems_reference_calibration"] = calibration
+        report["fault_workloads_owner_bound"] = True
+        report["systems_reference_calibration"] = systems_calibration
+        report["distributed_reference_calibration"] = distributed_calibration
         report["systems_actual_container_crown"] = systems
         report["distributed_actual_container_crown"] = distributed
         report["cli_process_death_cannot_earn_fault_credit"] = True
         report["post_operation_container_death_cannot_earn_crash_credit"] = True
+        report["implicit_fault_workload_cannot_earn_credit"] = True
         report["final_closure_v6_verified"] = True
         report["final_closure_verified"] = True
         base._atomic_write(E2E_REPORT, report)
