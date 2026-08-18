@@ -1,9 +1,8 @@
 """Route all specialized candidate evaluators through output-bounded v2 entrypoints.
 
 Every dynamic specialized receipt is source-bound to the exact candidate and carries the bounded
-process witness.  Durable systems additionally receives the owner-signed forced-crash workload; the
-production route therefore cannot silently fall back to an evaluator default that differs from the
-signed mission.
+process witness. Durable and distributed process-death workloads are explicit owner-bound inputs;
+production cannot silently fall back to evaluator defaults.
 """
 import hashlib
 import os
@@ -66,17 +65,17 @@ def _systems(ctx, cid, label, events):
     out = A(ctx, "reports", f"systems-{label}-{cid}.json")
     seed = int(hashlib.sha256(
         f"systems|{label}|{ctx.run_id}|{cid}".encode()).hexdigest()[:8], 16)
+    crash_events = protocol.workload("systems", "crash_events")
     result = subprocess.run([
         sys.executable,
         os.path.join(ctx.evaluator_dir, "observatory_systems_arena_v2.py"),
         "--candidate", path, "--out", out, "--seed", str(seed),
         "--large-events", str(events),
-        "--crash-events", str(protocol.workload("systems", "crash_events"))],
+        "--crash-events", str(crash_events)],
         capture_output=True, text=True)
     report = _finish(ctx, out, result, path)
     report["owner_signed_large_events"] = int(events)
-    report["owner_signed_crash_events"] = protocol.workload(
-        "systems", "crash_events")
+    report["owner_signed_crash_events"] = int(crash_events)
     if report.get("evidence_path"):
         atomic_write_json(out, report)
     return report
@@ -90,6 +89,7 @@ def _distributed(ctx, cid, label, events):
     out = A(ctx, "reports", f"distributed-{label}-{cid}.json")
     seed = int(hashlib.sha256(
         f"distributed|{label}|{ctx.run_id}|{cid}".encode()).hexdigest()[:8], 16)
+    crash_events = protocol.workload("distributed", "crash_events")
     result = subprocess.run([
         sys.executable,
         os.path.join(ctx.evaluator_dir, "observatory_distributed_arena_v2.py"),
@@ -98,12 +98,12 @@ def _distributed(ctx, cid, label, events):
             ctx, cid, "replication_distribution_model"),
         "--expected-commit-model", distributed._model(
             ctx, cid, "consistency_commit_model"),
-        "--seed", str(seed), "--large-events", str(events)],
+        "--seed", str(seed), "--large-events", str(events),
+        "--crash-events", str(crash_events)],
         capture_output=True, text=True)
     report = _finish(ctx, out, result, path)
     report["owner_signed_large_events"] = int(events)
-    report["owner_signed_crash_event_floor"] = protocol.workload(
-        "distributed", "crash_event_floor")
+    report["owner_signed_crash_events"] = int(crash_events)
     if report.get("evidence_path"):
         atomic_write_json(out, report)
     return report
