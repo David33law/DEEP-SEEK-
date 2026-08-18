@@ -5,12 +5,25 @@ This wrapper reopens the owner-ceremony durable systems calibration and the fina
 crown reports while the disposable proof clone/runtime still exist. A PASS requires actual runtime
 container death during an in-flight operation, absence before recovery, complete durable manifest
 evidence, exact signed proof workloads and the corrected distributed baseline metric.
+
+The wrapper bootstraps ``executable-orchestrator`` before importing ``lawmax21`` so it is directly
+executable from any working directory with no inherited PYTHONPATH.
 """
 from __future__ import annotations
 
 import json
 import math
 import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ORCH = os.path.dirname(HERE)
+ROOT = os.path.dirname(ORCH)
+LAWMAX_PACKAGE = os.path.join(ORCH, "lawmax21", "__init__.py")
+if not os.path.isfile(LAWMAX_PACKAGE):
+    raise RuntimeError("fault proof cannot locate lawmax21 package: " + LAWMAX_PACKAGE)
+if ORCH not in sys.path:
+    sys.path.insert(0, ORCH)
 
 import prove_complete_observatory_protocol_calibration_hardened as previous
 from lawmax21 import observatory_protocol
@@ -171,9 +184,27 @@ def _verify_systems_calibration(repo, preflight):
 def _verify_distributed_calibration(repo, preflight):
     receipt_path = _repo_path(repo, CALIBRATION_RECEIPT)
     report_path = _repo_path(repo, DISTRIBUTED_REPORT)
+    if not os.path.isfile(receipt_path) or not os.path.isfile(report_path):
+        raise RuntimeError("distributed reference calibration evidence is missing")
     receipt = _read(receipt_path)
     campaign = (receipt.get("campaigns") or {}).get("distributed") or {}
     sources = (receipt.get("sources") or {}).get("distributed") or {}
+    expected_sources = {
+        "benchmark/observatory_distributed_reference_candidate.py",
+        "private-evaluator/evaluator/observatory_distributed_arena_v2.py",
+    }
+    if set(sources) != expected_sources:
+        raise RuntimeError("distributed calibration source census is not the exact v2 pair")
+    for relative, expected_sha in sources.items():
+        path = _repo_path(repo, relative)
+        if not os.path.isfile(path) or CORE.sha256_file(path) != expected_sha:
+            raise RuntimeError("distributed calibration source hash drift: " + relative)
+    protocol = preflight.get("research_protocol") or {}
+    specialized_sources = (protocol.get("specialized_sources") or {}).get("distributed") or {}
+    specialized_calibration = protocol.get("specialized_calibration") or {}
+    if specialized_sources != sources \
+            or "distributed" not in set(specialized_calibration.get("campaigns") or []):
+        raise RuntimeError("preflight did not independently bind distributed calibration")
     if campaign.get("status") not in ("PASS", "OK") \
             or campaign.get("passed") is not True \
             or campaign.get("report_path") != DISTRIBUTED_REPORT \
@@ -289,5 +320,4 @@ __all__ = ["main", "sha256_file"]
 
 
 if __name__ == "__main__":
-    import sys
     sys.exit(main())
