@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Static closure extension for causal controlled-genome realization.
+"""Static closure extension for axis-behavioral controlled-genome realization.
 
 Runs the complete portable-owner protocol-v5 static proof, then verifies the final production wiring
 as one owner-bindable mechanism: audit-v3 candidate identity, exact-source evaluator receipts with
-bounded process witnesses, causal definition-set ablation, failure-scoped axis attribution, cited-
-definition semantics, deterministic dossier binding, exactly one causal localhost-provider route and
-the authoritative Docker E2E entrypoint. No provider call, candidate execution or owner mutation
-occurs here.
+bounded process witnesses, causal definition-set ablation, failure-only attribution, deterministic
+AST-body receipts, mandatory axis-specific behavioral failure, deterministic dossier binding, exactly
+one causal localhost-provider route and the authoritative Docker E2E entrypoint. No provider call,
+candidate execution or owner mutation occurs here.
 """
 from __future__ import annotations
 
@@ -97,7 +97,7 @@ def _ordered(text, tokens, label):
 
 def main():
     result = {
-        "proof": "observatory-protocol-static-v5-causal-closure",
+        "proof": "observatory-protocol-static-v5-axis-behavioral-closure",
         "provider_calls": 0,
         "candidate_executions": 0,
         "status": "FAIL",
@@ -129,7 +129,8 @@ def main():
         for flag in (
                 "causal_genome_ablation_required",
                 "causal_genome_negative_controls_required",
-                "axis_specific_causal_attribution_required"):
+                "axis_specific_causal_attribution_required",
+                "axis_specific_behavioral_failure_required"):
             if protocol.MISSION_FLAGS.get(flag) is not True:
                 raise RuntimeError("signed mission flag absent: " + flag)
         if int(protocol.SEARCH_POLICY.get(
@@ -244,22 +245,31 @@ def main():
             "observatory_causal_definition_semantics_hardening.py")
         _require(definition_semantics, (
             "def _definition_axis_support",
+            "definition_body_sha256",
             "definition_vocabulary_sha256_inputs",
-            "matched_source_axis_tokens",
-            "source_semantic_support",
+            "definition_vocabulary_sha256",
+            "behavioral_axis_evidence",
+            "removed_definition_name_is_sufficient",
+            "group_path_is_sufficient",
+            "genome_axis_behavioral_failure_required",
             "whole_receipt_searched",
             "axis._attribution = attribution"),
-            "cited-definition semantic attribution")
+            "axis-behavioral definition attribution")
 
         contract = _text(
             "profiles/national-observatory/GENOME-REALIZATION-CONTRACT.md")
         _require(contract, (
+            "Controlled Genome Realization Contract v4",
             "Causal source-ablation proof",
-            "Axis-specific failure attribution",
+            "Axis-specific behavioral failure attribution",
             "Inert negative controls",
             "auditor-specific axis/group/artifact citation set",
             "Every task in replication and crown",
             "Infrastructure refusal",
+            "`behavioral_axis_evidence=true`",
+            "`removed_definition_name_is_sufficient=false`",
+            "`group_path_is_sufficient=false`",
+            "`axis_specific_behavioral_failure_required=true`",
             "genome_causal_ablation_replication_passed",
             "genome_causal_ablation_crown_passed"),
             "genome realization contract")
@@ -270,6 +280,10 @@ def main():
             "causal_replication", "causal_crown",
             "axis_specific_attribution_required",
             "all_tasks_axis_specifically_attributed",
+            "axis_specific_behavioral_failure_required",
+            "all_tasks_axis_behaviorally_falsified",
+            "removed_definition_name_is_sufficient",
+            "group_failure_path_is_sufficient",
             "negative_controls", "exact_mutated_source_receipts_required"),
             "independent audit causal receipt")
         causal_dossier = _text(
@@ -279,7 +293,13 @@ def main():
             "def _attribution_valid",
             "all_ablation_mutations_destroyed_claimed_behavior",
             "axis_specific_failure_attributed",
-            "cited_definition_semantics_checked",
+            "axis_specific_behavioral_failure_required",
+            "axis_behavioral_failures",
+            "behavioral_axis_evidence",
+            "definition_body_sha256",
+            "definition_vocabulary_sha256",
+            "removed_definition_name_is_sufficient",
+            "group_path_is_sufficient",
             "whole_receipt_searched",
             "negative_controls_passed",
             "genome_causal_ablation_replication",
@@ -315,17 +335,18 @@ def main():
             "executable-orchestrator/tools/"
             "prove_complete_observatory_protocol_axis_hardened.py")
         _require(axis_e2e, (
-            "axis_specific_failure_attributed",
+            "axis_specific_behavioral_failure_required",
+            "behavioral_axis_evidence",
+            "definition_body_sha256",
+            "definition_vocabulary_sha256",
             "matched_dimensions",
             "matched_axis_failure_tokens",
-            "matched_group_path_tokens",
-            "definition_vocabulary_sha256_inputs",
-            "source_semantic_support",
-            "whole_receipt_searched",
-            "cited_definition_semantics_checked",
-            "axis_specific_causal_attribution_required",
-            "all_tasks_axis_specifically_attributed"),
-            "axis-specific Docker E2E verifier")
+            "removed_definition_name_is_sufficient",
+            "group_path_is_sufficient",
+            "axis_behavioral_failures",
+            "all_tasks_axis_behaviorally_falsified",
+            "whole_receipt_searched"),
+            "axis-behavioral Docker E2E verifier")
 
         provider = _text(
             "executable-orchestrator/tools/"
@@ -349,7 +370,6 @@ def main():
             "OVERRIDES",
             "governance_evolution_model",
             "apply_change",
-            "Production",
             "causal mock citation drift"),
             "causal-aware local provider")
         final_entry = _text(
@@ -360,7 +380,10 @@ def main():
             "prove_complete_observatory_protocol_axis_hardened",
             "causal_genome_ablation_bound",
             "axis_specific_causal_attribution_bound",
-            "failure_scoped_causal_attribution_bound"),
+            "failure_scoped_causal_attribution_bound",
+            "cited_definition_semantics_bound",
+            "axis_specific_behavioral_failure_verified",
+            "final_closure_verified"),
             "authoritative causal proof entrypoint")
         stable = _text(
             "executable-orchestrator/tools/run_observatory_proof.py")
@@ -381,8 +404,10 @@ def main():
             "bounded_evaluator_process_witnesses_verified": True,
             "auditor_specific_definition_set_ablation": True,
             "axis_specific_causal_attribution_verified": True,
+            "axis_specific_behavioral_failure_verified": True,
             "failure_scoped_attribution_verified": True,
             "cited_definition_semantics_verified": True,
+            "deterministic_definition_body_receipts_verified": True,
             "inert_negative_controls_required": True,
             "exact_mutated_source_receipts_required": True,
             "infrastructure_failure_exclusion_verified": True,
