@@ -40,8 +40,7 @@ def snapshot():
             "qualification": distributed.DISTRIBUTED_QUAL_EVENTS,
             "replication": distributed.DISTRIBUTED_REPLICATION_EVENTS,
             "crown": distributed.DISTRIBUTED_CROWN_EVENTS,
-            "crash_event_floor": protocol.workload(
-                "distributed", "crash_event_floor")},
+            "crash_events": protocol.workload("distributed", "crash_events")},
         "scale": {
             "qualification": scale.SCALE_QUAL_EVENTS,
             "replication": scale.SCALE_REPLICATION_EVENTS,
