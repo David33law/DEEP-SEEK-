@@ -2,10 +2,12 @@
 """Authoritative protocol-v6 proof wrapper for the protocol-v5 Observatory mission.
 
 The mission/protocol version remains Observatory Research Protocol 5. Static-v8 strictly extends the
-calibrated static-v7 fault topology with standalone cwd/PYTHONPATH-independent import closure. The
-dynamic E2E passes through the actual-container fault verifier, and the final receipt requires both
-durable and distributed reference/crown evidence to prove death during an in-flight operation under
-exact owner-bound crash workloads. No real provider route is changed.
+calibrated static-v7 fault topology with standalone cwd/PYTHONPATH-independent import closure;
+``prove_observatory_protocol_static_v8.py`` executes ``prove_observatory_protocol_static_v7.py`` as
+its inherited fault-closure seat rather than replacing that evidence chain. The dynamic E2E passes
+through the actual-container fault verifier, and the final receipt requires both durable and
+distributed reference/crown evidence to prove death during an in-flight operation under exact
+owner-bound crash workloads. No real provider route is changed.
 
 The wrapper bootstraps the repository-local ``lawmax21`` package before importing any proof extension,
 so direct execution is independent of the caller's current working directory and PYTHONPATH.
