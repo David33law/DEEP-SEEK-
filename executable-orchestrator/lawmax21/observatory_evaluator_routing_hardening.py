@@ -2,11 +2,11 @@
 
 Every dynamic specialized receipt is source-bound to the exact candidate and carries the bounded
 process witness. Durable and distributed process-death workloads are explicit owner-bound inputs;
-production cannot silently fall back to evaluator defaults.
+production cannot silently fall back to evaluator defaults. Trusted parent/evaluator subprocesses use
+the canonical strict UTF-8 process seat so host locale cannot alter legal/candidate text transport.
 """
 import hashlib
 import os
-import subprocess
 import sys
 
 from . import observatory_crown_overlay as crown
@@ -15,6 +15,7 @@ from . import observatory_formal_overlay as formal
 from . import observatory_interoperability_overlay as interop
 from . import observatory_protocol as protocol
 from . import observatory_scale_overlay as scale
+from . import observatory_utf8_process as utf8_process
 from .canonical import atomic_write_json, read_json
 from .handlers import A
 
@@ -35,6 +36,7 @@ def _process_receipt(result):
         "evaluator_returncode": result.returncode,
         "evaluator_stdout_tail": (result.stdout or "")[-_EVALUATOR_TAIL_LIMIT:],
         "evaluator_stderr_tail": (result.stderr or "")[-_EVALUATOR_TAIL_LIMIT:],
+        "evaluator_transport_encoding": utf8_process.ENCODING,
     }
 
 
@@ -57,6 +59,10 @@ def _finish(ctx, out, result, path):
     return report
 
 
+def _run(command):
+    return utf8_process.run(command, capture_output=True)
+
+
 def _systems(ctx, cid, label, events):
     path = crown._systems_path(ctx, cid)
     if not os.path.exists(path):
@@ -66,13 +72,12 @@ def _systems(ctx, cid, label, events):
     seed = int(hashlib.sha256(
         f"systems|{label}|{ctx.run_id}|{cid}".encode()).hexdigest()[:8], 16)
     crash_events = protocol.workload("systems", "crash_events")
-    result = subprocess.run([
+    result = _run([
         sys.executable,
         os.path.join(ctx.evaluator_dir, "observatory_systems_arena_v2.py"),
         "--candidate", path, "--out", out, "--seed", str(seed),
         "--large-events", str(events),
-        "--crash-events", str(crash_events)],
-        capture_output=True, text=True)
+        "--crash-events", str(crash_events)])
     report = _finish(ctx, out, result, path)
     report["owner_signed_large_events"] = int(events)
     report["owner_signed_crash_events"] = int(crash_events)
@@ -90,7 +95,7 @@ def _distributed(ctx, cid, label, events):
     seed = int(hashlib.sha256(
         f"distributed|{label}|{ctx.run_id}|{cid}".encode()).hexdigest()[:8], 16)
     crash_events = protocol.workload("distributed", "crash_events")
-    result = subprocess.run([
+    result = _run([
         sys.executable,
         os.path.join(ctx.evaluator_dir, "observatory_distributed_arena_v2.py"),
         "--candidate", path, "--out", out,
@@ -99,8 +104,7 @@ def _distributed(ctx, cid, label, events):
         "--expected-commit-model", distributed._model(
             ctx, cid, "consistency_commit_model"),
         "--seed", str(seed), "--large-events", str(events),
-        "--crash-events", str(crash_events)],
-        capture_output=True, text=True)
+        "--crash-events", str(crash_events)])
     report = _finish(ctx, out, result, path)
     report["owner_signed_large_events"] = int(events)
     report["owner_signed_crash_events"] = int(crash_events)
@@ -118,15 +122,14 @@ def _scale(ctx, cid, label, events, candidate_path=None):
     seed = int(hashlib.sha256(
         f"scale|{label}|{ctx.run_id}|{cid}".encode()).hexdigest()[:8], 16)
     tail = max(1000, min(50000, max(1, events // 10)))
-    result = subprocess.run([
+    result = _run([
         sys.executable,
         os.path.join(ctx.evaluator_dir, "observatory_scale_arena_v2.py"),
         "--candidate", path, "--out", out,
         "--expected-scaling-model", scale._model(ctx, cid),
         "--seed", str(seed), "--events", str(events),
         "--tail-events", str(tail), "--partitions", str(scale.SCALE_PARTITIONS),
-        "--batch-size", str(scale.SCALE_BATCH), "--timeout", "14400"],
-        capture_output=True, text=True)
+        "--batch-size", str(scale.SCALE_BATCH), "--timeout", "14400"])
     return _finish(ctx, out, result, path)
 
 
@@ -145,7 +148,7 @@ def _formal(ctx, cid, perspective, label, depth, candidate_path=None):
         "--depth", str(depth), "--timeout", "14400"]
     for axis, value in formal._expected(ctx, cid).items():
         command.extend(["--expected-" + axis.replace("_", "-"), value])
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = _run(command)
     report = _finish(ctx, out, result, path)
     report["shared_hidden_corpus_id"] = hashlib.sha256(
         corpus.encode()).hexdigest()
@@ -169,7 +172,7 @@ def _interop(ctx, cid, perspective, label, cases, candidate_path=None):
         "--cases", str(cases)]
     for axis, value in interop._expected(ctx, cid).items():
         command.extend(["--expected-" + axis.replace("_", "-"), value])
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = _run(command)
     report = _finish(ctx, out, result, path)
     report["shared_hidden_corpus_id"] = hashlib.sha256(
         corpus.encode()).hexdigest()
