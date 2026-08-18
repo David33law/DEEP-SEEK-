@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Authoritative protocol-v6 proof wrapper for the protocol-v5 Observatory mission.
 
-The mission/protocol version remains Observatory Research Protocol 5. Static-v7 closes calibrated
-fault topology, the dynamic E2E passes through the actual-container fault verifier, and the final
-receipt requires both durable and distributed reference/crown evidence to prove death during an
-in-flight operation under exact owner-bound crash workloads. No real provider route is changed.
+The mission/protocol version remains Observatory Research Protocol 5. Static-v8 strictly extends the
+calibrated static-v7 fault topology with standalone cwd/PYTHONPATH-independent import closure. The
+dynamic E2E passes through the actual-container fault verifier, and the final receipt requires both
+durable and distributed reference/crown evidence to prove death during an in-flight operation under
+exact owner-bound crash workloads. No real provider route is changed.
 
 The wrapper bootstraps the repository-local ``lawmax21`` package before importing any proof extension,
 so direct execution is independent of the caller's current working directory and PYTHONPATH.
@@ -27,15 +28,15 @@ if ORCH not in sys.path:
 import prove_complete_observatory_protocol_fault_hardened as fault_e2e
 import prove_complete_observatory_protocol_v5 as base
 
-STATIC_V7 = os.path.join(HERE, "prove_observatory_protocol_static_v7.py")
-STATIC_V7_REPORT = os.path.join(ROOT, "proof", "observatory-protocol-static-v7.json")
+STATIC_V8 = os.path.join(HERE, "prove_observatory_protocol_static_v8.py")
+STATIC_V8_REPORT = os.path.join(ROOT, "proof", "observatory-protocol-static-v8.json")
 E2E_REPORT = base.E2E_REPORT
 PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5"
 
-base.STATIC = STATIC_V7
+base.STATIC = STATIC_V8
 base.e2e = fault_e2e
 
-REQUIRED_STATIC_V7_GATES = (
+REQUIRED_STATIC_V8_GATES = (
     "systems_reference_calibration_static_bound",
     "systems_preflight_calibration_static_bound",
     "systems_signed_workload_static_bound",
@@ -76,8 +77,8 @@ def main(argv=None):
     code = base.main(argv)
     if code != 0:
         return code
-    if not os.path.isfile(E2E_REPORT) or not os.path.isfile(STATIC_V7_REPORT):
-        print("protocol-v6 proof lacks final/static-v7 report", file=sys.stderr)
+    if not os.path.isfile(E2E_REPORT) or not os.path.isfile(STATIC_V8_REPORT):
+        print("protocol-v6 proof lacks final/static-v8 report", file=sys.stderr)
         return 1
 
     report = _read(E2E_REPORT)
@@ -87,15 +88,15 @@ def main(argv=None):
                 or report.get("final_closure_verified") is not True:
             raise RuntimeError("inherited final protocol-v5 closure is not PASS")
 
-        static = _read(STATIC_V7_REPORT)
+        static = _read(STATIC_V8_REPORT)
         missing = [
-            key for key in REQUIRED_STATIC_V7_GATES
+            key for key in REQUIRED_STATIC_V8_GATES
             if static.get(key) is not True]
         if static.get("status") != "PASS" \
                 or static.get("protocol_version") != PROTOCOL_VERSION \
                 or missing:
             raise RuntimeError(
-                "static-v7 fault closure incomplete: " + ", ".join(missing))
+                "static-v8 closure incomplete: " + ", ".join(missing))
 
         verification = report.get("protocol_verification") or {}
         systems_calibration = verification.get(
@@ -136,11 +137,13 @@ def main(argv=None):
 
         report["authoritative_entrypoint"] = (
             "prove_complete_observatory_protocol_v6.py")
-        report["static_v7_fault_closure"] = {
+        report["static_v8_authoritative_closure"] = {
             "status": static["status"],
             "protocol_bundle_sha256": static.get("protocol_bundle_sha256"),
-            **{key: static.get(key) for key in REQUIRED_STATIC_V7_GATES},
-            "report_sha256": fault_e2e.sha256_file(STATIC_V7_REPORT),
+            **{key: static.get(key) for key in REQUIRED_STATIC_V8_GATES},
+            "entrypoint_import_probes": static.get(
+                "authoritative_entrypoint_import_probes"),
+            "report_sha256": fault_e2e.sha256_file(STATIC_V8_REPORT),
         }
         report["systems_reference_calibration_bound"] = True
         report["distributed_reference_calibration_bound"] = True
