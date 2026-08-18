@@ -89,29 +89,35 @@ A whole-process crash counts only when the trusted evaluator:
 
 1. creates the candidate as a uniquely named ephemeral container;
 2. proves that the candidate container reached running state;
-3. delivers the forced-crash workload to that running container;
-4. invokes the container runtime's kill operation against that exact container;
-5. obtains a successful runtime-kill result; and
-6. confirms that the candidate container is absent before the durable state directory is reopened.
+3. delivers the forced-crash workload to that running container **without** sending the normal
+   graceful `quit` command;
+4. observes that no operation reply has been emitted before the kill point, proving the durable
+   transition is still in flight rather than already complete;
+5. invokes the container runtime's kill operation against that exact container;
+6. obtains a successful runtime-kill result; and
+7. confirms that the candidate container is absent before the durable state directory is reopened.
 
 Killing, disconnecting or timing out only the local Docker/Podman CLI client is **not** process-crash
-evidence. The CLI may exit while the actual container remains alive and continues writing to the bind
-mount. Starting recovery while such an orphan is alive would create two writers over one state
-directory and invalidates the trial.
+evidence. Likewise, killing a container after `ingest_batch` already replied is not crash-atomicity
+evidence; it is merely an idle-process termination. Starting recovery while an orphan is alive would
+create two writers over one state directory and invalidates the trial.
 
 The evaluator must persist a crash receipt containing at least:
 
 - `actual_container_kill_required=true`;
+- `mid_operation_kill_required=true`;
 - `container_started=true`;
 - `workload_delivered=true`;
+- `operation_reply_observed_before_kill=false`;
+- `mid_operation_kill_verified=true`;
 - `runtime_kill_returncode=0`;
 - `runtime_kill_succeeded=true`;
 - `container_absent_before_recovery=true`;
 - `cli_process_kill_counts_as_evidence=false`.
 
-A missing field, failed runtime kill, ambiguous container state, surviving container or concurrent
-mutation before recovery makes the crash test FAIL. Cleanup of a local CLI process after the runtime
-kill is permitted but cannot earn evidence.
+A missing field, an operation reply before the kill point, failed runtime kill, ambiguous container
+state, surviving container or concurrent mutation before recovery makes the crash test FAIL. Cleanup
+of a local CLI process after the runtime kill is permitted but cannot earn evidence.
 
 ## 6. Calibration and signed workloads
 
@@ -129,7 +135,7 @@ The owner-signed protocol specifies:
 
 Production routing must pass the signed forced-crash count explicitly to the evaluator. Proof mode
 may use a reduced signed qualification/replication/crown workload but may not weaken the crash
-semantics or substitute a CLI-only termination.
+semantics or substitute a CLI-only or post-operation termination.
 
 ## 7. Isolation
 
@@ -143,8 +149,8 @@ of the writable state directory.
 A single-machine container campaign cannot prove real national traffic volume, Byzantine
 multi-datacenter behavior, every filesystem/controller/hardware fault, government adoption or every
 operational incident. Those remain explicit deployment/external claims. The arena proves only the
-signed, executed fault and durability model and prevents an in-memory or CLI-kill simulation from
-being mislabeled as durable evidence.
+signed, executed fault and durability model and prevents an in-memory, CLI-kill or post-operation
+simulation from being mislabeled as durable crash evidence.
 
 ## 9. Supremacy consequence
 
