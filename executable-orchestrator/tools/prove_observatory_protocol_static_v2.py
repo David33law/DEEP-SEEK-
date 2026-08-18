@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Static extension for streaming formal, protocol-v5, genome and dossier routing."""
+"""Static extension for streaming formal, protocol-v5, genome and dossier routing.
+
+This compatibility layer now follows the current stable owner-ceremony and production preflight
+seats (setup-v5 and preflight-v6) instead of asserting superseded setup-v4/preflight-v5 routing.
+Legacy v4/v5 modules remain available to downstream wrappers, but cannot satisfy the stable-entrypoint
+check on their own.
+"""
 import json
 import os
 import sys
@@ -9,8 +15,8 @@ import prove_observatory_protocol_static as base
 ROOT = base.ROOT
 REPORT = os.path.join(ROOT, "proof", "observatory-protocol-static.json")
 EXTRA_MODULES = [
-    "lawmax21.observatory_setup_v4",
-    "lawmax21.observatory_preflight_v5",
+    "lawmax21.observatory_setup_v5",
+    "lawmax21.observatory_preflight_v6",
     "lawmax21.observatory_formal_streaming_routing",
     "lawmax21.observatory_scale_hardening",
     "lawmax21.observatory_shared_corpus_hardening",
@@ -26,8 +32,8 @@ EXTRA_MODULES = [
 ]
 EXTRA_FILES = {
     "private-evaluator/evaluator/observatory_formal_arena_v3.py",
-    "executable-orchestrator/lawmax21/observatory_setup_v4.py",
-    "executable-orchestrator/lawmax21/observatory_preflight_v5.py",
+    "executable-orchestrator/lawmax21/observatory_setup_v5.py",
+    "executable-orchestrator/lawmax21/observatory_preflight_v6.py",
     "executable-orchestrator/lawmax21/observatory_formal_streaming_routing.py",
     "executable-orchestrator/lawmax21/observatory_semantic_evidence_binding_hardening.py",
     "executable-orchestrator/lawmax21/observatory_build_schema_hardening.py",
@@ -83,7 +89,7 @@ def main():
             raise RuntimeError("final hardening/overlay order is wrong")
         setup = _text("setup_observatory.py")
         launcher = _text(
-            "executable-orchestrator/lawmax21/observatory_launcher_v2.py")
+            "executable-orchestrator/lawmax21/observatory_launcher_v3.py")
         routing = _text(
             "executable-orchestrator/lawmax21/observatory_formal_streaming_routing.py")
         evaluator_routing = _text(
@@ -104,10 +110,11 @@ def main():
             "executable-orchestrator/lawmax21/observatory_phase_gate_hardening.py")
         protocol = _text(
             "executable-orchestrator/lawmax21/observatory_protocol.py")
-        if "observatory_setup_v4" not in setup:
-            raise RuntimeError("top-level setup does not use setup-v4")
-        if "observatory_preflight_v5" not in launcher:
-            raise RuntimeError("launcher does not use preflight-v5")
+        if "observatory_setup_v5" not in setup:
+            raise RuntimeError("top-level setup does not use setup-v5")
+        if "observatory_preflight_v6" not in launcher \
+                or "_launcher.observatory_preflight = final_preflight" not in launcher:
+            raise RuntimeError("final launcher does not bind preflight-v6")
         if "observatory_formal_arena_v3.py" not in routing:
             raise RuntimeError("production formal routing does not use streaming v3")
         if "candidate_sha256" not in routing \
@@ -177,7 +184,7 @@ def main():
             "status": "PASS", "final_static_extension": "PASS",
             "extra_modules_imported": EXTRA_MODULES,
             "streaming_formal_routing_verified": True,
-            "setup_v4_verified": True, "preflight_v5_verified": True,
+            "setup_v5_verified": True, "preflight_v6_verified": True,
             "strict_build_schema_verified": True,
             "semantic_evidence_source_binding_verified": True,
             "genome_realization_routing_verified": True,
