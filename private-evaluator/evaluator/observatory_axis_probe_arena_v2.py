@@ -5,7 +5,11 @@ Version 2 keeps the exact ``observatory-axis-probe-v1`` report contract and isol
 probe thresholds are loaded from the same owner-signed ``PARETO-DIMENSIONS.json`` used by frontier
 admission. Formal state-derivation probes require admission-order convergence only when explicitly
 claimed, and formal load/operation failures are preserved as structured false checks rather than
-empty failure reports. All other baseline/mutant identity and fail-closed behavior remains in base.
+empty failure reports.
+
+All Docker/subprocess text transport used by the base axis probes is forced through the existing
+output-bounded UTF-8 subprocess seat. Candidate source and legal fixtures may contain arbitrary
+Unicode; host locale/code-page settings are never allowed to change evaluator semantics.
 """
 from __future__ import annotations
 
@@ -13,8 +17,15 @@ import hashlib
 import json
 import os
 
+import bounded_subprocess
 import observatory_axis_probe_arena as base
 
+
+# ``subprocess`` is one module object shared by the base probe and the imported specialized arenas.
+# Installing here therefore covers semantic helper probes plus durable/distributed/scale/formal/
+# interoperability Docker calls without duplicating transport logic. run_bounded defaults text
+# transport to strict UTF-8 and caps stdout/stderr before buffering.
+bounded_subprocess.install(base.subprocess)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
