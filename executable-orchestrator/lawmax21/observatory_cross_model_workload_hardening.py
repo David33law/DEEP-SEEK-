@@ -1,11 +1,11 @@
 """Bind cross-model qualification/replication/crown to the signed history counts."""
 import hashlib
 import os
-import subprocess
 import sys
 
 from . import observatory_cross_model_overlay as cross
 from . import observatory_protocol
+from . import observatory_utf8_process as utf8_process
 from .canonical import read_json
 from .handlers import A
 
@@ -41,12 +41,15 @@ def _run(ctx, cid, label):
         command.extend(["--formal", path])
     for path in interop_paths:
         command.extend(["--interoperability", path])
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = utf8_process.run(command, capture_output=True)
     if not os.path.isfile(out):
         return {"status": "FAIL", "passed": False,
                 "reason": "cross-model evaluator produced no report: "
-                          + (result.stdout + result.stderr)[-1600:]}
-    report = read_json(out); report["evaluator_returncode"] = result.returncode
+                          + (result.stdout + result.stderr)[-1600:],
+                "evaluator_transport_encoding": utf8_process.ENCODING}
+    report = read_json(out)
+    report["evaluator_returncode"] = result.returncode
+    report["evaluator_transport_encoding"] = utf8_process.ENCODING
     report["evidence_path"] = os.path.relpath(out, ctx.runtime).replace("\\", "/")
     report["signed_history_count"] = _history_count(label)
     return report
