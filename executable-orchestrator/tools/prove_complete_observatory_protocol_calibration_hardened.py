@@ -2,9 +2,9 @@
 """Exhaustive axis-probe calibration extension of the protocol-v5 Docker E2E proof.
 
 The inherited axis proof verifies every runtime baseline/mutant causal pair and the exact v2 evaluator
-bytes. This wrapper independently reopens the owner-ceremony calibration in the disposable clone,
-rehashes its 56 reports, 28 controlled mutant sources, six references and evaluator, compares it with
-preflight-v6 and the signed specialized-calibration receipt, and requires zero provider calls.
+bytes. This wrapper requires an owner-signed calibration mandate, independently reopens the owner-
+ceremony calibration in the disposable clone, rehashes its 56 reports, 28 controlled mutant sources,
+six references and evaluator, compares them with preflight-v6 and requires zero provider calls.
 """
 from __future__ import annotations
 
@@ -111,6 +111,10 @@ def _valid_pair_report(report, baseline, pair):
 
 
 def _verify_calibration(repo, preflight):
+    mission = preflight.get("signed_mission") or {}
+    if mission.get("axis_probe_calibration_required") is not True:
+        raise RuntimeError(
+            "owner-signed mission does not require axis-probe calibration")
     protocol = preflight.get("research_protocol") or {}
     preflight_receipt = protocol.get("axis_probe_calibration") or {}
     if preflight_receipt.get("axis_probe_contract") != PROBE_CONTRACT \
@@ -240,6 +244,7 @@ def _verify_calibration(repo, preflight):
             "preflight axis calibration report hash drift")
     return {
         "status": "PASS",
+        "owner_signed_required": True,
         "axis_probe_contract": PROBE_CONTRACT,
         "evaluator_path": PROBE_EVALUATOR,
         "evaluator_sha256": evaluator["sha256"],
