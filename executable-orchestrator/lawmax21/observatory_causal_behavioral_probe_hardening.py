@@ -5,14 +5,14 @@ receipts. They are not allowed to decide causal credit. This hardening runs the 
 arena twice for every auditor/axis/group/artifact task: once over the exact original source and once
 over the exact load-bearing mutant, with the same hidden seed, full task identity and probe ID. Credit
 requires a valid passing baseline and a valid candidate-origin failing mutant. Infrastructure-invalid
-probes, a weak baseline or a passing mutant leave the obligation open.
+probes, a weak baseline or a passing mutant leave the obligation open. Trusted evaluator process I/O
+is routed through the canonical strict UTF-8 seat so host locale can never create causal evidence.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import os
-import subprocess
 import sys
 from types import MethodType
 
@@ -22,6 +22,7 @@ from . import observatory_formal_overlay as formal
 from . import observatory_genome_causal_ablation_hardening as causal
 from . import observatory_interoperability_overlay as interop
 from . import observatory_scale_overlay as scale
+from . import observatory_utf8_process as utf8_process
 from .canonical import atomic_write_json, read_json, sha256_file
 from .handlers import A
 
@@ -91,13 +92,13 @@ def _probe(ctx, cid, label, task, source_path, variant, seed, identity):
             expected, ensure_ascii=False, sort_keys=True,
             separators=(",", ":")),
     ]
-    process = subprocess.run(
-        command, capture_output=True, text=True,
-        timeout=PROBE_TIMEOUT_SECONDS)
+    process = utf8_process.run(
+        command, capture_output=True, timeout=PROBE_TIMEOUT_SECONDS)
     process_receipt = {
         "axis_probe_returncode": process.returncode,
         "axis_probe_stdout_tail": (process.stdout or "")[-_TAIL_LIMIT:],
         "axis_probe_stderr_tail": (process.stderr or "")[-_TAIL_LIMIT:],
+        "axis_probe_transport_encoding": utf8_process.ENCODING,
     }
     if not os.path.isfile(output):
         raise RuntimeError(
@@ -129,6 +130,7 @@ def _valid_baseline(report):
         and report.get("valid_execution") is True
         and report.get("failure_origin") == "none"
         and report.get("axis_probe_returncode") == 0
+        and report.get("axis_probe_transport_encoding") == "utf-8"
         and report.get("checks")
         and all(row.get("passed") is True
                 for row in report.get("checks") or []))
@@ -142,6 +144,7 @@ def _valid_mutant_failure(report):
         and report.get("valid_execution") is True
         and report.get("failure_origin") == "candidate_axis_behavior"
         and report.get("axis_probe_returncode") == 1
+        and report.get("axis_probe_transport_encoding") == "utf-8"
         and report.get("checks")
         and any(row.get("passed") is False
                 for row in report.get("checks") or []))
@@ -223,6 +226,7 @@ def install(ctx, handlers):
             "axis_probe_id": baseline.get("probe_id"),
             "axis_probe_seed": seed,
             "axis_probe_task_identity_sha256": identity,
+            "axis_probe_transport_encoding": "utf-8",
             "same_axis_probe": same_probe,
             "baseline_axis_probe_passed": baseline_passed,
             "mutant_axis_probe_failed": mutant_failed,
@@ -262,6 +266,7 @@ def install(ctx, handlers):
             "genome_axis_behavioral_probe_contract": PROBE_CONTRACT,
             "genome_axis_behavioral_probe_evaluator":
                 "observatory_axis_probe_arena_v2.py",
+            "genome_axis_behavioral_probe_transport_encoding": "utf-8",
             "genome_axis_behavioral_probe_replication_checked":
                 replication["checked"],
             "genome_axis_behavioral_probe_crown_checked": crown["checked"],
