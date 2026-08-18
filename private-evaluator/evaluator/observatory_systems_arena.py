@@ -213,14 +213,18 @@ def _corruption_trial(runtime, source, stable_state, work):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidate", required=True); ap.add_argument("--out", required=True)
-    ap.add_argument("--seed", type=int, default=7302026); ap.add_argument("--large-events", type=int, default=50000)
+    ap.add_argument("--seed", type=int, default=7302026)
+    ap.add_argument("--large-events", type=int, default=50000)
+    ap.add_argument("--crash-events", type=int, default=100000)
     a = ap.parse_args(argv)
     runtime = container_runtime()
     if not runtime: raise RuntimeError("durable systems arena requires docker/podman")
     source = open(a.candidate, encoding="utf-8").read()
     temp = tempfile.mkdtemp(prefix="obs-systems-")
     report = {"status": "FAIL", "backend": "container", "runtime": runtime,
-              "image": IMAGE, "candidate": os.path.abspath(a.candidate)}
+              "image": IMAGE, "candidate": os.path.abspath(a.candidate),
+              "requested_large_events": int(a.large_events),
+              "requested_crash_events": int(a.crash_events)}
     try:
         base = os.path.join(temp, "stable"); small = _events(2000, a.seed); start = time.monotonic()
         rep = _session(runtime, source, base,
@@ -265,7 +269,8 @@ def main(argv=None):
         crash_state = os.path.join(temp, "crash")
         _session(runtime, source, crash_state,
                  [{"op": "ingest_batch", "events": _events(1000, a.seed + 200)}, {"op": "close"}], timeout=180)
-        crash_observed = _crash(runtime, source, crash_state, _events(100000, a.seed + 201))
+        crash_events = _events(max(1000, a.crash_events), a.seed + 201)
+        crash_observed = _crash(runtime, source, crash_state, crash_events)
         try:
             _crash_root, crash_integrity_rep, _ = _root(runtime, source, crash_state)
             crash_integrity = crash_observed and crash_integrity_rep.get("ok") is True
