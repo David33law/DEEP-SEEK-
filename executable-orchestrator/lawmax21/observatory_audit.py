@@ -4,6 +4,7 @@ from . import observatory_build_schema_hardening
 from . import observatory_causal_attribution_scope_hardening
 from . import observatory_causal_audit_hardening
 from . import observatory_causal_axis_attribution_hardening
+from . import observatory_causal_behavioral_probe_hardening
 from . import observatory_causal_definition_semantics_hardening
 from . import observatory_causal_dossier_hardening
 from . import observatory_causal_failure_classification_hardening
@@ -69,17 +70,19 @@ def install(ctx, handlers):
     out = observatory_cross_model_overlay.install(ctx, out)
     out = observatory_genome_realization_overlay.install(ctx, out)
 
-    # Citation validity is still not causal proof. Classify failures conservatively, restrict token
-    # matching to actual failure fields and require the cited definition body to support the claimed
-    # axis unless the hidden evaluator independently exposes an axis-specific hard failure.
+    # Citation validity is still not causal proof. Conservative process classification, failure-only
+    # diagnostics and deterministic AST-body receipts remain supporting evidence. The authoritative
+    # attribution seat is the trusted baseline-versus-mutant axis probe: the original exact source
+    # must pass and the exact mutant must fail the same hidden probe ID and seed.
     observatory_causal_failure_classification_hardening.install(ctx, out)
     observatory_causal_axis_attribution_hardening.install(ctx, out)
     observatory_causal_attribution_scope_hardening.install(ctx, out)
     observatory_causal_definition_semantics_hardening.install(ctx, out)
+    observatory_causal_behavioral_probe_hardening.install(ctx, out)
     observatory_genome_causal_ablation_hardening.install(ctx, out)
 
-    # Index the direct causal receipts in the deterministic dossier before its final audit handler is
-    # installed, then add the dossier itself as an explicit terminal condition.
+    # Index the direct causal and axis-probe receipts in the deterministic dossier before its final
+    # audit handler is installed, then add the dossier itself as an explicit terminal condition.
     observatory_causal_dossier_hardening.install(ctx, out)
     out = observatory_supremacy_dossier_overlay.install(ctx, out)
 
