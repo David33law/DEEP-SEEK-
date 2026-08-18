@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Final static closure for protocol-v5 exhaustive axis-probe calibration.
 
-Runs the complete causal/static v5 proof, then proves that the stable owner ceremony uses setup-v5,
-the real production launcher binds preflight-v6, both seats share the exact nine-file calibration
-source census, the 28-route calibration script is protocol-bound, and the authoritative E2E/final
-proofs pass through the calibration-hardening wrapper. No provider call, candidate execution, Docker
-run or owner mutation occurs here. The augmented receipt retains the protocol-v5 identity.
+Runs the complete causal/static v5 proof, then proves that the owner-signed mission requires
+calibration, stable setup uses setup-v5, the production launcher binds preflight-v6, both seats share
+the exact nine-file source census, the v2 evaluator loads signed minima and structured formal failure
+checks, and the authoritative E2E/final proofs pass through calibration hardening. No provider call,
+candidate execution, Docker run or owner mutation occurs here.
 """
 from __future__ import annotations
 
@@ -57,6 +57,10 @@ def main():
             "lawmax21.observatory_setup_v5")
         preflight = importlib.import_module(
             "lawmax21.observatory_preflight_v6")
+        if observatory_protocol.MISSION_FLAGS.get(
+                "axis_probe_calibration_required") is not True:
+            raise RuntimeError(
+                "owner-signed mission does not require axis-probe calibration")
         if tuple(setup.AXIS_PROBE_SOURCES) != tuple(
                 preflight.AXIS_PROBE_SOURCES):
             raise RuntimeError(
@@ -125,11 +129,27 @@ def main():
             "private-evaluator/evaluator/observatory_axis_probe_calibration.py"),
             "exec")
 
+        probe_v2 = _text(
+            "private-evaluator/evaluator/observatory_axis_probe_arena_v2.py")
+        _require(probe_v2, (
+            "PARETO-DIMENSIONS.json", "def _load_hard_minima",
+            "SEMANTIC_HARD_MINIMA = _load_hard_minima()",
+            "_ORIGINAL_FORMAL_PROBE",
+            "def _formal_probe",
+            "formal-axis-candidate-operation",
+            "structured_candidate_failure",
+            'base.PROBES["formal"] = _formal_probe'),
+            "structured v2 axis-probe route")
+        compile(probe_v2, _path(
+            "private-evaluator/evaluator/observatory_axis_probe_arena_v2.py"),
+            "exec")
+
         e2e = _text(
             "executable-orchestrator/tools/"
             "prove_complete_observatory_protocol_calibration_hardened.py")
         _require(e2e, (
             "prove_complete_observatory_protocol_axis_hardened",
+            "axis_probe_calibration_required",
             "AXIS_PROBE_SOURCES", "CALIBRATION_REPORT",
             "CALIBRATION_RECEIPT", "def _verify_calibration",
             "axis_probe_calibration_verified",
@@ -154,8 +174,10 @@ def main():
             "axis_probe_calibration_static_bound": True,
             "axis_probe_calibration_preflight_bound": True,
             "axis_probe_calibration_e2e_bound": True,
+            "axis_probe_calibration_owner_signed": True,
             "axis_probe_setup_v5_bound": True,
             "axis_probe_preflight_v6_bound": True,
+            "axis_probe_structured_formal_failure_bound": True,
             "axis_probe_calibration_routes": 28,
             "axis_probe_calibration_expected_reports": 56,
             "axis_probe_calibration_expected_evidence_files": 84,
