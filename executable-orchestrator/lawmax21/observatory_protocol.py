@@ -36,6 +36,7 @@ MISSION_FLAGS = {
     "causal_genome_negative_controls_required": True,
     "axis_specific_causal_attribution_required": True,
     "axis_specific_behavioral_failure_required": True,
+    "axis_behavioral_probe_required": True,
     "authoritative_prior_art_challenge_required": True,
     "active_novelty_saturation_required": True,
     "meta_search_required": True,
