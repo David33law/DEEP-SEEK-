@@ -5,8 +5,8 @@ The mission/protocol version remains Observatory Research Protocol 5. Static-v8 
 calibrated static-v7 fault topology with standalone cwd/PYTHONPATH-independent import closure,
 mechanically proves every retired/public proof command is a monotonic shim to this v6 authority, and
 proves locale-independent strict UTF-8 trusted process transport with host-codec failures excluded
-from causal evidence. The dynamic E2E passes through the actual-container fault verifier and requires
-both durable and distributed reference/crown evidence under exact owner-bound crash workloads.
+from causal evidence. Dynamic closure independently requires UTF-8 on exhaustive calibration,
+runtime causal axis pairs and actual-container fault campaigns.
 
 The wrapper bootstraps the repository-local ``lawmax21`` package before importing any proof extension,
 so direct execution is independent of the caller's current working directory and PYTHONPATH.
@@ -130,16 +130,30 @@ def main(argv=None):
             "systems_actual_container_crown_verified") or {}
         distributed = verification.get(
             "distributed_actual_container_crown_verified") or {}
+        axis_calibration = verification.get(
+            "axis_probe_calibration_verified") or {}
+        axis_campaigns = verification.get("axis_probe_pairs_verified") or {}
         if verification.get("fault_injection_actual_container_verified") is not True \
                 or verification.get("fault_injection_mid_operation_verified") is not True \
                 or verification.get("fault_workloads_owner_bound_verified") is not True \
                 or verification.get("trusted_process_transport_utf8_verified") is not True \
+                or verification.get("axis_probe_utf8_transport_verified") is not True \
+                or axis_calibration.get("status") != "PASS" \
+                or axis_calibration.get("transport_encoding") != "utf-8" \
                 or systems_calibration.get("status") != "PASS" \
                 or distributed_calibration.get("status") != "PASS" \
                 or systems.get("status") != "PASS" \
                 or distributed.get("status") != "PASS":
             raise RuntimeError(
                 "dynamic mid-operation/UTF-8 owner-bound verification is incomplete")
+        for phase in ("replication", "crown"):
+            campaign = axis_campaigns.get(phase) or {}
+            if campaign.get("axis_probe_transport_encoding") != "utf-8" \
+                    or int(campaign.get("tasks", 0)) < 1 \
+                    or int(campaign.get("axis_probe_pairs", 0)) != int(
+                        campaign.get("tasks", -1)):
+                raise RuntimeError(
+                    f"dynamic causal {phase} UTF-8 probe-pair closure is incomplete")
 
         for label, row in (
                 ("systems calibration", systems_calibration),
@@ -185,6 +199,8 @@ def main(argv=None):
         report["fault_injection_mid_operation_bound"] = True
         report["fault_workloads_owner_bound"] = True
         report["trusted_process_transport_utf8_bound"] = True
+        report["axis_probe_calibration_utf8_bound"] = True
+        report["axis_probe_runtime_pairs_utf8_bound"] = True
         report["host_unicode_failure_cannot_earn_causal_credit"] = True
         report["utf8_unicode_roundtrip_bound"] = True
         report["authoritative_entrypoint_standalone_import_bound"] = True
