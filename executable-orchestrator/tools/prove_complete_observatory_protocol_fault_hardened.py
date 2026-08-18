@@ -3,8 +3,8 @@
 
 This wrapper reopens the owner-ceremony durable systems calibration and the final durable/distributed
 crown reports while the disposable proof clone/runtime still exist. A PASS requires actual runtime
-container death *during an in-flight operation*, absence before recovery, complete durable manifest
-evidence, signed proof workloads and the corrected distributed baseline metric.
+container death during an in-flight operation, absence before recovery, complete durable manifest
+evidence, exact signed proof workloads and the corrected distributed baseline metric.
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ _ORIGINAL_VERIFY = CORE.verify_protocol
 SYSTEMS_REFERENCE = "benchmark/observatory_systems_reference_candidate.py"
 SYSTEMS_EVALUATOR = "private-evaluator/evaluator/observatory_systems_arena_v2.py"
 SYSTEMS_REPORT = "proof/systems-reference-calibration.json"
+DISTRIBUTED_REPORT = "proof/distributed-reference-calibration.json"
 CALIBRATION_RECEIPT = "proof/observatory-specialized-calibration-receipt.json"
 
 FAULT_FILES = {
@@ -87,14 +88,16 @@ def _crash_evidence(report, label):
         raise RuntimeError(
             label + " lacks authoritative mid-operation container crash evidence: "
             + ", ".join(missing or ["reply/kill-returncode/CLI-credit"]))
-    return {
-        key: evidence.get(key) for key in (
-            *required_true,
-            "operation_reply_observed_before_kill",
-            "runtime_kill_returncode",
-            "cli_process_kill_counts_as_evidence",
-        )
-    }
+    keys = (
+        *required_true,
+        "operation_reply_observed_before_kill",
+        "runtime_kill_returncode",
+        "cli_process_kill_counts_as_evidence",
+    )
+    out = {key: evidence.get(key) for key in keys}
+    if "events_delivered" in evidence:
+        out["events_delivered"] = evidence.get("events_delivered")
+    return out
 
 
 def _manifest_evidence(report, label):
@@ -165,6 +168,34 @@ def _verify_systems_calibration(repo, preflight):
     }
 
 
+def _verify_distributed_calibration(repo, preflight):
+    receipt_path = _repo_path(repo, CALIBRATION_RECEIPT)
+    report_path = _repo_path(repo, DISTRIBUTED_REPORT)
+    receipt = _read(receipt_path)
+    campaign = (receipt.get("campaigns") or {}).get("distributed") or {}
+    sources = (receipt.get("sources") or {}).get("distributed") or {}
+    if campaign.get("status") not in ("PASS", "OK") \
+            or campaign.get("passed") is not True \
+            or campaign.get("report_path") != DISTRIBUTED_REPORT \
+            or campaign.get("report_sha256") != CORE.sha256_file(report_path):
+        raise RuntimeError("distributed specialized calibration receipt is not PASS/hash-bound")
+    report = _read(report_path)
+    expected = observatory_protocol.PROOF_WORKLOADS["distributed"]
+    crash = _crash_evidence(report, "distributed reference calibration")
+    if report.get("status") != "PASS" or report.get("passed") is not True \
+            or int(report.get("requested_crash_events", -1)) != int(expected["crash_events"]) \
+            or int(crash.get("events_delivered", -1)) != int(expected["crash_events"]):
+        raise RuntimeError("distributed reference calibration used the wrong crash workload")
+    return {
+        "status": "PASS",
+        "report_path": DISTRIBUTED_REPORT,
+        "report_sha256": CORE.sha256_file(report_path),
+        "crash_events": int(expected["crash_events"]),
+        "crash": crash,
+        "provider_calls": 0,
+    }
+
+
 def _verify_systems_crown(runtime, incumbent):
     path = _runtime_path(
         runtime, f"reports/systems-crown-{incumbent}.json")
@@ -204,11 +235,13 @@ def _verify_distributed_crown(runtime, incumbent):
     baseline_elapsed = float(report.get("baseline_elapsed_seconds", 0.0))
     observed_eps = float(report.get("events_per_second_baseline", 0.0))
     expected_eps = baseline_events / max(baseline_elapsed, 1e-9)
+    crash = _crash_evidence(report, "distributed crown")
     if report.get("status") != "PASS" or report.get("passed") is not True \
             or tests.get("whole_process_crash_recovery") is not True \
             or int(report.get("owner_signed_large_events", -1)) != int(expected["crown"]) \
-            or int(report.get("owner_signed_crash_event_floor", -1)) != int(
-                expected["crash_event_floor"]) \
+            or int(report.get("requested_crash_events", -1)) != int(expected["crash_events"]) \
+            or int(report.get("owner_signed_crash_events", -1)) != int(expected["crash_events"]) \
+            or int(crash.get("events_delivered", -1)) != int(expected["crash_events"]) \
             or baseline_events != 1000 or baseline_elapsed <= 0.0 \
             or not math.isclose(observed_eps, expected_eps, rel_tol=1e-12, abs_tol=1e-12) \
             or float(report.get("campaign_elapsed_seconds", 0.0)) < baseline_elapsed:
@@ -218,12 +251,12 @@ def _verify_distributed_crown(runtime, incumbent):
         "path": os.path.relpath(path, runtime).replace("\\", "/"),
         "sha256": CORE.sha256_file(path),
         "large_events": int(expected["crown"]),
-        "crash_event_floor": int(expected["crash_event_floor"]),
+        "crash_events": int(expected["crash_events"]),
         "baseline_events": baseline_events,
         "baseline_elapsed_seconds": baseline_elapsed,
         "events_per_second_baseline": observed_eps,
         "campaign_elapsed_seconds": report.get("campaign_elapsed_seconds"),
-        "crash": _crash_evidence(report, "distributed crown"),
+        "crash": crash,
     }
 
 
@@ -236,12 +269,15 @@ def _verify(repo, runtime, source_head, preflight, launch):
         raise RuntimeError("fault verifier cannot resolve committed incumbent")
     verified["systems_reference_calibration_verified"] = (
         _verify_systems_calibration(repo, preflight))
+    verified["distributed_reference_calibration_verified"] = (
+        _verify_distributed_calibration(repo, preflight))
     verified["systems_actual_container_crown_verified"] = (
         _verify_systems_crown(runtime, incumbent))
     verified["distributed_actual_container_crown_verified"] = (
         _verify_distributed_crown(runtime, incumbent))
     verified["fault_injection_actual_container_verified"] = True
     verified["fault_injection_mid_operation_verified"] = True
+    verified["fault_workloads_owner_bound_verified"] = True
     return verified
 
 
