@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """Output-bounded entrypoint for the distributed Observatory fault arena.
 
-The whole-process crash injector must kill the candidate container itself, not merely the local
-``docker``/``podman`` CLI client.  A named ephemeral container is therefore created for the crash
-trial, killed through the container runtime, and verified absent before recovery begins.  This
-prevents an orphaned writer from continuing to mutate the shared cluster directory while the
-recovery container is being evaluated.
+The whole-process crash injector kills the candidate container itself, not merely the local
+``docker``/``podman`` CLI client. A named ephemeral container is created for the crash trial, killed
+through the container runtime, and verified absent before recovery begins. This prevents an orphaned
+writer from continuing to mutate the shared cluster directory while the recovery container is being
+evaluated.
+
+This wrapper also corrects the distributed throughput receipt. The base arena historically divided
+1000 baseline events by the elapsed time of the *entire* fault campaign. The trusted v2 entrypoint
+now measures the first 1000-event healthy baseline session directly and rewrites only the throughput
+fields after the base campaign has produced its report. Campaign elapsed time remains separately
+preserved.
 """
 from __future__ import annotations
 
@@ -20,6 +26,37 @@ import bounded_subprocess
 import observatory_distributed_arena as base
 
 bounded_subprocess.install(base.subprocess)
+
+_ORIGINAL_SESSION = base._session
+_BASELINE = {"elapsed_seconds": None, "events": None}
+
+
+def _is_baseline(commands):
+    if _BASELINE["elapsed_seconds"] is not None or not commands:
+        return False
+    first = commands[0] if isinstance(commands[0], dict) else {}
+    events = first.get("events") if first.get("op") == "ingest_batch" else None
+    if not isinstance(events, list) or len(events) != 1000:
+        return False
+    if not events or not str(events[0].get("source_id", "")).startswith("DIST-"):
+        return False
+    operations = [row.get("op") for row in commands if isinstance(row, dict)]
+    return operations[:5] == [
+        "ingest_batch", "integrity", "roots", "publication_roots", "close"]
+
+
+def _timed_session(runtime, source, cluster_dir, commands,
+                   timeout=240, allow_errors=False):
+    baseline = _is_baseline(commands)
+    started = time.monotonic() if baseline else None
+    result = _ORIGINAL_SESSION(
+        runtime, source, cluster_dir, commands,
+        timeout=timeout, allow_errors=allow_errors)
+    if baseline:
+        elapsed = time.monotonic() - started
+        _BASELINE["elapsed_seconds"] = elapsed
+        _BASELINE["events"] = len(commands[0]["events"])
+    return result
 
 
 def _named_argv(runtime, cluster_dir, name):
@@ -74,7 +111,7 @@ def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
 
     Returning ``True`` means all of the following happened: the named candidate container reached
     running state, the crash workload was delivered, the runtime successfully killed that container,
-    and the container was absent before the subsequent recovery session could start.  Killing only
+    and the container was absent before the subsequent recovery session could start. Killing only
     the CLI process never earns crash evidence.
     """
     os.makedirs(cluster_dir, exist_ok=True)
@@ -100,8 +137,6 @@ def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
         except (BrokenPipeError, OSError):
             return False
 
-        # The input line has been delivered to the running container.  Give the candidate a small
-        # deterministic window to enter the durable batch path, then kill the container itself.
         time.sleep(max(0.0, float(delay)))
         if _inspect(runtime, name) is not True:
             return False
@@ -114,8 +149,8 @@ def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
         try:
             process.wait(timeout=30)
         except subprocess.TimeoutExpired:
-            # At this point the container kill has already been attempted.  Killing the local CLI is
-            # only cleanup and cannot by itself make the crash trial pass.
+            # Runtime kill is the evidence-producing action. Killing the local CLI here is cleanup
+            # only and can never make the crash trial pass by itself.
             try:
                 process.kill()
             except OSError:
@@ -145,11 +180,58 @@ def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
                 pass
 
 
-base._crash_process = _safe_crash_process
+def _out_argument():
+    try:
+        index = sys.argv.index("--out")
+        return os.path.abspath(sys.argv[index + 1])
+    except (ValueError, IndexError):
+        return None
+
+
+def _rewrite_throughput_receipt(path):
+    elapsed = _BASELINE.get("elapsed_seconds")
+    events = _BASELINE.get("events")
+    if not path or not os.path.isfile(path) or not elapsed or not events:
+        raise RuntimeError("distributed v2 could not bind a measured baseline throughput receipt")
+    with open(path, encoding="utf-8") as handle:
+        report = json.load(handle)
+    campaign_elapsed = report.get("elapsed_seconds")
+    report["campaign_elapsed_seconds"] = campaign_elapsed
+    report["baseline_elapsed_seconds"] = float(elapsed)
+    report["baseline_events"] = int(events)
+    report["events_per_second_baseline"] = float(events) / max(float(elapsed), 1e-9)
+    report["throughput_measurement"] = (
+        "first healthy 1000-event baseline session including canonical integrity, root, publication "
+        "and close verification; excludes later injected fault campaigns")
+    temporary = path + ".throughput.tmp"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump(report, handle, ensure_ascii=False, indent=1, sort_keys=True)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
+    return report
+
+
+def main():
+    base._session = _timed_session
+    base._crash_process = _safe_crash_process
+    code = base.main()
+    report = _rewrite_throughput_receipt(_out_argument())
+    print(json.dumps({
+        "distributed_v2_receipt_rewrite": "PASS",
+        "baseline_events": report["baseline_events"],
+        "baseline_elapsed_seconds": report["baseline_elapsed_seconds"],
+        "events_per_second_baseline": report["events_per_second_baseline"],
+        "campaign_elapsed_seconds": report["campaign_elapsed_seconds"],
+        "whole_process_crash_recovery": (report.get("tests") or {}).get(
+            "whole_process_crash_recovery"),
+    }, ensure_ascii=False, indent=1, sort_keys=True))
+    return code
+
 
 if __name__ == "__main__":
     try:
-        sys.exit(base.main())
+        sys.exit(main())
     except Exception as exc:
         print(json.dumps({"status": "FAIL", "passed": False,
                           "reason": str(exc)}, ensure_ascii=False, indent=1))
