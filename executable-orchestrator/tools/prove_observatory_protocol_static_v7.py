@@ -4,8 +4,9 @@
 Runs static-v6 first, then proves that both load-bearing process-death arenas are calibrated before
 launch, use the same bounded v2 entrypoints in preflight and production, consume exact owner-bound
 workloads, and require actual container death while the tested operation is still in flight. The
-stable proof entrypoint must route through the final fault-hardened v6 seat. No provider call,
-candidate execution, Docker run or owner mutation occurs here.
+stable proof entrypoint must route through the final fault-hardened v6 seat. Static-v7 does not infer
+its own ancestry from filename strings inside later wrappers; executable v7->v8 inheritance is proved
+by static-v8 itself. No provider call, candidate execution, Docker run or owner mutation occurs here.
 """
 from __future__ import annotations
 
@@ -233,7 +234,6 @@ def main():
         final = _text(FINAL_V6)
         _require(final, (
             "prove_complete_observatory_protocol_fault_hardened",
-            "prove_observatory_protocol_static_v7.py",
             'verification.get("fault_injection_mid_operation_verified") is not True',
             'report["fault_injection_mid_operation_bound"] = True',
             'report["final_closure_v6_verified"] = True'),
