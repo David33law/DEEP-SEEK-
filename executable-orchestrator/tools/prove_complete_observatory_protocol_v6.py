@@ -58,6 +58,7 @@ REQUIRED_STATIC_V8_GATES = (
     "authoritative_entrypoint_standalone_import_static_bound",
     "compatibility_proof_shims_monotonic_static_bound",
     "trusted_utf8_process_static_bound",
+    "bounded_evaluator_strict_utf8_static_bound",
     "production_evaluator_utf8_static_bound",
     "axis_probe_utf8_transport_static_bound",
     "axis_calibration_utf8_static_bound",
