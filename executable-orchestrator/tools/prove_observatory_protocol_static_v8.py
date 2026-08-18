@@ -37,6 +37,7 @@ COMPATIBILITY_SHIMS = dict(root_static.AUTHORITATIVE_SHIMS)
 ENTRYPOINTS = tuple(sorted(BOOTSTRAP_ENTRYPOINTS | set(COMPATIBILITY_SHIMS)))
 
 UTF8_PROCESS = "executable-orchestrator/lawmax21/observatory_utf8_process.py"
+BOUNDED_SUBPROCESS = "private-evaluator/evaluator/bounded_subprocess.py"
 UTF8_ORCHESTRATOR_ROUTES = {
     "executable-orchestrator/lawmax21/observatory_setup.py",
     "executable-orchestrator/lawmax21/observatory_evaluator_routing_hardening.py",
@@ -159,6 +160,15 @@ def _verify_utf8_topology():
         'errors="strict"'),
         "canonical UTF-8 process seat")
 
+    bounded = _text(BOUNDED_SUBPROCESS)
+    _require(bounded, (
+        'codec = encoding or "utf-8"',
+        'codec_errors = errors or "strict"',
+        'payload = input.encode(codec, codec_errors)',
+        'out.decode(codec, codec_errors)',
+        'err.decode(codec, codec_errors)'),
+        "bounded evaluator strict UTF-8 seat")
+
     for relative in UTF8_ORCHESTRATOR_ROUTES:
         text = _text(relative)
         _require(text, (
@@ -228,6 +238,7 @@ def _verify_utf8_topology():
 
     return {
         "canonical_process_seat": UTF8_PROCESS,
+        "bounded_process_seat": BOUNDED_SUBPROCESS,
         "orchestrator_routes": sorted(UTF8_ORCHESTRATOR_ROUTES),
         "evaluator_routes": sorted(UTF8_EVALUATOR_ROUTES),
         "causal_classifier": CAUSAL_CLASSIFIER,
@@ -299,9 +310,9 @@ def main():
 
         from lawmax21 import observatory_protocol
         protocol_files = set(observatory_protocol.protocol_files(ROOT))
-        required_files = set(ENTRYPOINTS) | {UTF8_PROCESS, *UTF8_ORCHESTRATOR_ROUTES,
-                                            *UTF8_EVALUATOR_ROUTES, CAUSAL_CLASSIFIER,
-                                            FAULT_E2E}
+        required_files = set(ENTRYPOINTS) | {
+            UTF8_PROCESS, BOUNDED_SUBPROCESS, *UTF8_ORCHESTRATOR_ROUTES,
+            *UTF8_EVALUATOR_ROUTES, CAUSAL_CLASSIFIER, FAULT_E2E}
         missing = sorted(required_files - protocol_files)
         if missing:
             raise RuntimeError(
@@ -327,6 +338,7 @@ def main():
             "authoritative_entrypoints_cwd_independent": True,
             "authoritative_entrypoints_pythonpath_independent": True,
             "trusted_utf8_process_static_bound": True,
+            "bounded_evaluator_strict_utf8_static_bound": True,
             "production_evaluator_utf8_static_bound": True,
             "axis_probe_utf8_transport_static_bound": True,
             "axis_calibration_utf8_static_bound": True,
