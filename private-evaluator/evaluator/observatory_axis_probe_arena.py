@@ -7,10 +7,10 @@ one controlled axis it executes a small hidden probe through the same container-
 interface used by the corresponding full evaluator.
 
 A report is evidence only when ``valid_execution`` is true. Missing container engines, parent timeout,
-nonzero container transport exit, output flooding and evaluator defects are ``INVALID``. Candidate
-load/operation errors reached through the axis-specific probe are valid behavioral failures. The
-orchestrator must compare an inert baseline control and the exact load-bearing mutant under the same
-probe ID; this file alone never decides causal credit.
+nonzero container transport exit, output flooding, host encoding/decoding failures and evaluator
+defects are ``INVALID``. Candidate load/operation errors reached through the axis-specific probe are
+valid behavioral failures. The orchestrator must compare an inert baseline control and the exact
+load-bearing mutant under the same probe ID; this file alone never decides causal credit.
 """
 from __future__ import annotations
 
@@ -78,6 +78,13 @@ _INFRASTRUCTURE_MARKERS = (
     "timed out", "timeoutexpired", "permission denied while trying to connect",
     "cannot connect to docker", "error during connect", "no such image",
     "manifest unknown", "out of memory", "oomkilled", "exit code 137",
+    "unicodeencodeerror", "unicodedecodeerror", "charmap codec",
+    "character maps to <undefined>",
+)
+_HOST_INFRASTRUCTURE_EXCEPTIONS = (
+    UnicodeError,
+    OSError,
+    subprocess.SubprocessError,
 )
 
 
@@ -100,6 +107,14 @@ def _check(identifier, passed, detail=None):
 
 
 def _candidate_failure(exc):
+    """Return True only when the failure is attributable to candidate behavior.
+
+    Host process/pipe/codec failures are evaluator infrastructure and must never earn causal credit.
+    The textual markers retain fail-closed handling for wrappers that normalize an infrastructure
+    exception into RuntimeError before it reaches this classifier.
+    """
+    if isinstance(exc, _HOST_INFRASTRUCTURE_EXCEPTIONS):
+        return False
     text = (type(exc).__name__ + ": " + str(exc)).lower()
     return not any(marker in text for marker in _INFRASTRUCTURE_MARKERS)
 
@@ -469,7 +484,7 @@ try:
   state=initial_state(); state=step(state,admit(SA,A,1,1,"SET",t0))["state"]
   before=query(copy.deepcopy(state),{"canonical_id":A,"legal_time":10,"knowledge_time":10})
   upgraded=step(state,{"type":"RULE_UPGRADE","rule_version":"AXIS-RULE-"+token[:8]})
-  after=query(copy.deepcopy(upgraded["state"]),{"canonical_id":A,"legal_time":10,"knowledge_time":10})
+  after=query(copy.deepcopy(upgraded["state"],{"canonical_id":A,"legal_time":10,"knowledge_time":10})
   check("governance-upgrade-accepted",upgraded.get("accepted") is True,upgraded)
   check("governance-nonretroactive",(before.get("status"),before.get("text"),before.get("evidence_chain"))==
         (after.get("status"),after.get("text"),after.get("evidence_chain")),{"before":before,"after":after})
@@ -738,7 +753,9 @@ def main(argv=None):
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as handle:
         json.dump(report, handle, ensure_ascii=False, indent=1, sort_keys=True)
-    print(json.dumps(report, ensure_ascii=False, indent=1, sort_keys=True))
+    # stdout is diagnostic transport, not the canonical report. Keep it ASCII-only so a Windows
+    # parent with a legacy console code page cannot fail while decoding evaluator diagnostics.
+    print(json.dumps(report, ensure_ascii=True, indent=1, sort_keys=True))
     return exit_code
 
 
