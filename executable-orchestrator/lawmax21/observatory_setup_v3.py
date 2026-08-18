@@ -1,9 +1,8 @@
 """Final setup wrapper using the same bounded evaluator entrypoints as production.
 
 Every load-bearing specialized arena is reference-calibrated with the same bounded entrypoint used by
-production before the owner ceremony can complete.  Durable systems is a first-class campaign: its
-actual-container crash injector, restart, corruption, concurrency and rebuild path are therefore
-proved executable before any architecture tournament begins.
+production before the owner ceremony can complete. Durable and distributed process-death workloads
+are passed explicitly from the owner-bound workload policy.
 """
 import os
 
@@ -30,7 +29,9 @@ CAMPAIGNS = {
             "--expected-replication-model", "single_primary_read_replicas",
             "--expected-commit-model", "single_writer_sequence",
             "--large-events", str(observatory_protocol.workload(
-                "distributed", "qualification"))]},
+                "distributed", "qualification")),
+            "--crash-events", str(observatory_protocol.workload(
+                "distributed", "crash_events"))]},
     "scale": {
         "reference": "benchmark/observatory_scale_reference_candidate.py",
         "evaluator": "private-evaluator/evaluator/observatory_scale_arena_v2.py",
