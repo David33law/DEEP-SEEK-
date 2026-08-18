@@ -2,13 +2,11 @@
 """Authoritative protocol-v6 proof wrapper for the protocol-v5 Observatory mission.
 
 The mission/protocol version remains Observatory Research Protocol 5. Static-v8 strictly extends the
-calibrated static-v7 fault topology with standalone cwd/PYTHONPATH-independent import closure and
-mechanically proves that every retired/public proof command is a monotonic shim to this v6 authority;
-``prove_observatory_protocol_static_v8.py`` executes ``prove_observatory_protocol_static_v7.py`` as
-its inherited fault-closure seat rather than replacing that evidence chain. The dynamic E2E passes
-through the actual-container fault verifier, and the final receipt requires both durable and
-distributed reference/crown evidence to prove death during an in-flight operation under exact
-owner-bound crash workloads. No real provider route is changed.
+calibrated static-v7 fault topology with standalone cwd/PYTHONPATH-independent import closure,
+mechanically proves every retired/public proof command is a monotonic shim to this v6 authority, and
+proves locale-independent strict UTF-8 trusted process transport with host-codec failures excluded
+from causal evidence. The dynamic E2E passes through the actual-container fault verifier and requires
+both durable and distributed reference/crown evidence under exact owner-bound crash workloads.
 
 The wrapper bootstraps the repository-local ``lawmax21`` package before importing any proof extension,
 so direct execution is independent of the caller's current working directory and PYTHONPATH.
@@ -59,6 +57,14 @@ REQUIRED_STATIC_V8_GATES = (
     "authoritative_fault_final_entry_static_bound",
     "authoritative_entrypoint_standalone_import_static_bound",
     "compatibility_proof_shims_monotonic_static_bound",
+    "trusted_utf8_process_static_bound",
+    "production_evaluator_utf8_static_bound",
+    "axis_probe_utf8_transport_static_bound",
+    "axis_calibration_utf8_static_bound",
+    "fault_crash_utf8_static_bound",
+    "e2e_utf8_transport_static_bound",
+    "host_unicode_failure_noncausal_static_bound",
+    "utf8_unicode_roundtrip_static_bound",
 )
 
 
@@ -73,7 +79,7 @@ def _fail(report, reason):
     report["final_closure_v6_verified"] = False
     report["final_closure_reason"] = reason
     base._atomic_write(E2E_REPORT, report)
-    print(json.dumps(report, ensure_ascii=False, indent=1, sort_keys=True))
+    print(json.dumps(report, ensure_ascii=True, indent=1, sort_keys=True))
     return 1
 
 
@@ -107,6 +113,13 @@ def main(argv=None):
                 or int(static.get("authoritative_entrypoint_import_count", 0)) != 10:
             raise RuntimeError(
                 "static-v8 proof-authority/shim census is incomplete")
+        roundtrip = static.get("utf8_unicode_roundtrip") or {}
+        classifier = static.get("unicode_failure_classifier") or {}
+        if roundtrip.get("status") != "PASS" \
+                or roundtrip.get("encoding") != "utf-8" \
+                or classifier.get("status") != "PASS" \
+                or classifier.get("candidate_causal_credit") is not False:
+            raise RuntimeError("static-v8 Unicode transport/classification proof is incomplete")
 
         verification = report.get("protocol_verification") or {}
         systems_calibration = verification.get(
@@ -120,12 +133,13 @@ def main(argv=None):
         if verification.get("fault_injection_actual_container_verified") is not True \
                 or verification.get("fault_injection_mid_operation_verified") is not True \
                 or verification.get("fault_workloads_owner_bound_verified") is not True \
+                or verification.get("trusted_process_transport_utf8_verified") is not True \
                 or systems_calibration.get("status") != "PASS" \
                 or distributed_calibration.get("status") != "PASS" \
                 or systems.get("status") != "PASS" \
                 or distributed.get("status") != "PASS":
             raise RuntimeError(
-                "dynamic mid-operation owner-bound fault verification is incomplete")
+                "dynamic mid-operation/UTF-8 owner-bound verification is incomplete")
 
         for label, row in (
                 ("systems calibration", systems_calibration),
@@ -133,7 +147,8 @@ def main(argv=None):
                 ("systems crown", systems),
                 ("distributed crown", distributed)):
             crash = row.get("crash") or {}
-            if crash.get("actual_container_kill_required") is not True \
+            if row.get("transport_encoding") != "utf-8" \
+                    or crash.get("actual_container_kill_required") is not True \
                     or crash.get("mid_operation_kill_required") is not True \
                     or crash.get("container_started") is not True \
                     or crash.get("workload_delivered") is not True \
@@ -143,7 +158,8 @@ def main(argv=None):
                     or crash.get("container_absent_before_recovery") is not True \
                     or crash.get("cli_process_kill_counts_as_evidence") is not False \
                     or int(crash.get("runtime_kill_returncode", -1)) != 0:
-                raise RuntimeError(label + " lacks final mid-operation runtime-kill evidence")
+                raise RuntimeError(
+                    label + " lacks final UTF-8 mid-operation runtime-kill evidence")
 
         report["authoritative_entrypoint"] = (
             "prove_complete_observatory_protocol_v6.py")
@@ -156,6 +172,9 @@ def main(argv=None):
             "compatibility_proof_shim_count": static.get("compatibility_proof_shim_count"),
             "entrypoint_import_probes": static.get(
                 "authoritative_entrypoint_import_probes"),
+            "utf8_transport_topology": static.get("utf8_transport_topology"),
+            "utf8_unicode_roundtrip": roundtrip,
+            "unicode_failure_classifier": classifier,
             "report_sha256": fault_e2e.sha256_file(STATIC_V8_REPORT),
         }
         report["systems_reference_calibration_bound"] = True
@@ -165,6 +184,9 @@ def main(argv=None):
         report["fault_injection_actual_container_bound"] = True
         report["fault_injection_mid_operation_bound"] = True
         report["fault_workloads_owner_bound"] = True
+        report["trusted_process_transport_utf8_bound"] = True
+        report["host_unicode_failure_cannot_earn_causal_credit"] = True
+        report["utf8_unicode_roundtrip_bound"] = True
         report["authoritative_entrypoint_standalone_import_bound"] = True
         report["compatibility_proof_shims_monotonic_bound"] = True
         report["authoritative_proof_target"] = static.get("authoritative_proof_target")
