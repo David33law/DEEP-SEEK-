@@ -1,10 +1,9 @@
-"""Require axis-specific behavioral failure in addition to cited-definition diagnostics.
+"""Preserve cited-definition semantics as diagnostic evidence, never causal authority.
 
 A removed definition name, axis vocabulary in its AST body, or a failed test from the same broad
-artifact group is useful diagnostic context but is not causal proof for a particular controlled axis.
-This hardening binds every cited body to deterministic AST hashes, records its semantic vocabulary,
-and grants causal credit only when the hidden evaluator independently exposes an axis-specific hard
-dimension or failure signature. Group-only paths and definition-name exceptions never suffice.
+artifact group is useful review context but is not causal proof for a particular controlled axis.
+This hardening binds every cited body to deterministic AST hashes and records its semantic vocabulary.
+The authoritative decision is supplied later by the trusted baseline-versus-mutant axis probe.
 """
 from __future__ import annotations
 
@@ -171,6 +170,8 @@ def install(ctx, handlers):
                 "behavioral_axis_evidence": behavioral,
                 "removed_definition_named": removed_named,
                 "removed_definition_name_is_sufficient": False,
+                "group_path_is_sufficient": False,
+                "diagnostic_failure_attribution_is_sufficient": False,
                 **source_support,
                 "failure_payload_fields": sorted(payload),
                 "whole_receipt_searched": False,
@@ -188,6 +189,7 @@ def install(ctx, handlers):
             "behavioral_axis_evidence": behavioral,
             "removed_definition_named": removed_named,
             "removed_definition_name_is_sufficient": False,
+            "diagnostic_failure_attribution_is_sufficient": False,
             **source_support,
             "failed_test_paths": failed_tests,
             "failed_directed_paths": failed_directed,
