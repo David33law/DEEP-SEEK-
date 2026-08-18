@@ -3,7 +3,7 @@
 The inherited setup performs semantic, durable, distributed, scale, formal and interoperability
 calibration and writes the owner-signed protocol receipt. This layer then executes all 28 trusted
 axis-probe routes against passing references and controlled candidate-origin failures, and appends the
-exact source/report hashes to the same zero-provider-call calibration receipt.
+exact source/report hashes plus strict UTF-8 transport identity to the same zero-provider receipt.
 """
 from __future__ import annotations
 
@@ -46,6 +46,8 @@ def _calibrate():
     ], timeout=43200)
     report = core._assert_report(report_path, "axis_probe")
     if report.get("axis_probe_contract") != "observatory-axis-probe-v1" \
+            or report.get("transport_encoding") != "utf-8" \
+            or report.get("failed_route") not in (None, {}, []) \
             or int(report.get("axis_routes", 0)) != 28 \
             or int(report.get("valid_probe_pairs", 0)) != 28 \
             or int(report.get("baseline_reports", 0)) != 28 \
@@ -53,7 +55,7 @@ def _calibrate():
             or len(report.get("pairs") or []) != 28 \
             or report.get("provider_calls") != 0:
         raise RuntimeError(
-            "axis-probe calibration did not close all 28 zero-provider routes")
+            "axis-probe calibration did not close all 28 strict-UTF-8 zero-provider routes")
 
     receipt_path = os.path.join(
         core.PROOF, "observatory-specialized-calibration-receipt.json")
@@ -69,6 +71,7 @@ def _calibrate():
         "report_path": AXIS_PROBE_REPORT,
         "report_sha256": observatory_protocol.file_sha256(report_path),
         "axis_probe_contract": report["axis_probe_contract"],
+        "transport_encoding": report["transport_encoding"],
         "axis_routes": report["axis_routes"],
         "valid_probe_pairs": report["valid_probe_pairs"],
         "baseline_reports": report["baseline_reports"],
@@ -82,6 +85,7 @@ def _calibrate():
     atomic_write_json(receipt_path, receipt)
     visible["axis_probe"] = {
         "status": report["status"],
+        "transport_encoding": report["transport_encoding"],
         "axis_routes": report["axis_routes"],
         "valid_probe_pairs": report["valid_probe_pairs"],
         "report": AXIS_PROBE_REPORT,
