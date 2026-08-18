@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Authoritative protocol-v5 proof with baseline-versus-mutant axis causality.
+"""Authoritative protocol-v5 proof with calibrated baseline-versus-mutant causality.
 
-Runs portable-owner static closure, v2 axis-probe static closure and the axis-hardened production-
-container E2E proof through the exact causal-aware localhost provider. Final closure is written only
-after the E2E receipt proves COMMITTED state, zero paid calls, one provider-route substitution, exact-
-source causal campaigns and a complete ``observatory-axis-probe-v1`` baseline/mutant pair for every
-replication and crown task, all produced by the exact statically bound v2 evaluator bytes.
+Runs portable-owner static closure, v2 axis-probe static closure and the calibration-hardened
+production-container E2E proof through the exact causal-aware localhost provider. Final closure is
+written only after COMMITTED state, zero paid calls, exact v2 evaluator bytes, 28 independently
+reverified calibration pairs and a complete runtime baseline/mutant pair for every replication and
+crown causal task, all directly indexed in the deterministic supremacy dossier.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import os
 import subprocess
 import sys
 
-import prove_complete_observatory_protocol_axis_hardened as e2e
+import prove_complete_observatory_protocol_calibration_hardened as e2e
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -60,6 +60,7 @@ CAUSAL_STATIC_GATES = (
     "axis_specific_behavioral_failure_verified",
     "axis_probe_contract_verified",
     "axis_probe_evaluator_v2_verified",
+    "axis_probe_evaluator_imported",
     "axis_probe_evaluator_bytes_bound",
     "axis_probe_signed_hard_minima_verified",
     "axis_probe_conditional_commutativity_verified",
@@ -67,6 +68,9 @@ CAUSAL_STATIC_GATES = (
     "axis_probe_baseline_mutant_pair_required",
     "axis_probe_dossier_direct_indexing_required",
     "axis_probe_docker_reverification_required",
+    "axis_probe_calibration_static_bound",
+    "axis_probe_calibration_preflight_bound",
+    "axis_probe_calibration_e2e_bound",
     "failure_scoped_attribution_verified",
     "cited_definition_semantics_verified",
     "deterministic_definition_body_receipts_verified",
@@ -93,8 +97,7 @@ def _atomic_write(path, value):
         with open(temporary, "w", encoding="utf-8") as handle:
             json.dump(value, handle, ensure_ascii=False,
                       indent=1, sort_keys=True)
-            handle.flush()
-            os.fsync(handle.fileno())
+            handle.flush(); os.fsync(handle.fileno())
         os.replace(temporary, path)
         try:
             directory = os.open(os.path.dirname(os.path.abspath(path)), os.O_RDONLY)
@@ -157,8 +160,7 @@ def _pair_summary_valid(phase, summary):
             or summary.get("axis_probe_evaluator") != PROBE_EVALUATOR:
         raise RuntimeError(
             f"E2E {phase} axis-probe count, contract or evaluator drift")
-    identities = set()
-    evidence_paths = set()
+    identities = set(); evidence_paths = set()
     for row in rows:
         identity = row.get("task_identity_sha256")
         baseline = row.get("baseline") or {}
@@ -186,12 +188,38 @@ def _pair_summary_valid(phase, summary):
         raise RuntimeError(
             f"E2E {phase} reuses an axis-probe report across tasks")
     return {
-        "tasks": tasks,
-        "pairs": pairs,
-        "reports": reports,
+        "tasks": tasks, "pairs": pairs, "reports": reports,
         "task_identities": len(identities),
         "evidence_paths": len(evidence_paths),
         "evaluator": PROBE_EVALUATOR,
+    }
+
+
+def _calibration_summary_valid(calibration, evaluator_sha):
+    if calibration.get("status") != "PASS" \
+            or calibration.get("axis_probe_contract") != PROBE_CONTRACT \
+            or calibration.get("evaluator_path") != PROBE_EVALUATOR_PATH \
+            or calibration.get("evaluator_sha256") != evaluator_sha \
+            or int(calibration.get("axis_routes", 0)) != 28 \
+            or int(calibration.get("valid_probe_pairs", 0)) != 28 \
+            or int(calibration.get("baseline_reports", 0)) != 28 \
+            or int(calibration.get("mutant_reports", 0)) != 28 \
+            or int(calibration.get("evidence_files", 0)) != 84 \
+            or calibration.get("provider_calls") != 0 \
+            or len(str(calibration.get("report_sha256") or "")) != 64 \
+            or len(str(calibration.get("receipt_sha256") or "")) != 64:
+        raise RuntimeError(
+            "E2E exhaustive axis-probe calibration summary is incomplete")
+    return {
+        "axis_routes": 28,
+        "valid_probe_pairs": 28,
+        "baseline_reports": 28,
+        "mutant_reports": 28,
+        "evidence_files": 84,
+        "evaluator_sha256": evaluator_sha,
+        "provider_calls": 0,
+        "report_sha256": calibration["report_sha256"],
+        "receipt_sha256": calibration["receipt_sha256"],
     }
 
 
@@ -221,21 +249,24 @@ def _dynamic_closure(report, static_causal):
             "E2E did not prove exactly one causal localhost-provider route")
     if verification.get("infrastructure_failure_exclusion_reverified") is not True:
         raise RuntimeError(
-            "E2E did not independently exclude infrastructure-only causal credit")
+            "E2E did not exclude infrastructure-only causal credit")
     if verification.get("axis_specific_behavioral_failure_verified") is not True \
             or verification.get("axis_probe_dossier_index_verified") is not True:
         raise RuntimeError(
             "E2E did not prove axis behavior and direct dossier indexing")
 
     evaluator = verification.get("axis_probe_evaluator_verified") or {}
+    evaluator_sha = static_causal.get("axis_probe_evaluator_sha256")
     if evaluator.get("name") != PROBE_EVALUATOR \
             or evaluator.get("path") != PROBE_EVALUATOR_PATH \
-            or evaluator.get("sha256") != static_causal.get(
-                "axis_probe_evaluator_sha256") \
+            or evaluator.get("sha256") != evaluator_sha \
             or not isinstance(evaluator.get("bytes"), int) \
             or evaluator.get("bytes") <= 0:
         raise RuntimeError(
             "E2E v2 axis-probe evaluator bytes do not match static closure")
+    calibration = _calibration_summary_valid(
+        verification.get("axis_probe_calibration_verified") or {},
+        evaluator_sha)
 
     causal = verification.get("causal_genome_ablation_verified") or {}
     probes = verification.get("axis_probe_pairs_verified") or {}
@@ -256,6 +287,7 @@ def _dynamic_closure(report, static_causal):
             raise RuntimeError(
                 f"E2E {phase} axis-probe pairs do not cover every causal task")
     verification["axis_probe_pair_final_summaries"] = pair_summaries
+    verification["axis_probe_calibration_final_summary"] = calibration
     return verification
 
 
@@ -318,6 +350,9 @@ def main(argv=None):
         report["axis_probe_evaluator_v2_bound"] = True
         report["axis_probe_evaluator"] = verification[
             "axis_probe_evaluator_verified"]
+        report["axis_probe_calibration_bound"] = True
+        report["axis_probe_calibration"] = verification[
+            "axis_probe_calibration_final_summary"]
         report["axis_probe_dossier_index_bound"] = True
         report["axis_probe_pair_summaries"] = verification[
             "axis_probe_pair_final_summaries"]
