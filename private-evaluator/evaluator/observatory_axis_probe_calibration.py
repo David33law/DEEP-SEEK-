@@ -6,6 +6,10 @@ Every allowed ``(group, axis)`` route is executed twice through
 mechanically controlled source mutation must produce a valid candidate-origin FAIL with at least one
 structured false axis check. The suite persists all 28 pairs, 56 reports and exact source/evaluator
 hashes. It calibrates the evaluator path; it does not certify a tournament architecture.
+
+Evaluator child processes are launched with explicit UTF-8 stdin/stdout semantics independent of the
+Windows active code page. Baselines are validated before the corresponding mutant is executed, and a
+failed route records the exact status/origin/check/process diagnostics instead of only a generic label.
 """
 from __future__ import annotations
 
@@ -161,6 +165,13 @@ def _mutant_source(source, symbol, group, axis):
     return mutated, marker
 
 
+def _utf8_env():
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
+    return env
+
+
 def _run(candidate, group, axis, output, seed, expected, timeout):
     command = [
         sys.executable, EVALUATOR,
@@ -172,7 +183,8 @@ def _run(candidate, group, axis, output, seed, expected, timeout):
         "--expected-json", _canonical(expected),
     ]
     process = subprocess.run(
-        command, capture_output=True, text=True, timeout=timeout)
+        command, capture_output=True, text=True,
+        encoding="utf-8", errors="strict", env=_utf8_env(), timeout=timeout)
     if not os.path.isfile(output):
         raise RuntimeError(
             "axis-probe calibration produced no report: "
@@ -189,6 +201,7 @@ def _run(candidate, group, axis, output, seed, expected, timeout):
     report["calibration_process_returncode"] = process.returncode
     report["calibration_stdout_tail"] = (process.stdout or "")[-2000:]
     report["calibration_stderr_tail"] = (process.stderr or "")[-2000:]
+    report["calibration_transport_encoding"] = "utf-8"
     temporary = output + ".tmp"
     with open(temporary, "w", encoding="utf-8") as handle:
         json.dump(report, handle, ensure_ascii=False, indent=1, sort_keys=True)
@@ -209,6 +222,7 @@ def _valid_report(report, *, baseline, candidate_sha, group, axis,
         and report.get("seed") == seed
         and report.get("candidate_sha256") == candidate_sha
         and report.get("expected_sha256") == expected_sha
+        and report.get("calibration_transport_encoding") == "utf-8"
         and isinstance(checks, list) and checks
         and all(isinstance(row, dict)
                 and isinstance(row.get("passed"), bool)
@@ -230,6 +244,26 @@ def _valid_report(report, *, baseline, candidate_sha, group, axis,
         and any(row["passed"] is False for row in checks))
 
 
+def _diagnostic(report, path):
+    checks = report.get("checks") or []
+    return {
+        "report_path": os.path.relpath(path, ROOT).replace("\\", "/"),
+        "status": report.get("status"),
+        "passed": report.get("passed"),
+        "valid_execution": report.get("valid_execution"),
+        "failure_origin": report.get("failure_origin"),
+        "reason": report.get("reason"),
+        "process_returncode": report.get("calibration_process_returncode"),
+        "transport_encoding": report.get("calibration_transport_encoding"),
+        "failed_checks": [
+            str(row.get("id")) for row in checks
+            if isinstance(row, dict) and row.get("passed") is False],
+        "stdout_tail": (report.get("calibration_stdout_tail") or "")[-1000:],
+        "stderr_tail": (report.get("calibration_stderr_tail") or "")[-1000:],
+        "detail": report.get("detail"),
+    }
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -246,6 +280,7 @@ def main(argv=None):
         "calibration": "observatory-axis-probe-exhaustive-v1",
         "axis_probe_contract": CONTRACT,
         "provider_calls": 0,
+        "transport_encoding": "utf-8",
         "evaluator": {
             "path": EVALUATOR_RELATIVE,
             "sha256": _sha256(EVALUATOR),
@@ -300,24 +335,37 @@ def main(argv=None):
                     raise RuntimeError(
                         f"axis-probe calibration mutation did not change source: {group}/{axis}")
 
+                # Baseline is authoritative calibration of the route. Never spend the mutant
+                # execution if the exact passing reference does not first establish a valid probe.
                 baseline = _run(
                     reference_path, group, axis, baseline_report_path,
-                    seed, expected, args.timeout)
-                mutant_report = _run(
-                    mutant_source_path, group, axis, mutant_report_path,
                     seed, expected, args.timeout)
                 if not _valid_report(
                         baseline, baseline=True,
                         candidate_sha=reference_sha, group=group, axis=axis,
                         seed=seed, expected_sha=expected_sha):
+                    diagnostic = _diagnostic(baseline, baseline_report_path)
+                    report["failed_route"] = {
+                        "variant": "baseline", "group": group, "axis": axis,
+                        **diagnostic}
                     raise RuntimeError(
-                        f"axis-probe baseline calibration failed: {group}/{axis}")
+                        "axis-probe baseline calibration failed: "
+                        f"{group}/{axis} :: " + _canonical(diagnostic))
+
+                mutant_report = _run(
+                    mutant_source_path, group, axis, mutant_report_path,
+                    seed, expected, args.timeout)
                 if not _valid_report(
                         mutant_report, baseline=False,
                         candidate_sha=mutant_sha, group=group, axis=axis,
                         seed=seed, expected_sha=expected_sha):
+                    diagnostic = _diagnostic(mutant_report, mutant_report_path)
+                    report["failed_route"] = {
+                        "variant": "mutant", "group": group, "axis": axis,
+                        **diagnostic}
                     raise RuntimeError(
-                        f"axis-probe mutant calibration failed: {group}/{axis}")
+                        "axis-probe mutant calibration failed: "
+                        f"{group}/{axis} :: " + _canonical(diagnostic))
                 if baseline.get("probe_id") != mutant_report.get("probe_id") \
                         or baseline.get("seed") != mutant_report.get("seed") \
                         or baseline.get("expected_sha256") != mutant_report.get(
@@ -385,7 +433,8 @@ def main(argv=None):
         json.dump(report, handle, ensure_ascii=False, indent=1, sort_keys=True)
         handle.flush(); os.fsync(handle.fileno())
     os.replace(temporary, output)
-    print(json.dumps(report, ensure_ascii=False, indent=1, sort_keys=True))
+    # Diagnostic stdout is ASCII-safe; the canonical report remains UTF-8 on disk.
+    print(json.dumps(report, ensure_ascii=True, indent=1, sort_keys=True))
     return 0 if report.get("status") == "PASS" else 1
 
 
