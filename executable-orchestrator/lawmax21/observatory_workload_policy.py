@@ -1,4 +1,5 @@
 """Apply the owner-signed Observatory workload policy to evaluator overlays."""
+from . import observatory_crown_overlay as crown
 from . import observatory_distributed_overlay as distributed
 from . import observatory_formal_overlay as formal
 from . import observatory_interoperability_overlay as interoperability
@@ -7,6 +8,9 @@ from . import observatory_scale_overlay as scale
 
 
 def apply():
+    crown.SYSTEMS_QUAL_EVENTS = protocol.workload("systems", "qualification")
+    crown.SYSTEMS_REPLICATION_EVENTS = protocol.workload("systems", "replication")
+    crown.SYSTEMS_CROWN_EVENTS = protocol.workload("systems", "crown")
     distributed.DISTRIBUTED_QUAL_EVENTS = protocol.workload("distributed", "qualification")
     distributed.DISTRIBUTED_REPLICATION_EVENTS = protocol.workload("distributed", "replication")
     distributed.DISTRIBUTED_CROWN_EVENTS = protocol.workload("distributed", "crown")
@@ -27,10 +31,17 @@ def apply():
 def snapshot():
     return {
         "proof_mode": protocol.proof_mode(),
+        "systems": {
+            "qualification": crown.SYSTEMS_QUAL_EVENTS,
+            "replication": crown.SYSTEMS_REPLICATION_EVENTS,
+            "crown": crown.SYSTEMS_CROWN_EVENTS,
+            "crash_events": protocol.workload("systems", "crash_events")},
         "distributed": {
             "qualification": distributed.DISTRIBUTED_QUAL_EVENTS,
             "replication": distributed.DISTRIBUTED_REPLICATION_EVENTS,
-            "crown": distributed.DISTRIBUTED_CROWN_EVENTS},
+            "crown": distributed.DISTRIBUTED_CROWN_EVENTS,
+            "crash_event_floor": protocol.workload(
+                "distributed", "crash_event_floor")},
         "scale": {
             "qualification": scale.SCALE_QUAL_EVENTS,
             "replication": scale.SCALE_REPLICATION_EVENTS,
