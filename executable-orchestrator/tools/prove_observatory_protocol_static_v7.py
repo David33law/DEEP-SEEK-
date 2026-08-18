@@ -43,6 +43,7 @@ NEW_GATES = (
     "distributed_baseline_metric_static_bound",
     "distributed_atomic_batch_reference_static_bound",
     "distributed_crash_workload_static_bound",
+    "distributed_contract_signed_crash_static_bound",
     "fault_evaluator_production_routing_static_bound",
     "fault_mid_operation_crash_static_bound",
     "fault_exact_workloads_static_bound",
@@ -210,9 +211,13 @@ def main():
         distributed_contract = _text(DISTRIBUTED_CONTRACT)
         _require(distributed_contract, (
             "Distributed Systems Contract v2",
+            "exact owner-signed `distributed.crash_events` workload",
+            "events_delivered=<signed distributed.crash_events>",
             "operation_reply_observed_before_kill=false",
             "mid_operation_kill_verified=true",
             "confirmed absent",
+            "--crash-events",
+            "rejects an absent crash count",
             "partially serialized canonical authority is never acceptable"),
             "distributed contract")
 
