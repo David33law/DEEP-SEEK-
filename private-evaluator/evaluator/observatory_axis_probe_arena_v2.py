@@ -1,33 +1,56 @@
 #!/usr/bin/env python3
 """Contract-compatible hardening of ``observatory_axis_probe_arena``.
 
-Version 2 keeps the exact ``observatory-axis-probe-v1`` report contract and isolation path. It removes
-two false-rejection hazards: semantic probes use the signed Pareto hard minima rather than requiring
-an undocumented perfect 1.0 for every dimension, and formal state-derivation probes require admission
+Version 2 keeps the exact ``observatory-axis-probe-v1`` report contract and isolation path. Semantic
+probe thresholds are loaded from the same owner-signed ``PARETO-DIMENSIONS.json`` used by frontier
+admission, eliminating a duplicated policy seat. Formal state-derivation probes require admission
 order convergence only when the candidate manifest explicitly claims independent admissions are
 commutative. All other baseline/mutant identity and fail-closed behavior remains in the base arena.
 """
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 
 import observatory_axis_probe_arena as base
 
 
-SEMANTIC_HARD_MINIMA = {
-    "source_coverage": 1.0,
-    "change_detection_recall": 1.0,
-    "temporal_reconstruction_accuracy": 0.99,
-    "canonical_identity_accuracy": 0.995,
-    "normative_effect_accuracy": 0.99,
-    "jurisprudence_temporal_link_accuracy": 0.98,
-    "doctrine_epistemic_separation": 1.0,
-    "provenance_completeness": 0.995,
-    "publication_projection_consistency": 1.0,
-    "replay_determinism": 1.0,
-    "recovery_success": 1.0,
-    "honest_unknown_rate": 1.0,
-}
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))))
+PARETO_PATH = os.path.join(
+    ROOT, "profiles", "national-observatory", "PARETO-DIMENSIONS.json")
+_REQUIRED_SEMANTIC_DIMENSIONS = sorted({
+    dimension
+    for dimensions in base.SEMANTIC_DIMENSIONS.values()
+    for dimension in dimensions})
+
+
+def _load_hard_minima():
+    if not os.path.isfile(PARETO_PATH):
+        raise RuntimeError(
+            "axis-probe v2 cannot locate owner-signed Pareto dimensions")
+    with open(PARETO_PATH, encoding="utf-8") as handle:
+        rows = json.load(handle)
+    if not isinstance(rows, list):
+        raise RuntimeError("Pareto dimensions must be a JSON array")
+    by_id = {
+        row.get("id"): row for row in rows
+        if isinstance(row, dict) and row.get("id")}
+    minima = {}
+    for dimension in _REQUIRED_SEMANTIC_DIMENSIONS:
+        row = by_id.get(dimension) or {}
+        value = row.get("hard_minimum")
+        if row.get("direction") != "higher" \
+                or not isinstance(value, (int, float)):
+            raise RuntimeError(
+                "axis probe has no higher-is-better signed hard minimum for "
+                + dimension)
+        minima[dimension] = float(value)
+    return minima
+
+
+SEMANTIC_HARD_MINIMA = _load_hard_minima()
 _ORIGINAL_SEMANTIC_PROBE = base._semantic_probe
 
 
@@ -52,9 +75,6 @@ def _semantic_probe(source, axis, seed, runtime, expected):
     scores = report.get("dimension_scores") or {}
     checks = []
     for dimension in dimensions:
-        if dimension not in SEMANTIC_HARD_MINIMA:
-            raise RuntimeError(
-                "axis probe has no signed hard minimum for " + dimension)
         required = SEMANTIC_HARD_MINIMA[dimension]
         checks.append(base._check(
             "semantic-dimension:" + dimension,
@@ -68,6 +88,7 @@ def _semantic_probe(source, axis, seed, runtime, expected):
         {"scenario_statuses": statuses}))
     return checks, {
         "probe_family": "semantic-hidden-scenarios-v2",
+        "pareto_path": os.path.relpath(PARETO_PATH, ROOT).replace("\\", "/"),
         "hard_minima": {
             key: SEMANTIC_HARD_MINIMA[key] for key in dimensions},
         "dimension_scores": {key: scores.get(key) for key in dimensions},
@@ -114,7 +135,9 @@ base.PROBES["semantic"] = _semantic_probe
 
 main = base.main
 
-__all__ = ["main", "SEMANTIC_HARD_MINIMA"]
+__all__ = [
+    "main", "SEMANTIC_HARD_MINIMA", "PARETO_PATH",
+]
 
 
 if __name__ == "__main__":
