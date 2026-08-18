@@ -3,8 +3,8 @@
 The inherited preflight verifies the signed mission, full protocol bundle, Pareto census, prior art and
 all specialized campaigns. This layer additionally reopens every one of the 28 axis-probe calibration
 pairs, rehashes all 56 reports and 28 controlled mutant sources, verifies the six exact reference
-sources and the v2 evaluator bytes, and rejects launch if any baseline/mutant route is missing or
-reused.
+sources and the v2 evaluator bytes, and rejects launch if any baseline/mutant route is missing, reused
+or was transported through anything other than strict UTF-8.
 """
 from __future__ import annotations
 
@@ -79,6 +79,7 @@ def _report_valid(report, baseline, reference_sha, mutant_sha,
         and report.get("seed") == seed
         and report.get("expected_sha256") == expected_sha
         and report.get("candidate_sha256") == expected_candidate
+        and report.get("calibration_transport_encoding") == "utf-8"
         and isinstance(checks, list) and checks
         and all(isinstance(row, dict)
                 and isinstance(row.get("passed"), bool)
@@ -115,6 +116,8 @@ def _axis_probe_calibration(root):
             or report.get("status") != "PASS" \
             or report.get("passed") is not True \
             or report.get("axis_probe_contract") != PROBE_CONTRACT \
+            or report.get("transport_encoding") != "utf-8" \
+            or report.get("failed_route") not in (None, {}, []) \
             or report.get("provider_calls") != 0 \
             or int(report.get("axis_routes", 0)) != 28 \
             or int(report.get("valid_probe_pairs", 0)) != 28 \
@@ -200,6 +203,7 @@ def _axis_probe_calibration(root):
         "axis_probe_contract": PROBE_CONTRACT,
         "evaluator_path": PROBE_EVALUATOR,
         "evaluator_sha256": evaluator["sha256"],
+        "transport_encoding": "utf-8",
         "axis_routes": len(routes),
         "valid_probe_pairs": len(pairs),
         "evidence_files": len(evidence_paths),
