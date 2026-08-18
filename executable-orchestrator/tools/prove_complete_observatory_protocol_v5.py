@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Authoritative protocol-v5 proof with baseline-versus-mutant axis causality.
 
-Runs portable-owner static closure, axis-probe static closure and the axis-hardened production-
+Runs portable-owner static closure, v2 axis-probe static closure and the axis-hardened production-
 container E2E proof through the exact causal-aware localhost provider. Final closure is written only
 after the E2E receipt proves COMMITTED state, zero paid calls, one provider-route substitution, exact-
 source causal campaigns and a complete ``observatory-axis-probe-v1`` baseline/mutant pair for every
-replication and crown causal task, with both reports indexed in the deterministic supremacy dossier.
+replication and crown task, all produced by the exact statically bound v2 evaluator bytes.
 """
 from __future__ import annotations
 
@@ -27,6 +27,9 @@ E2E_REPORT = os.path.join(
     ROOT, "proof", "complete-observatory-protocol-e2e.json")
 PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5"
 PROBE_CONTRACT = "observatory-axis-probe-v1"
+PROBE_EVALUATOR = "observatory_axis_probe_arena_v2.py"
+PROBE_EVALUATOR_PATH = (
+    "private-evaluator/evaluator/" + PROBE_EVALUATOR)
 INHERITED_STATIC_GATES = (
     "strict_one_file_build_schema",
     "semantic_source_receipts_bound",
@@ -56,6 +59,10 @@ CAUSAL_STATIC_GATES = (
     "axis_specific_causal_attribution_verified",
     "axis_specific_behavioral_failure_verified",
     "axis_probe_contract_verified",
+    "axis_probe_evaluator_v2_verified",
+    "axis_probe_evaluator_bytes_bound",
+    "axis_probe_signed_hard_minima_verified",
+    "axis_probe_conditional_commutativity_verified",
     "axis_probe_task_identity_bound",
     "axis_probe_baseline_mutant_pair_required",
     "axis_probe_dossier_direct_indexing_required",
@@ -128,11 +135,14 @@ def _static_closure():
         }, ensure_ascii=False, sort_keys=True))
     inherited_bundle = inherited.get("protocol_bundle_sha256")
     causal_bundle = causal.get("protocol_bundle_sha256")
+    evaluator_sha = causal.get("axis_probe_evaluator_sha256")
     if not isinstance(inherited_bundle, str) \
             or len(inherited_bundle) != 64 \
-            or inherited_bundle != causal_bundle:
+            or inherited_bundle != causal_bundle \
+            or not isinstance(evaluator_sha, str) \
+            or len(evaluator_sha) != 64:
         raise RuntimeError(
-            "portable-owner and causal static receipts bind different protocol bundles")
+            "static receipts do not bind one protocol bundle and v2 evaluator")
     return inherited, causal
 
 
@@ -143,9 +153,10 @@ def _pair_summary_valid(phase, summary):
     rows = summary.get("pairs") or []
     if tasks < 1 or tasks != pairs or reports != 2 * tasks \
             or len(rows) != tasks \
-            or summary.get("axis_probe_contract") != PROBE_CONTRACT:
+            or summary.get("axis_probe_contract") != PROBE_CONTRACT \
+            or summary.get("axis_probe_evaluator") != PROBE_EVALUATOR:
         raise RuntimeError(
-            f"E2E {phase} axis-probe pair count or contract drift")
+            f"E2E {phase} axis-probe count, contract or evaluator drift")
     identities = set()
     evidence_paths = set()
     for row in rows:
@@ -154,6 +165,7 @@ def _pair_summary_valid(phase, summary):
         mutant = row.get("mutant") or {}
         if not isinstance(identity, str) or len(identity) != 64 \
                 or identity in identities \
+                or row.get("probe_evaluator") != PROBE_EVALUATOR \
                 or baseline.get("task_identity_sha256") != identity \
                 or mutant.get("task_identity_sha256") != identity \
                 or baseline.get("probe_id") != mutant.get("probe_id") \
@@ -167,7 +179,7 @@ def _pair_summary_valid(phase, summary):
                 or len(str(mutant.get("sha256") or "")) != 64 \
                 or not mutant.get("failed_checks"):
             raise RuntimeError(
-                f"E2E {phase} contains a malformed axis-probe pair")
+                f"E2E {phase} contains a malformed v2 axis-probe pair")
         identities.add(identity)
         evidence_paths.update((baseline["path"], mutant["path"]))
     if len(evidence_paths) != 2 * tasks:
@@ -179,10 +191,11 @@ def _pair_summary_valid(phase, summary):
         "reports": reports,
         "task_identities": len(identities),
         "evidence_paths": len(evidence_paths),
+        "evaluator": PROBE_EVALUATOR,
     }
 
 
-def _dynamic_closure(report):
+def _dynamic_closure(report, static_causal):
     if report.get("status") != "PASS" \
             or report.get("protocol_version") != PROTOCOL_VERSION \
             or report.get("paid_api_calls") != 0:
@@ -213,6 +226,16 @@ def _dynamic_closure(report):
             or verification.get("axis_probe_dossier_index_verified") is not True:
         raise RuntimeError(
             "E2E did not prove axis behavior and direct dossier indexing")
+
+    evaluator = verification.get("axis_probe_evaluator_verified") or {}
+    if evaluator.get("name") != PROBE_EVALUATOR \
+            or evaluator.get("path") != PROBE_EVALUATOR_PATH \
+            or evaluator.get("sha256") != static_causal.get(
+                "axis_probe_evaluator_sha256") \
+            or not isinstance(evaluator.get("bytes"), int) \
+            or evaluator.get("bytes") <= 0:
+        raise RuntimeError(
+            "E2E v2 axis-probe evaluator bytes do not match static closure")
 
     causal = verification.get("causal_genome_ablation_verified") or {}
     probes = verification.get("axis_probe_pairs_verified") or {}
@@ -262,7 +285,7 @@ def main(argv=None):
         return 1
     report = _read(E2E_REPORT)
     try:
-        verification = _dynamic_closure(report)
+        verification = _dynamic_closure(report, causal)
         report["static_protocol_v5_portable_owner_closure"] = {
             "status": inherited.get("status"),
             "protocol_version": inherited.get("protocol_version"),
@@ -279,6 +302,8 @@ def main(argv=None):
             "protocol_bundle_sha256": causal.get(
                 "protocol_bundle_sha256"),
             **{key: causal.get(key) for key in CAUSAL_STATIC_GATES},
+            "axis_probe_evaluator_sha256": causal.get(
+                "axis_probe_evaluator_sha256"),
             "causal_terminal_conditions": causal.get(
                 "causal_terminal_conditions"),
             "causal_phases": causal.get("causal_phases"),
@@ -290,6 +315,9 @@ def main(argv=None):
         report["axis_specific_causal_attribution_bound"] = True
         report["axis_specific_behavioral_failure_bound"] = True
         report["axis_probe_pairs_bound"] = True
+        report["axis_probe_evaluator_v2_bound"] = True
+        report["axis_probe_evaluator"] = verification[
+            "axis_probe_evaluator_verified"]
         report["axis_probe_dossier_index_bound"] = True
         report["axis_probe_pair_summaries"] = verification[
             "axis_probe_pair_final_summaries"]
