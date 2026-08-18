@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 from . import observatory_protocol
+from . import observatory_utf8_process as utf8_process
 from .canonical import atomic_write_json, read_json
 
 ORCH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -30,8 +31,8 @@ PRICE_SCHEDULE = {
 
 
 def _run(argv, timeout=14400):
-    result = subprocess.run([sys.executable, *argv], capture_output=True,
-                            text=True, timeout=timeout)
+    result = utf8_process.run(
+        [sys.executable, *argv], capture_output=True, timeout=timeout)
     if result.returncode != 0:
         raise RuntimeError("FAILED: " + " ".join(argv) + "\n"
                            + result.stdout[-4000:] + "\n" + result.stderr[-4000:])
@@ -39,7 +40,9 @@ def _run(argv, timeout=14400):
 
 
 def _git(*args):
-    result = subprocess.run(["git", "-C", ROOT, *args], capture_output=True, text=True)
+    result = subprocess.run(
+        ["git", "-C", ROOT, *args], capture_output=True, text=True,
+        encoding="utf-8", errors="strict")
     if result.returncode != 0:
         raise RuntimeError("git failed: " + result.stderr.strip())
     return result.stdout.strip()
