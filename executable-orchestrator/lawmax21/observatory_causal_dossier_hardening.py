@@ -1,9 +1,10 @@
-"""Bind replication/crown causal genome-ablation receipts into the deterministic dossier.
+"""Bind replication/crown causal genome evidence into the deterministic supremacy dossier.
 
-The final public dossier independently rehashes every mutant source and evaluator receipt, verifies
-process/source identity, inert controls, auditor obligations and failure-scoped attribution, and now
-requires an axis-specific behavioral failure for every task. Definition names, source vocabulary and
-group-only test paths remain diagnostics; none can independently earn causal credit.
+The final dossier independently rehashes every mutant source, evaluator receipt, inert control and
+trusted baseline-versus-mutant axis-probe pair. Diagnostic token matching, definition names and broad
+artifact failures remain review context only. Causal credit requires the original exact source to pass
+and the exact mutant to fail the same hidden ``observatory-axis-probe-v1`` probe ID, seed, axis, group
+and controlled-manifest digest. Both probe reports are indexed directly in the public evidence set.
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ from .handlers import A
 
 
 LABELS = ("replication", "crown")
+PROBE_CONTRACT = "observatory-axis-probe-v1"
 
 
 def _inside_runtime(ctx, relative):
@@ -25,6 +27,11 @@ def _inside_runtime(ctx, relative):
         raise RuntimeError(
             "causal dossier evidence escapes runtime: " + str(relative))
     return path
+
+
+def _hex64(value):
+    return isinstance(value, str) and len(value) == 64 \
+        and all(char in "0123456789abcdef" for char in value.lower())
 
 
 def _verify_execution(ctx, label, row, kind):
@@ -62,24 +69,157 @@ def _verify_execution(ctx, label, row, kind):
                 "the wrong failure origin")
 
 
-def _attribution_valid(attribution):
-    if attribution.get("whole_receipt_searched") is not False \
-            or not attribution.get("definition_vocabulary_sha256_inputs") \
-            or len(str(attribution.get(
-                "definition_vocabulary_sha256") or "")) != 64 \
-            or not attribution.get("definition_body_sha256") \
+def _definition_receipt_valid(attribution):
+    inputs = attribution.get("definition_vocabulary_sha256_inputs") or []
+    bodies = attribution.get("definition_body_sha256") or {}
+    return bool(
+        inputs
+        and isinstance(bodies, dict)
+        and set(bodies) == set(inputs)
+        and all(_hex64(value) for value in bodies.values())
+        and _hex64(attribution.get("definition_vocabulary_sha256"))
+        and attribution.get("whole_receipt_searched") is False
+        and attribution.get(
+            "removed_definition_name_is_sufficient") is False
+        and attribution.get("group_path_is_sufficient") is False
+        and attribution.get(
+            "diagnostic_failure_attribution_is_sufficient") is False)
+
+
+def _probe_report(ctx, label, task, attribution, variant):
+    prefix = variant + "_axis_probe_"
+    relative = attribution.get(prefix + "path")
+    expected_report_sha = attribution.get(prefix + "sha256")
+    expected_source_sha = attribution.get(prefix + "source_sha256")
+    if not relative or not _hex64(expected_report_sha) \
+            or not _hex64(expected_source_sha):
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} {variant} axis probe "
+            "lacks path/source/report hashes")
+    path = _inside_runtime(ctx, relative)
+    if not os.path.isfile(path) \
+            or sha256_file(path) != expected_report_sha:
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} {variant} axis-probe "
+            "report hash drift")
+    report = read_json(path)
+    if not isinstance(report, dict):
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} {variant} axis-probe "
+            "report is not an object")
+    source_path = _inside_runtime(ctx, report.get("source_path"))
+    if not os.path.isfile(source_path) \
+            or sha256_file(source_path) != expected_source_sha \
+            or report.get("source_sha256") != expected_source_sha \
+            or report.get("candidate_sha256") != expected_source_sha:
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} {variant} axis probe "
+            "is not bound to the exact source bytes")
+    if report.get("evidence_path") != relative \
+            or report.get("contract") != PROBE_CONTRACT \
+            or report.get("variant") != variant \
+            or report.get("axis") != task.get("axis") \
+            or report.get("group") != task.get("group") \
+            or report.get("probe_id") != attribution.get("axis_probe_id") \
+            or report.get("seed") != attribution.get("axis_probe_seed") \
+            or report.get("task_identity_sha256") != task.get(
+                "axis_probe_task_identity_sha256"):
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} {variant} axis-probe "
+            "identity drift")
+    checks = report.get("checks") or []
+    if not isinstance(checks, list) or not checks \
+            or not all(isinstance(row, dict)
+                       and isinstance(row.get("passed"), bool)
+                       for row in checks):
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} {variant} axis-probe "
+            "checks are malformed")
+    if variant == "baseline":
+        valid = bool(
+            report.get("status") == "PASS"
+            and report.get("passed") is True
+            and report.get("valid_execution") is True
+            and report.get("failure_origin") == "none"
+            and report.get("axis_probe_returncode") == 0
+            and all(row["passed"] is True for row in checks))
+    else:
+        valid = bool(
+            report.get("status") == "FAIL"
+            and report.get("passed") is False
+            and report.get("valid_execution") is True
+            and report.get("failure_origin") == "candidate_axis_behavior"
+            and report.get("axis_probe_returncode") == 1
+            and any(row["passed"] is False for row in checks))
+    if not valid:
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} {variant} axis-probe "
+            "behavioral verdict is invalid")
+    return {
+        "variant": variant,
+        "path": path,
+        "relative_path": relative,
+        "report_sha256": expected_report_sha,
+        "source_path": source_path,
+        "source_sha256": expected_source_sha,
+        "probe_id": report["probe_id"],
+        "seed": report["seed"],
+        "expected_sha256": report.get("expected_sha256"),
+        "task_identity_sha256": report.get("task_identity_sha256"),
+        "checks": checks,
+        "failed_checks": sorted(
+            str(row.get("id")) for row in checks
+            if row.get("passed") is False),
+    }
+
+
+def _probe_pair(ctx, label, task):
+    attribution = task.get("attribution") or {}
+    if attribution.get("mode") != "baseline-versus-mutant-axis-probe" \
+            or attribution.get("axis_probe_contract") != PROBE_CONTRACT \
+            or attribution.get("same_axis_probe") is not True \
+            or attribution.get("baseline_axis_probe_passed") is not True \
+            or attribution.get("mutant_axis_probe_failed") is not True \
             or attribution.get("behavioral_axis_evidence") is not True \
-            or attribution.get(
-                "removed_definition_name_is_sufficient") is not False:
-        return False
-    mode = attribution.get("mode")
-    if mode == "semantic-hard-dimension":
-        return bool(attribution.get("matched_dimensions"))
-    if mode == "specialized-failure-signature":
-        return bool(
-            attribution.get("matched_axis_failure_tokens")
-            and attribution.get("group_path_is_sufficient") is False)
-    return False
+            or not _definition_receipt_valid(attribution):
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} task has no valid "
+            "baseline-versus-mutant axis attribution")
+    identity = attribution.get("axis_probe_task_identity_sha256")
+    if not _hex64(identity):
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} task identity is invalid")
+    enriched = dict(task)
+    enriched["axis_probe_task_identity_sha256"] = identity
+    baseline = _probe_report(
+        ctx, label, enriched, attribution, "baseline")
+    mutant = _probe_report(
+        ctx, label, enriched, attribution, "mutant")
+    if baseline["probe_id"] != mutant["probe_id"] \
+            or baseline["seed"] != mutant["seed"] \
+            or baseline["expected_sha256"] != mutant["expected_sha256"] \
+            or baseline["task_identity_sha256"] != mutant[
+                "task_identity_sha256"] \
+            or baseline["source_sha256"] == mutant["source_sha256"] \
+            or mutant["source_sha256"] != task.get("source_sha256") \
+            or attribution.get("baseline_axis_checks") != baseline["checks"] \
+            or attribution.get("mutant_axis_checks") != mutant["checks"]:
+        raise RuntimeError(
+            f"supremacy dossier: causal genome {label} baseline/mutant "
+            "axis-probe pair does not share one exact probe")
+    return {
+        "task_identity_sha256": identity,
+        "auditor_id": task.get("auditor_id"),
+        "axis": task.get("axis"),
+        "group": task.get("group"),
+        "artifact": task.get("artifact"),
+        "probe_contract": PROBE_CONTRACT,
+        "probe_id": baseline["probe_id"],
+        "seed": baseline["seed"],
+        "expected_sha256": baseline["expected_sha256"],
+        "baseline": baseline,
+        "mutant": mutant,
+    }
 
 
 def _verify(ctx, incumbent, label):
@@ -139,28 +279,36 @@ def _verify(ctx, incumbent, label):
             raise RuntimeError(
                 f"supremacy dossier: causal genome {label} inert control failed")
         _verify_execution(ctx, label, row, "negative-control")
-    attributed = 0
-    behavioral = 0
-    for row in tasks:
-        attribution = row.get("attribution") or {}
-        if row.get("auditor_id") not in auditors \
-                or not row.get("axis") \
-                or not row.get("group") \
-                or not row.get("renamed_definitions") \
-                or row.get("causal_failure_observed") is not True \
-                or row.get("observed_candidate_pass") is not False \
-                or row.get("axis_specific_failure_attributed") is not True \
-                or not _attribution_valid(attribution):
+
+    pairs = []
+    probe_paths = []
+    for task in tasks:
+        if task.get("auditor_id") not in auditors \
+                or not task.get("axis") \
+                or not task.get("group") \
+                or not task.get("renamed_definitions") \
+                or task.get("causal_failure_observed") is not True \
+                or task.get("observed_candidate_pass") is not False \
+                or task.get("axis_specific_failure_attributed") is not True:
             raise RuntimeError(
-                f"supremacy dossier: causal genome {label} task did not "
-                "falsify an axis-specific behavioral claim")
-        _verify_execution(ctx, label, row, "ablation")
-        attributed += 1
-        behavioral += 1
-    if attributed != len(tasks) or behavioral != len(tasks):
+                f"supremacy dossier: causal genome {label} task is incomplete")
+        _verify_execution(ctx, label, task, "ablation")
+        pair = _probe_pair(ctx, label, task)
+        pairs.append(pair)
+        probe_paths.extend((
+            pair["baseline"]["relative_path"],
+            pair["mutant"]["relative_path"]))
+    if len(pairs) != len(tasks) \
+            or len(set(probe_paths)) != 2 * len(tasks):
         raise RuntimeError(
-            f"supremacy dossier: causal genome {label} attribution count drift")
-    return genome_path, causal_path, causal, attributed, behavioral
+            f"supremacy dossier: causal genome {label} axis-probe pair count drift")
+    return {
+        "genome_path": genome_path,
+        "causal_path": causal_path,
+        "causal": causal,
+        "pairs": pairs,
+        "task_count": len(tasks),
+    }
 
 
 def install(_ctx, handlers):
@@ -177,11 +325,13 @@ def install(_ctx, handlers):
         existing = {row.get("path") for row in rows}
         receipts = {}
         for label in LABELS:
-            genome_path, causal_path, causal, attributed, behavioral = _verify(
-                context, incumbent, label)
+            verified = _verify(context, incumbent, label)
+            causal = verified["causal"]
             for evidence_path, evidence_label in (
-                    (genome_path, f"genome_realization_{label}"),
-                    (causal_path, f"genome_causal_ablation_{label}")):
+                    (verified["genome_path"],
+                     f"genome_realization_{label}"),
+                    (verified["causal_path"],
+                     f"genome_causal_ablation_{label}")):
                 relative = os.path.relpath(
                     evidence_path, context.runtime).replace("\\", "/")
                 if relative in existing:
@@ -191,13 +341,61 @@ def install(_ctx, handlers):
                     label=evidence_label)
                 rows.append(row)
                 existing.add(relative)
+
+            pair_receipts = []
+            for index, pair in enumerate(verified["pairs"], 1):
+                for variant in ("baseline", "mutant"):
+                    probe = pair[variant]
+                    relative = probe["relative_path"]
+                    if relative not in existing:
+                        row, _parsed = dossier._evidence(
+                            context, probe["path"],
+                            require_pass=(variant == "baseline"),
+                            label=(
+                                f"axis_probe_{label}_{index:04d}_"
+                                f"{pair['axis']}_{pair['group']}_{variant}"))
+                        rows.append(row)
+                        existing.add(relative)
+                pair_receipts.append({
+                    "task_identity_sha256": pair[
+                        "task_identity_sha256"],
+                    "auditor_id": pair["auditor_id"],
+                    "axis": pair["axis"],
+                    "group": pair["group"],
+                    "artifact": pair["artifact"],
+                    "probe_contract": pair["probe_contract"],
+                    "probe_id": pair["probe_id"],
+                    "seed": pair["seed"],
+                    "expected_sha256": pair["expected_sha256"],
+                    "baseline_path": pair["baseline"]["relative_path"],
+                    "baseline_sha256": pair["baseline"]["report_sha256"],
+                    "baseline_source_sha256": pair[
+                        "baseline"]["source_sha256"],
+                    "mutant_path": pair["mutant"]["relative_path"],
+                    "mutant_sha256": pair["mutant"]["report_sha256"],
+                    "mutant_source_sha256": pair[
+                        "mutant"]["source_sha256"],
+                    "mutant_failed_checks": pair[
+                        "mutant"]["failed_checks"],
+                })
+
             receipts[label] = {
                 "status": causal["status"],
                 "tasks_executed": causal["tasks_executed"],
-                "axis_specific_tasks": attributed,
-                "axis_behavioral_failures": behavioral,
+                "axis_specific_tasks": verified["task_count"],
+                "axis_behavioral_failures": verified["task_count"],
+                "axis_probe_contract": PROBE_CONTRACT,
+                "axis_probe_pairs": len(pair_receipts),
+                "axis_probe_reports": 2 * len(pair_receipts),
+                "all_tasks_have_baseline_mutant_probe_pairs": bool(
+                    pair_receipts
+                    and len(pair_receipts) == verified["task_count"]),
+                "axis_probe_pair_receipts": pair_receipts,
                 "axis_specific_failure_attribution": True,
                 "axis_specific_behavioral_failure_required": True,
+                "baseline_axis_probe_required": True,
+                "mutant_axis_probe_failure_required": True,
+                "diagnostic_failure_attribution_is_sufficient": False,
                 "cited_definition_semantics_checked": True,
                 "removed_definition_name_is_sufficient": False,
                 "group_failure_path_is_sufficient": False,
@@ -208,8 +406,9 @@ def install(_ctx, handlers):
                 "verified_auditor_axis_group_obligations": causal[
                     "verified_auditor_axis_group_obligations"],
                 "evidence_path": os.path.relpath(
-                    causal_path, context.runtime).replace("\\", "/"),
-                "evidence_sha256": sha256_file(causal_path),
+                    verified["causal_path"], context.runtime).replace(
+                        "\\", "/"),
+                "evidence_sha256": sha256_file(verified["causal_path"]),
             }
         artifact["evidence_index"] = rows
         artifact["causal_genome_realization"] = receipts
@@ -219,12 +418,16 @@ def install(_ctx, handlers):
             "axis_specific_causal_replication"] = "PASS"
         artifact.setdefault("search_closure", {})[
             "axis_behavioral_causal_replication"] = "PASS"
+        artifact.setdefault("search_closure", {})[
+            "axis_probe_pairs_replication"] = "PASS"
         artifact.setdefault("crown_summary", {})[
             "causal_genome_crown"] = "PASS"
         artifact.setdefault("crown_summary", {})[
             "axis_specific_causal_crown"] = "PASS"
         artifact.setdefault("crown_summary", {})[
             "axis_behavioral_causal_crown"] = "PASS"
+        artifact.setdefault("crown_summary", {})[
+            "axis_probe_pairs_crown"] = "PASS"
         atomic_write_json(path, artifact)
         return path, artifact
 
