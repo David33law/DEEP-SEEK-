@@ -3,11 +3,11 @@
 
 The retired prove_complete_observatory_protocol_v3 seat and inherited
 prove_complete_observatory_protocol_v5 seat remain protocol-history/static compatibility markers;
-execution always enters prove_complete_observatory_protocol_v6, which strictly extends v5 with
-static-v7 and independently reverified actual-container fault evidence.
+execution always enters prove_complete_observatory_protocol_v6, which strictly extends v5 through
+static-v8: inherited static-v7 fault closure plus independently executed cwd/PYTHONPATH import closure.
 
 This entrypoint is intentionally independent of the caller's current working directory and
-PYTHONPATH.  The repository's executable-orchestrator directory is installed before importing any
+PYTHONPATH. The repository's executable-orchestrator directory is installed before importing any
 proof wrapper so the ``lawmax21`` package is available throughout the authoritative import chain.
 """
 import os
