@@ -7,7 +7,8 @@ and that container must be absent before recovery begins. The crash event count 
 owner-bound v2 argument rather than a hidden function of the normal large-history workload.
 
 The wrapper also verifies declared authority files and measures the 1000-event healthy baseline
-separately from the later fault campaign.
+separately from the later fault campaign. The actual crash injector uses explicit UTF-8 stdin
+transport so candidate/legal Unicode is independent of the Windows active code page.
 """
 from __future__ import annotations
 
@@ -195,7 +196,9 @@ def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
             stdin=subprocess.PIPE,
             stdout=output,
             stderr=subprocess.DEVNULL,
-            text=True)
+            text=True,
+            encoding="utf-8",
+            errors="strict")
         try:
             started = _wait_running(runtime, name, process)
             _CRASH["container_started"] = bool(started)
@@ -206,7 +209,7 @@ def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
                 process.stdin.write(_crash_body(source, events))
                 process.stdin.flush()
                 _CRASH["workload_delivered"] = True
-            except (BrokenPipeError, OSError):
+            except (BrokenPipeError, OSError, UnicodeError):
                 return False
 
             time.sleep(max(0.0, float(delay)))
@@ -287,6 +290,7 @@ def _rewrite_receipt(path):
     report["baseline_elapsed_seconds"] = float(elapsed)
     report["baseline_events"] = int(events)
     report["events_per_second_baseline"] = float(events) / max(float(elapsed), 1e-9)
+    report["transport_encoding"] = "utf-8"
     report["throughput_measurement"] = (
         "first healthy 1000-event baseline session including canonical integrity, root, publication "
         "and close verification; excludes later injected fault campaigns")
@@ -336,7 +340,8 @@ def main():
         "whole_process_crash_recovery": (report.get("tests") or {}).get(
             "whole_process_crash_recovery"),
         "whole_process_crash_evidence": report.get("whole_process_crash_evidence"),
-    }, ensure_ascii=False, indent=1, sort_keys=True))
+        "transport_encoding": report.get("transport_encoding"),
+    }, ensure_ascii=True, indent=1, sort_keys=True))
     return code
 
 
@@ -345,5 +350,5 @@ if __name__ == "__main__":
         sys.exit(main())
     except Exception as exc:
         print(json.dumps({"status": "FAIL", "passed": False,
-                          "reason": str(exc)}, ensure_ascii=False, indent=1))
+                          "reason": str(exc)}, ensure_ascii=True, indent=1))
         sys.exit(1)
