@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Authoritative protocol-v6 proof wrapper for the protocol-v5 Observatory mission.
 
-The mission/protocol version remains Observatory Research Protocol 5.  This proof seat advances the
-verification chain: static-v7 must close calibrated fault topology, the dynamic E2E must pass through
-the actual-container fault verifier, and the final receipt must contain durable reference calibration,
-durable crown and distributed crown runtime-kill evidence.  No real provider route is changed.
+The mission/protocol version remains Observatory Research Protocol 5. This proof seat advances the
+verification chain: static-v7 closes calibrated fault topology, the dynamic E2E passes through the
+actual-container fault verifier, and the final receipt requires durable reference calibration,
+durable crown and distributed crown to prove container death while the tested operation is still in
+flight. No real provider route is changed.
 """
 from __future__ import annotations
 
@@ -22,8 +23,6 @@ STATIC_V7_REPORT = os.path.join(ROOT, "proof", "observatory-protocol-static-v7.j
 E2E_REPORT = base.E2E_REPORT
 PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5"
 
-# The inherited final proof remains the complete causal/axis/calibration closure.  Replace only its
-# static and dynamic extension seats with strictly stronger wrappers.
 base.STATIC = STATIC_V7
 base.e2e = fault_e2e
 
@@ -92,27 +91,30 @@ def main(argv=None):
         distributed = verification.get(
             "distributed_actual_container_crown_verified") or {}
         if verification.get("fault_injection_actual_container_verified") is not True \
+                or verification.get("fault_injection_mid_operation_verified") is not True \
                 or calibration.get("status") != "PASS" \
                 or systems.get("status") != "PASS" \
                 or distributed.get("status") != "PASS":
             raise RuntimeError(
-                "dynamic actual-container fault verification is incomplete")
+                "dynamic mid-operation actual-container fault verification is incomplete")
 
         for label, row in (
                 ("systems calibration", calibration),
                 ("systems crown", systems),
                 ("distributed crown", distributed)):
             crash = row.get("crash") or {}
-            if crash.get("runtime_kill_succeeded") is not True \
+            if crash.get("actual_container_kill_required") is not True \
+                    or crash.get("mid_operation_kill_required") is not True \
+                    or crash.get("container_started") is not True \
+                    or crash.get("workload_delivered") is not True \
+                    or crash.get("operation_reply_observed_before_kill") is not False \
+                    or crash.get("mid_operation_kill_verified") is not True \
+                    or crash.get("runtime_kill_succeeded") is not True \
                     or crash.get("container_absent_before_recovery") is not True \
                     or crash.get("cli_process_kill_counts_as_evidence") is not False \
                     or int(crash.get("runtime_kill_returncode", -1)) != 0:
-                raise RuntimeError(label + " lacks final runtime-kill evidence")
+                raise RuntimeError(label + " lacks final mid-operation runtime-kill evidence")
 
-        protocol_files = set(
-            (report.get("run_summary") or {}).get("research_protocol_files") or [])
-        # run_summary implementations need not repeat the full census; static-v7 and signed D09 own
-        # that identity.  The final receipt therefore records the authoritative seats explicitly.
         report["authoritative_entrypoint"] = (
             "prove_complete_observatory_protocol_v6.py")
         report["static_v7_fault_closure"] = {
@@ -125,10 +127,12 @@ def main(argv=None):
         report["systems_actual_container_crown_bound"] = True
         report["distributed_actual_container_crown_bound"] = True
         report["fault_injection_actual_container_bound"] = True
+        report["fault_injection_mid_operation_bound"] = True
         report["systems_reference_calibration"] = calibration
         report["systems_actual_container_crown"] = systems
         report["distributed_actual_container_crown"] = distributed
         report["cli_process_death_cannot_earn_fault_credit"] = True
+        report["post_operation_container_death_cannot_earn_crash_credit"] = True
         report["final_closure_v6_verified"] = True
         report["final_closure_verified"] = True
         base._atomic_write(E2E_REPORT, report)
