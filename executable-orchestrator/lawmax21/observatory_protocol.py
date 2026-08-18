@@ -68,7 +68,10 @@ SEARCH_POLICY = {
     "stagnation_response": "continue-successor-radical-novelty-meta-search",
 }
 PRODUCTION_WORKLOADS = {
-    "distributed": {"qualification": 5000, "replication": 10000, "crown": 50000},
+    "systems": {"qualification": 5000, "replication": 10000, "crown": 50000,
+                "crash_events": 100000},
+    "distributed": {"qualification": 5000, "replication": 10000, "crown": 50000,
+                    "crash_event_floor": 20000},
     "scale": {"qualification": 100000, "replication": 250000, "crown": 1000000,
               "partitions": 16, "batch": 5000},
     "formal": {"qualification_depth": 3, "replication_depth": 4, "crown_depth": 5},
@@ -78,7 +81,10 @@ PRODUCTION_WORKLOADS = {
                     "crown_histories": 16},
 }
 PROOF_WORKLOADS = {
-    "distributed": {"qualification": 300, "replication": 600, "crown": 1200},
+    "systems": {"qualification": 1000, "replication": 2000, "crown": 5000,
+                "crash_events": 100000},
+    "distributed": {"qualification": 300, "replication": 600, "crown": 1200,
+                    "crash_event_floor": 20000},
     "scale": {"qualification": 2000, "replication": 4000, "crown": 8000,
               "partitions": 8, "batch": 500},
     "formal": {"qualification_depth": 2, "replication_depth": 2, "crown_depth": 3},
