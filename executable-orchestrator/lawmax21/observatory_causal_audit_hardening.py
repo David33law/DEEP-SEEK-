@@ -2,6 +2,9 @@
 from . import observatory_audit_v2 as audit
 
 
+PROBE_CONTRACT = "observatory-axis-probe-v1"
+
+
 def install(_ctx, handlers):
     if getattr(audit, "_causal_audit_hardening_installed", False):
         return dict(handlers)
@@ -57,6 +60,22 @@ def install(_ctx, handlers):
                 "genome_definition_semantic_crown_failure_scoped", 0),
             "definition_semantics_crown_behavioral": summary.get(
                 "genome_definition_semantic_crown_behavioral", 0),
+            "axis_behavioral_probe_required": summary.get(
+                "genome_axis_behavioral_probe_required", False),
+            "axis_behavioral_probe_contract": summary.get(
+                "genome_axis_behavioral_probe_contract"),
+            "axis_behavioral_probe_replication_checked": summary.get(
+                "genome_axis_behavioral_probe_replication_checked", False),
+            "axis_behavioral_probe_crown_checked": summary.get(
+                "genome_axis_behavioral_probe_crown_checked", False),
+            "axis_behavioral_probe_replication_tasks": summary.get(
+                "genome_axis_behavioral_probe_replication_tasks", 0),
+            "axis_behavioral_probe_replication_pairs": summary.get(
+                "genome_axis_behavioral_probe_replication_pairs", 0),
+            "axis_behavioral_probe_crown_tasks": summary.get(
+                "genome_axis_behavioral_probe_crown_tasks", 0),
+            "axis_behavioral_probe_crown_pairs": summary.get(
+                "genome_axis_behavioral_probe_crown_pairs", 0),
             "causal_definition_set_ablation": True,
             "inert_mutation_controls_required": True,
         })
@@ -87,6 +106,19 @@ def install(_ctx, handlers):
                 "definition_semantics_crown_failure_scoped"])
             == int(controlled[
                 "definition_semantics_crown_behavioral"]))
+        all_probe_pairs = bool(
+            controlled["axis_behavioral_probe_required"] is True
+            and controlled["axis_behavioral_probe_contract"] == PROBE_CONTRACT
+            and controlled["axis_behavioral_probe_replication_checked"] is True
+            and controlled["axis_behavioral_probe_crown_checked"] is True
+            and int(controlled["axis_behavioral_probe_replication_tasks"]) > 0
+            and int(controlled["axis_behavioral_probe_crown_tasks"]) > 0
+            and int(controlled["axis_behavioral_probe_replication_tasks"])
+            == int(controlled["axis_behavioral_probe_replication_pairs"])
+            == int(controlled["causal_replication_tasks"])
+            and int(controlled["axis_behavioral_probe_crown_tasks"])
+            == int(controlled["axis_behavioral_probe_crown_pairs"])
+            == int(controlled["causal_crown_tasks"]))
         result["causal_genome_ablation"] = {
             "replication_passed": controlled["causal_replication"],
             "crown_passed": controlled["causal_crown"],
@@ -110,7 +142,7 @@ def install(_ctx, handlers):
             "all_tasks_definition_semantics_checked":
                 all_definition_semantics,
             "all_tasks_axis_behaviorally_falsified":
-                all_definition_semantics,
+                bool(all_definition_semantics and all_probe_pairs),
             "replication_definition_semantics_tasks": controlled[
                 "definition_semantics_replication_failure_scoped"],
             "crown_definition_semantics_tasks": controlled[
@@ -119,6 +151,20 @@ def install(_ctx, handlers):
                 "definition_semantics_replication_behavioral"],
             "crown_axis_behavioral_failures": controlled[
                 "definition_semantics_crown_behavioral"],
+            "axis_behavioral_probe_required": controlled[
+                "axis_behavioral_probe_required"],
+            "axis_behavioral_probe_contract": controlled[
+                "axis_behavioral_probe_contract"],
+            "all_tasks_have_baseline_mutant_probe_pairs": all_probe_pairs,
+            "replication_axis_probe_tasks": controlled[
+                "axis_behavioral_probe_replication_tasks"],
+            "replication_axis_probe_pairs": controlled[
+                "axis_behavioral_probe_replication_pairs"],
+            "crown_axis_probe_tasks": controlled[
+                "axis_behavioral_probe_crown_tasks"],
+            "crown_axis_probe_pairs": controlled[
+                "axis_behavioral_probe_crown_pairs"],
+            "diagnostic_failure_attribution_is_sufficient": False,
             "removed_definition_name_is_sufficient": False,
             "group_failure_path_is_sufficient": False,
             "whole_success_receipt_searched": False,
