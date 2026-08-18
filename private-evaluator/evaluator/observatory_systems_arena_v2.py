@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """Output-bounded entrypoint for the durable Observatory systems arena.
 
-The forced-crash trial kills the actual candidate container through the selected container runtime,
-not merely the local Docker/Podman CLI process. A unique named container is verified running, receives
-the crash workload, is killed by the runtime, and is confirmed absent before the same durable state
-directory is reopened. The final report carries the complete crash receipt; CLI death alone can never
-earn crash evidence.
+A forced crash counts only when the actual uniquely named candidate container is killed by the
+container runtime while the submitted durable operation has not yet produced a reply, and that
+container is confirmed absent before reopening the same state directory. Killing only the local CLI,
+or killing an idle container after the operation completed, cannot earn crash evidence.
 
-The v2 seat also validates every declared durable authority/recovery file before fault injection: paths
-must be relative, remain inside the state directory, exist, and not alias one another. A manifest that
-hides or aliases load-bearing bytes is therefore rejected before it can earn durable evidence.
+Every declared authority/recovery file is also validated before fault injection: paths must be
+relative, remain inside the state directory, exist, and not alias one another.
 """
 from __future__ import annotations
 
@@ -17,6 +15,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 
@@ -28,8 +27,11 @@ bounded_subprocess.install(base.subprocess)
 _ORIGINAL_MANIFEST = base._manifest
 _CRASH = {
     "actual_container_kill_required": True,
+    "mid_operation_kill_required": True,
     "container_started": False,
     "workload_delivered": False,
+    "operation_reply_observed_before_kill": None,
+    "mid_operation_kill_verified": False,
     "runtime_kill_returncode": None,
     "runtime_kill_succeeded": False,
     "container_absent_before_recovery": False,
@@ -94,6 +96,16 @@ def _named_argv(runtime, state_dir, name):
     return argv
 
 
+def _crash_body(source, events):
+    # Deliberately omit the normal ``quit`` command.  If ingest completes quickly the candidate
+    # remains alive waiting for another request, letting the trusted host distinguish an idle
+    # post-operation kill from a genuine mid-operation kill by observing whether a reply appeared.
+    return "\n".join((
+        json.dumps({"candidate_source": source}, ensure_ascii=False),
+        json.dumps({"op": "ingest_batch", "events": events}, ensure_ascii=False),
+    )) + "\n"
+
+
 def _inspect(runtime, name):
     result = subprocess.run(
         [runtime, "inspect", "-f", "{{.State.Running}}", name],
@@ -134,74 +146,83 @@ def _force_remove(runtime, name):
 def _safe_crash(runtime, source, state_dir, events, delay=0.01):
     os.makedirs(state_dir, exist_ok=True)
     name = "obs-sys-crash-" + uuid.uuid4().hex
-    process = subprocess.Popen(
-        _named_argv(runtime, state_dir, name),
-        stdin=subprocess.PIPE,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        text=True)
-    try:
-        started = _wait_running(runtime, name, process)
-        _CRASH["container_started"] = bool(started)
-        if not started:
-            return False
-
+    with tempfile.TemporaryFile(mode="w+b") as output:
+        process = subprocess.Popen(
+            _named_argv(runtime, state_dir, name),
+            stdin=subprocess.PIPE,
+            stdout=output,
+            stderr=subprocess.DEVNULL,
+            text=True)
         try:
-            process.stdin.write(base._body(source, [
-                {"op": "ingest_batch", "events": events}]))
-            process.stdin.flush()
-            _CRASH["workload_delivered"] = True
-        except (BrokenPipeError, OSError):
-            return False
+            started = _wait_running(runtime, name, process)
+            _CRASH["container_started"] = bool(started)
+            if not started:
+                return False
 
-        time.sleep(max(0.0, float(delay)))
-        if _inspect(runtime, name) is not True:
-            return False
+            try:
+                process.stdin.write(_crash_body(source, events))
+                process.stdin.flush()
+                _CRASH["workload_delivered"] = True
+            except (BrokenPipeError, OSError):
+                return False
 
-        kill = subprocess.run(
-            [runtime, "kill", name], capture_output=True,
-            text=True, timeout=30)
-        _CRASH["runtime_kill_returncode"] = int(kill.returncode)
-        _CRASH["runtime_kill_stdout_tail"] = (kill.stdout or "")[-1000:]
-        _CRASH["runtime_kill_stderr_tail"] = (kill.stderr or "")[-1000:]
-        _CRASH["runtime_kill_succeeded"] = kill.returncode == 0
+            time.sleep(max(0.0, float(delay)))
+            if _inspect(runtime, name) is not True:
+                return False
 
-        try:
-            process.wait(timeout=30)
-        except subprocess.TimeoutExpired:
-            # Only the runtime kill above is evidence. Local CLI termination is cleanup.
-            try:
-                process.kill()
-            except OSError:
-                pass
-            process.wait(timeout=15)
+            reply_observed = os.fstat(output.fileno()).st_size > 0
+            _CRASH["operation_reply_observed_before_kill"] = bool(reply_observed)
+            if reply_observed:
+                # The durable operation already replied.  Killing the now-idle container is cleanup,
+                # not evidence of crash atomicity.
+                return False
+            _CRASH["mid_operation_kill_verified"] = True
 
-        absent = _wait_absent(runtime, name, timeout=30.0)
-        if not absent:
-            absent = _force_remove(runtime, name)
-        _CRASH["container_absent_before_recovery"] = bool(absent)
-        return bool(
-            started
-            and _CRASH["workload_delivered"] is True
-            and _CRASH["runtime_kill_succeeded"] is True
-            and absent)
-    finally:
-        if process.stdin is not None:
+            kill = subprocess.run(
+                [runtime, "kill", name], capture_output=True,
+                text=True, timeout=30)
+            _CRASH["runtime_kill_returncode"] = int(kill.returncode)
+            _CRASH["runtime_kill_stdout_tail"] = (kill.stdout or "")[-1000:]
+            _CRASH["runtime_kill_stderr_tail"] = (kill.stderr or "")[-1000:]
+            _CRASH["runtime_kill_succeeded"] = kill.returncode == 0
+
             try:
-                process.stdin.close()
-            except OSError:
-                pass
-        if _inspect(runtime, name) is not None:
-            _force_remove(runtime, name)
-        if process.poll() is None:
-            try:
-                process.kill()
-            except OSError:
-                pass
-            try:
-                process.wait(timeout=10)
+                process.wait(timeout=30)
             except subprocess.TimeoutExpired:
-                pass
+                # Only the runtime kill above is evidence. Local CLI termination is cleanup.
+                try:
+                    process.kill()
+                except OSError:
+                    pass
+                process.wait(timeout=15)
+
+            absent = _wait_absent(runtime, name, timeout=30.0)
+            if not absent:
+                absent = _force_remove(runtime, name)
+            _CRASH["container_absent_before_recovery"] = bool(absent)
+            return bool(
+                started
+                and _CRASH["workload_delivered"] is True
+                and _CRASH["mid_operation_kill_verified"] is True
+                and _CRASH["runtime_kill_succeeded"] is True
+                and absent)
+        finally:
+            if process.stdin is not None:
+                try:
+                    process.stdin.close()
+                except OSError:
+                    pass
+            if _inspect(runtime, name) is not None:
+                _force_remove(runtime, name)
+            if process.poll() is None:
+                try:
+                    process.kill()
+                except OSError:
+                    pass
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    pass
 
 
 def _out_argument():
@@ -223,6 +244,8 @@ def _bind_receipt(path):
     crash_complete = all((
         _CRASH.get("container_started") is True,
         _CRASH.get("workload_delivered") is True,
+        _CRASH.get("operation_reply_observed_before_kill") is False,
+        _CRASH.get("mid_operation_kill_verified") is True,
         _CRASH.get("runtime_kill_succeeded") is True,
         _CRASH.get("container_absent_before_recovery") is True,
     ))
@@ -236,7 +259,7 @@ def _bind_receipt(path):
         report["status"] = "FAIL"
         report["passed"] = False
         report["reason"] = (
-            "durable v2 evidence incomplete: actual-container crash or declared-file verification")
+            "durable v2 evidence incomplete: mid-operation container death or declared-file proof")
     temporary = path + ".v2.tmp"
     with open(temporary, "w", encoding="utf-8") as handle:
         json.dump(report, handle, ensure_ascii=False, indent=1, sort_keys=True)
