@@ -2,6 +2,12 @@
 
 This is deliberately a simple single-primary/read-replica construction. It proves that the generic
 cluster contract and fault injector are executable; it is not a preferred production architecture.
+
+The canonical authority is persisted with atomic replace + file/directory fsync.  A submitted batch
+is evaluated in memory and committed with one durable canonical write followed by replica snapshot
+synchronization, rather than rewriting the complete cluster state once per event.  The resulting
+batch boundary is crash-resilient: after process death, reopening observes either the last durable
+canonical state or the completely committed batch, never a partially serialized authority file.
 """
 import hashlib
 import json
@@ -27,8 +33,9 @@ def _root(events, order):
 
 
 def _atomic(path, obj):
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    fd, temp = tempfile.mkstemp(prefix=".tmp-", dir=os.path.dirname(os.path.abspath(path)))
+    directory = os.path.dirname(os.path.abspath(path))
+    os.makedirs(directory, exist_ok=True)
+    fd, temp = tempfile.mkstemp(prefix=".tmp-", dir=directory)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(obj, f, ensure_ascii=False, sort_keys=True,
@@ -37,7 +44,7 @@ def _atomic(path, obj):
             os.fsync(f.fileno())
         os.replace(temp, path)
         try:
-            dfd = os.open(os.path.dirname(os.path.abspath(path)), os.O_RDONLY)
+            dfd = os.open(directory, os.O_RDONLY)
             try:
                 os.fsync(dfd)
             finally:
@@ -104,6 +111,10 @@ class Cluster:
             return
         _atomic(self._node_path(node_id), self._snapshot())
 
+    def _sync_group(self, node_ids):
+        for node_id in node_ids:
+            self._sync_node(node_id)
+
     def _group(self, node_id):
         for group in self.state.get("partitions", []):
             if node_id in group:
@@ -119,45 +130,91 @@ class Cluster:
                   and x not in self.state.get("faulty", [])]
         return active if len(active) >= self._quorum() else []
 
-    def submit(self, node_id, event):
+    def _admission_context(self, node_id):
         node_id = str(node_id)
         if node_id not in self.node_ids:
             raise ValueError("unknown node")
         if node_id in self.state.get("crashed", []):
-            return {"accepted": False, "pending": False, "reason": "node-crashed"}
+            return node_id, [], {"accepted": False, "pending": False,
+                                 "reason": "node-crashed"}
         if node_id in self.state.get("faulty", []):
-            return {"accepted": False, "pending": False, "reason": "node-excluded-faulty"}
+            return node_id, [], {"accepted": False, "pending": False,
+                                 "reason": "node-excluded-faulty"}
         safe = self._safe_group(node_id)
         if not safe:
-            return {"accepted": False, "pending": True,
-                    "reason": "partition-without-quorum"}
+            return node_id, [], {"accepted": False, "pending": True,
+                                 "reason": "partition-without-quorum"}
+        return node_id, safe, None
+
+    def _stage_event(self, event):
         if not isinstance(event, dict) or not event.get("source_id"):
-            return {"accepted": False, "pending": False, "reason": "malformed-event"}
+            return {"accepted": False, "pending": False,
+                    "reason": "malformed-event"}, False
         source_id = str(event["source_id"])
         existing = self.state["events"].get(source_id)
         if existing is not None:
             if _canonical(existing) == _canonical(event):
-                return {"accepted": True, "duplicate": True,
-                        "canonical_root": self._canonical_root()}
+                return {"accepted": True, "duplicate": True}, False
             return {"accepted": False, "pending": False,
-                    "reason": "conflicting-source-id", "unresolved": True}
+                    "reason": "conflicting-source-id", "unresolved": True}, False
         self.state["events"][source_id] = event
         self.state["order"].append(source_id)
-        self._persist()
-        for target in safe:
-            self._sync_node(target)
-        return {"accepted": True, "duplicate": False,
-                "canonical_root": self._canonical_root()}
+        return {"accepted": True, "duplicate": False}, True
+
+    def submit(self, node_id, event):
+        _node_id, safe, refusal = self._admission_context(node_id)
+        if refusal is not None:
+            return refusal
+        result, changed = self._stage_event(event)
+        if changed:
+            self._persist()
+            self._sync_group(safe)
+        if result.get("accepted"):
+            result["canonical_root"] = self._canonical_root()
+        return result
 
     def ingest_batch(self, node_id, events):
-        results = [self.submit(node_id, event) for event in list(events or [])]
+        """Apply one deterministic batch and durably publish it as one canonical transition.
+
+        Per-event admission semantics are preserved, including duplicates and conflicting source IDs,
+        but the canonical authority is fsynced once for the batch.  If the process dies while the
+        temporary file is being written, atomic replacement leaves the prior durable authority
+        intact.  If replacement completed, reopening heals replica snapshots from the new authority.
+        """
+        _node_id, safe, refusal = self._admission_context(node_id)
+        batch = list(events or [])
+        if refusal is not None:
+            results = [dict(refusal) for _ in batch]
+            return {
+                "accepted": 0,
+                "pending": len(batch) if refusal.get("pending") else 0,
+                "rejected": 0 if refusal.get("pending") else len(batch),
+                "results": results,
+                "canonical_root": self._canonical_root(),
+            }
+
+        results = []
+        changed = False
+        for event in batch:
+            result, event_changed = self._stage_event(event)
+            results.append(result)
+            changed = changed or event_changed
+
+        if changed:
+            self._persist()
+            self._sync_group(safe)
+
+        root = self._canonical_root()
+        for result in results:
+            if result.get("accepted"):
+                result["canonical_root"] = root
         return {
             "accepted": sum(1 for x in results if x.get("accepted")),
             "pending": sum(1 for x in results if x.get("pending")),
             "rejected": sum(1 for x in results
                             if not x.get("accepted") and not x.get("pending")),
             "results": results,
-            "canonical_root": self._canonical_root(),
+            "canonical_root": root,
         }
 
     def partition(self, groups):
@@ -172,8 +229,7 @@ class Cluster:
     def heal(self):
         self.state["partitions"] = [list(self.node_ids)]
         self._persist()
-        for node_id in self.node_ids:
-            self._sync_node(node_id)
+        self._sync_group(self.node_ids)
         return {"ok": True, "canonical_root": self._canonical_root()}
 
     def roots(self):
@@ -237,8 +293,6 @@ class Cluster:
         faulty.add(node_id)
         self.state["faulty"] = sorted(faulty)
         self._persist()
-        # The persisted node snapshot is deliberately made inconsistent. The canonical cluster state
-        # remains unchanged and the faulty node is excluded from acknowledgements/publication.
         _atomic(self._node_path(node_id), {
             "events": {}, "order": [], "root": "EQUIVOCATED",
             "generation": self.state["generation"],
