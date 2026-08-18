@@ -10,6 +10,12 @@ empty failure reports.
 All Docker/subprocess text transport used by the base axis probes is forced through the existing
 output-bounded UTF-8 subprocess seat. Candidate source and legal fixtures may contain arbitrary
 Unicode; host locale/code-page settings are never allowed to change evaluator semantics.
+
+The embedded formal harness is also treated as executable trusted code rather than opaque text. This
+layer repairs the historical malformed governance query seat, applies the conditional-commutativity
+hardening, then compiles the complete final harness at import time. Consequently the static protocol
+closure that imports this evaluator fails before any calibration/candidate execution if the embedded
+harness ever becomes syntactically invalid again.
 """
 from __future__ import annotations
 
@@ -108,6 +114,23 @@ def _semantic_probe(source, axis, seed, runtime, expected):
     }
 
 
+# Historical malformed embedded harness seat.  The request mapping accidentally became the second
+# positional argument to ``copy.deepcopy`` instead of the second argument to ``query``.  Patch the
+# exact signed text only; any unrecognised drift is fail-closed.
+_BROKEN_GOVERNANCE_QUERY = (
+    '  after=query(copy.deepcopy(upgraded["state"],'
+    '{"canonical_id":A,"legal_time":10,"knowledge_time":10})\n')
+_FIXED_GOVERNANCE_QUERY = (
+    '  after=query(copy.deepcopy(upgraded["state"]),'
+    '{"canonical_id":A,"legal_time":10,"knowledge_time":10})\n')
+if _BROKEN_GOVERNANCE_QUERY in base.FORMAL_PROBE:
+    base.FORMAL_PROBE = base.FORMAL_PROBE.replace(
+        _BROKEN_GOVERNANCE_QUERY, _FIXED_GOVERNANCE_QUERY, 1)
+elif _FIXED_GOVERNANCE_QUERY not in base.FORMAL_PROBE:
+    raise RuntimeError(
+        "axis-probe v2 cannot locate the formal governance query seat")
+
+
 _OLD_DERIVATION = ''' elif axis=="state_derivation_model":
   state=initial_state(); action=admit(SA,A,1,1,"SET",t0)
   one=step(state,action); two=step(state,action)
@@ -143,6 +166,22 @@ if _OLD_DERIVATION not in base.FORMAL_PROBE:
 base.FORMAL_PROBE = base.FORMAL_PROBE.replace(
     _OLD_DERIVATION, _NEW_DERIVATION, 1)
 
+if _BROKEN_GOVERNANCE_QUERY in base.FORMAL_PROBE \
+        or _FIXED_GOVERNANCE_QUERY not in base.FORMAL_PROBE:
+    raise RuntimeError(
+        "axis-probe v2 governance query hardening did not become load-bearing")
+
+try:
+    compile(base.FORMAL_PROBE, "<observatory-axis-formal-probe-v2>", "exec")
+except SyntaxError as exc:
+    raise RuntimeError(
+        "axis-probe v2 embedded formal harness is syntactically invalid: "
+        f"line={exc.lineno} offset={exc.offset} message={exc.msg}") from exc
+
+FORMAL_PROBE_COMPILE_VERIFIED = True
+FORMAL_PROBE_SHA256 = hashlib.sha256(
+    base.FORMAL_PROBE.encode("utf-8")).hexdigest()
+
 
 def _formal_probe(source, axis, seed, runtime, expected):
     checks, detail = _ORIGINAL_FORMAL_PROBE(
@@ -169,6 +208,7 @@ main = base.main
 
 __all__ = [
     "main", "SEMANTIC_HARD_MINIMA", "PARETO_PATH",
+    "FORMAL_PROBE_COMPILE_VERIFIED", "FORMAL_PROBE_SHA256",
 ]
 
 
