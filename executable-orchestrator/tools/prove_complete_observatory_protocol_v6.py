@@ -38,6 +38,7 @@ REQUIRED_STATIC_V7_GATES = (
     "distributed_baseline_metric_static_bound",
     "distributed_atomic_batch_reference_static_bound",
     "distributed_crash_workload_static_bound",
+    "distributed_contract_signed_crash_static_bound",
     "fault_evaluator_production_routing_static_bound",
     "fault_mid_operation_crash_static_bound",
     "fault_exact_workloads_static_bound",
