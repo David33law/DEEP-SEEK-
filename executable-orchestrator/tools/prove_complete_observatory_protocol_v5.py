@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Authoritative protocol-v5 proof with calibrated baseline-versus-mutant causality.
 
-Runs portable-owner static closure, v2 axis-probe static closure and the calibration-hardened
-production-container E2E proof through the exact causal-aware localhost provider. Final closure is
-written only after COMMITTED state, zero paid calls, exact v2 evaluator bytes, 28 independently
-reverified calibration pairs and a complete runtime baseline/mutant pair for every replication and
-crown causal task, all directly indexed in the deterministic supremacy dossier.
+Runs the full static-v6 closure, which itself executes every inherited protocol-v5 static proof, and
+then the calibration-hardened production-container E2E proof through the exact causal-aware localhost
+provider. Final closure is written only after COMMITTED state, zero paid calls, exact v2 evaluator
+bytes, 28 independently reverified calibration pairs and a complete runtime baseline/mutant pair for
+every replication and crown causal task, all directly indexed in the deterministic supremacy dossier.
 """
 from __future__ import annotations
 
@@ -18,7 +18,9 @@ import prove_complete_observatory_protocol_calibration_hardened as e2e
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-STATIC = os.path.join(HERE, "prove_observatory_protocol_static_v5.py")
+# Retained so inherited static-v5 can prove the complete chain rather than seeing a severed wrapper.
+STATIC_V5 = os.path.join(HERE, "prove_observatory_protocol_static_v5.py")
+STATIC = os.path.join(HERE, "prove_observatory_protocol_static_v6.py")
 INHERITED_STATIC_REPORT = os.path.join(
     ROOT, "proof", "observatory-protocol-static-v5.json")
 CAUSAL_STATIC_REPORT = os.path.join(
