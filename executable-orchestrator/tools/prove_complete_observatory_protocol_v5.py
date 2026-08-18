@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Authoritative protocol-v5 proof with definition-grounded causal genome realization.
+"""Authoritative protocol-v5 proof with axis-behavioral causal genome realization.
 
 Runs portable-owner static closure, causal static closure and then the axis-hardened production-
 container E2E proof through the exact causal-aware localhost provider. Final closure is written only
-after the generated E2E receipt itself proves COMMITTED state, zero paid calls, one provider-route
-substitution, exact-source causal campaigns, infrastructure-failure exclusion and failure-scoped,
-definition-grounded attribution for replication and crown.
+after the generated E2E receipt proves COMMITTED state, zero paid calls, one provider-route
+substitution, exact-source causal campaigns, infrastructure-failure exclusion and a behavioral failure
+specific to every claimed axis in both replication and crown.
 """
 from __future__ import annotations
 
@@ -53,8 +53,10 @@ CAUSAL_STATIC_GATES = (
     "causal_genome_ablation_bound",
     "auditor_specific_definition_set_ablation",
     "axis_specific_causal_attribution_verified",
+    "axis_specific_behavioral_failure_verified",
     "failure_scoped_attribution_verified",
     "cited_definition_semantics_verified",
+    "deterministic_definition_body_receipts_verified",
     "inert_negative_controls_required",
     "exact_mutated_source_receipts_required",
     "infrastructure_failure_exclusion_verified",
@@ -155,6 +157,9 @@ def _dynamic_closure(report):
     if verification.get("infrastructure_failure_exclusion_reverified") is not True:
         raise RuntimeError(
             "E2E did not independently exclude infrastructure-only causal credit")
+    if verification.get("axis_specific_behavioral_failure_verified") is not True:
+        raise RuntimeError(
+            "E2E did not prove mandatory axis-specific behavioral failure")
 
     causal = verification.get("causal_genome_ablation_verified") or {}
     attributed = verification.get(
@@ -170,12 +175,20 @@ def _dynamic_closure(report):
                     "verified_auditor_axis_group_obligations", 0)) < 1:
             raise RuntimeError(
                 f"E2E causal {phase} campaign is incomplete")
-        if int(axis.get("tasks", 0)) != int(axis.get(
-                "axis_specific_tasks", -1)) \
+        task_count = int(axis.get("tasks", 0))
+        if task_count < 1 \
+                or task_count != int(axis.get("axis_specific_tasks", -1)) \
+                or task_count != int(axis.get("axis_behavioral_failures", -1)) \
                 or axis.get("whole_receipt_searched") is not False \
-                or axis.get("cited_definition_semantics_checked") is not True:
+                or axis.get("cited_definition_semantics_checked") is not True \
+                or axis.get("definition_body_hashes_checked") is not True \
+                or axis.get(
+                    "removed_definition_name_is_sufficient") is not False \
+                or axis.get(
+                    "group_failure_path_is_sufficient") is not False:
             raise RuntimeError(
-                f"E2E causal {phase} attribution is not complete and definition-grounded")
+                f"E2E causal {phase} attribution is not complete, "
+                "definition-bound and axis-behavioral")
     return verification
 
 
@@ -231,12 +244,16 @@ def main(argv=None):
             "prove_complete_observatory_protocol_v5.py")
         report["causal_genome_ablation_bound"] = True
         report["axis_specific_causal_attribution_bound"] = True
+        report["axis_specific_behavioral_failure_bound"] = True
         report["failure_scoped_causal_attribution_bound"] = True
         report["cited_definition_semantics_bound"] = True
+        report["deterministic_definition_body_receipts_bound"] = True
         report["causal_aware_local_provider_used"] = True
         report["causal_local_provider_route"] = verification[
             "causal_local_provider_route_verified"]
         report["infrastructure_failure_cannot_earn_causal_credit"] = True
+        report["removed_definition_name_cannot_earn_causal_credit"] = True
+        report["group_failure_path_cannot_earn_causal_credit"] = True
         report["final_closure_verified"] = True
         _atomic_write(E2E_REPORT, report)
         return 0
