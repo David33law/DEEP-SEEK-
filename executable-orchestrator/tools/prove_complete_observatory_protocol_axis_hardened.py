@@ -5,8 +5,9 @@ The inherited proof verifies exact mutated source bytes, process receipts, inert
 owner signatures and every architecture arena. This final layer reopens each
 ``observatory-axis-probe-v1`` baseline and mutant report, rehashes both reports and source files,
 requires the exact v2 evaluator bytes from the disposable clone, and proves that the original passes
-while the exact mutant fails the same hidden probe. Every probe report is also required in the direct
-deterministic supremacy-dossier evidence index.
+while the exact mutant fails the same hidden probe. Every runtime pair must also carry strict UTF-8
+trusted-process evidence; host locale failures can never be accepted as behavioral falsification.
+Every probe report is required in the direct deterministic supremacy-dossier evidence index.
 """
 from __future__ import annotations
 
@@ -29,6 +30,7 @@ AXIS_FILES = {
     "observatory_causal_definition_semantics_hardening.py",
     "executable-orchestrator/lawmax21/"
     "observatory_causal_behavioral_probe_hardening.py",
+    "executable-orchestrator/lawmax21/observatory_utf8_process.py",
     "private-evaluator/evaluator/observatory_axis_probe_arena.py",
     PROBE_EVALUATOR_PATH,
     "executable-orchestrator/tools/"
@@ -113,6 +115,8 @@ def _probe_report(runtime, task, details, variant):
     identity = details.get("axis_probe_task_identity_sha256")
     if report.get("contract") != PROBE_CONTRACT \
             or details.get("axis_probe_evaluator") != PROBE_EVALUATOR \
+            or details.get("axis_probe_transport_encoding") != "utf-8" \
+            or report.get("axis_probe_transport_encoding") != "utf-8" \
             or report.get("variant") != variant \
             or report.get("evidence_path") != relative \
             or report.get("axis") != task.get("axis") \
@@ -121,7 +125,7 @@ def _probe_report(runtime, task, details, variant):
             or report.get("seed") != details.get("axis_probe_seed") \
             or report.get("task_identity_sha256") != identity:
         raise RuntimeError(
-            f"axis-probe {variant}: evaluator/probe/task identity drift")
+            f"axis-probe {variant}: evaluator/probe/task/UTF-8 identity drift")
     checks = report.get("checks") or []
     if not checks or not all(
             isinstance(row, dict) and isinstance(row.get("passed"), bool)
@@ -157,6 +161,7 @@ def _probe_report(runtime, task, details, variant):
         "seed": report.get("seed"),
         "expected_sha256": report.get("expected_sha256"),
         "task_identity_sha256": report.get("task_identity_sha256"),
+        "transport_encoding": report.get("axis_probe_transport_encoding"),
         "checks": checks,
         "failed_checks": sorted(
             str(row.get("id")) for row in checks
@@ -172,6 +177,7 @@ def _probe_pair(runtime, task):
             or details.get("mode") != "baseline-versus-mutant-axis-probe" \
             or details.get("axis_probe_contract") != PROBE_CONTRACT \
             or details.get("axis_probe_evaluator") != PROBE_EVALUATOR \
+            or details.get("axis_probe_transport_encoding") != "utf-8" \
             or details.get("same_axis_probe") is not True \
             or details.get("baseline_axis_probe_passed") is not True \
             or details.get("mutant_axis_probe_failed") is not True \
@@ -180,7 +186,7 @@ def _probe_pair(runtime, task):
                 "axis_probe_task_identity_sha256")) \
             or not _definition_receipt_valid(details):
         raise RuntimeError(
-            "axis-probe task lacks an authoritative v2 behavioral pair")
+            "axis-probe task lacks an authoritative UTF-8 v2 behavioral pair")
     baseline = _probe_report(runtime, task, details, "baseline")
     mutant = _probe_report(runtime, task, details, "mutant")
     if baseline["probe_id"] != mutant["probe_id"] \
@@ -188,12 +194,16 @@ def _probe_pair(runtime, task):
             or baseline["expected_sha256"] != mutant["expected_sha256"] \
             or baseline["task_identity_sha256"] != mutant[
                 "task_identity_sha256"] \
+            or baseline["transport_encoding"] != mutant["transport_encoding"] != "utf-8" \
             or baseline["source_sha256"] == mutant["source_sha256"] \
             or mutant["source_sha256"] != task.get("source_sha256") \
             or details.get("baseline_axis_checks") != baseline["checks"] \
             or details.get("mutant_axis_checks") != mutant["checks"]:
         raise RuntimeError(
-            "axis-probe baseline and mutant are not the same exact probe pair")
+            "axis-probe baseline and mutant are not the same exact UTF-8 probe pair")
+    if baseline["transport_encoding"] != "utf-8" \
+            or mutant["transport_encoding"] != "utf-8":
+        raise RuntimeError("axis-probe pair transport is not strict UTF-8")
     return {
         "task_identity_sha256": baseline["task_identity_sha256"],
         "auditor_id": task.get("auditor_id"),
@@ -205,6 +215,7 @@ def _probe_pair(runtime, task):
         "probe_id": baseline["probe_id"],
         "seed": baseline["seed"],
         "expected_sha256": baseline["expected_sha256"],
+        "transport_encoding": "utf-8",
         "baseline": baseline,
         "mutant": mutant,
     }
@@ -230,9 +241,10 @@ def _verify_campaign(runtime, incumbent, label):
     paths = [
         pair[variant]["path"]
         for pair in pairs for variant in ("baseline", "mutant")]
-    if len(pairs) != len(tasks) or len(set(paths)) != 2 * len(tasks):
+    if len(pairs) != len(tasks) or len(set(paths)) != 2 * len(tasks) \
+            or any(pair.get("transport_encoding") != "utf-8" for pair in pairs):
         raise RuntimeError(
-            f"axis-probe causal {label}: probe-pair count or uniqueness drift")
+            f"axis-probe causal {label}: probe-pair count/uniqueness/UTF-8 drift")
     return {
         "campaign_path": receipt.get("path"),
         "campaign_sha256": receipt.get("sha256"),
@@ -241,6 +253,7 @@ def _verify_campaign(runtime, incumbent, label):
         "axis_behavioral_failures": len(pairs),
         "axis_probe_contract": PROBE_CONTRACT,
         "axis_probe_evaluator": PROBE_EVALUATOR,
+        "axis_probe_transport_encoding": "utf-8",
         "axis_probe_pairs": len(pairs),
         "axis_probe_reports": len(paths),
         "whole_receipt_searched": False,
@@ -392,6 +405,7 @@ def _verify(repo, runtime, source_head, preflight, launch):
     verified["axis_probe_pairs_verified"] = campaigns
     verified["axis_probe_evaluator_verified"] = evaluator_receipt
     verified["axis_probe_dossier_index_verified"] = True
+    verified["axis_probe_utf8_transport_verified"] = True
     return verified
 
 
