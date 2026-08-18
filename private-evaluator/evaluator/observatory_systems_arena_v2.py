@@ -6,6 +6,10 @@ not merely the local Docker/Podman CLI process. A unique named container is veri
 the crash workload, is killed by the runtime, and is confirmed absent before the same durable state
 directory is reopened. The final report carries the complete crash receipt; CLI death alone can never
 earn crash evidence.
+
+The v2 seat also validates every declared durable authority/recovery file before fault injection: paths
+must be relative, remain inside the state directory, exist, and not alias one another. A manifest that
+hides or aliases load-bearing bytes is therefore rejected before it can earn durable evidence.
 """
 from __future__ import annotations
 
@@ -21,6 +25,7 @@ import observatory_systems_arena as base
 
 bounded_subprocess.install(base.subprocess)
 
+_ORIGINAL_MANIFEST = base._manifest
 _CRASH = {
     "actual_container_kill_required": True,
     "container_started": False,
@@ -30,6 +35,52 @@ _CRASH = {
     "container_absent_before_recovery": False,
     "cli_process_kill_counts_as_evidence": False,
 }
+_MANIFEST = {
+    "authority_files_verified": False,
+    "recovery_files_verified": False,
+    "declared_authority_files": [],
+    "declared_recovery_files": [],
+}
+
+
+def _inside(root, relative):
+    root = os.path.abspath(root)
+    parts = str(relative).replace("\\", "/").split("/")
+    if os.path.isabs(str(relative)) or ".." in parts:
+        raise RuntimeError("durable manifest path must be relative: " + str(relative))
+    path = os.path.abspath(os.path.join(root, *parts))
+    if path == root or not path.startswith(root + os.sep):
+        raise RuntimeError("durable manifest path escapes state directory: " + str(relative))
+    return path
+
+
+def _safe_manifest(runtime, source, state_dir):
+    manifest = _ORIGINAL_MANIFEST(runtime, source, state_dir)
+    authority = manifest.get("authority_files") or []
+    recovery = manifest.get("recovery_files") or []
+    if not isinstance(authority, list) or not authority:
+        raise RuntimeError("durability_manifest requires authority_files")
+    if not isinstance(recovery, list):
+        raise RuntimeError("durability_manifest recovery_files must be a list when present")
+    seen = set()
+    for label, rows in (("authority", authority), ("recovery", recovery)):
+        for relative in rows:
+            path = _inside(state_dir, relative)
+            real = os.path.realpath(path)
+            if not os.path.isfile(path):
+                raise RuntimeError(
+                    f"declared durable {label} file does not exist: {relative}")
+            if real in seen:
+                raise RuntimeError(
+                    f"durable manifest aliases authority/recovery file: {relative}")
+            seen.add(real)
+    _MANIFEST.update({
+        "authority_files_verified": True,
+        "recovery_files_verified": True,
+        "declared_authority_files": [str(x) for x in authority],
+        "declared_recovery_files": [str(x) for x in recovery],
+    })
+    return manifest
 
 
 def _named_argv(runtime, state_dir, name):
@@ -161,23 +212,31 @@ def _out_argument():
         return None
 
 
-def _bind_crash_receipt(path):
+def _bind_receipt(path):
     if not path or not os.path.isfile(path):
-        raise RuntimeError("durable v2 evaluator produced no report to bind crash evidence")
+        raise RuntimeError("durable v2 evaluator produced no report to bind evidence")
     with open(path, encoding="utf-8") as handle:
         report = json.load(handle)
     report["whole_process_crash_evidence"] = dict(_CRASH)
+    report["durable_manifest_evidence"] = dict(_MANIFEST)
     tests = report.setdefault("tests", {})
-    if tests.get("crash_was_actually_observed") is True and not all((
-            _CRASH.get("container_started") is True,
-            _CRASH.get("workload_delivered") is True,
-            _CRASH.get("runtime_kill_succeeded") is True,
-            _CRASH.get("container_absent_before_recovery") is True)):
+    crash_complete = all((
+        _CRASH.get("container_started") is True,
+        _CRASH.get("workload_delivered") is True,
+        _CRASH.get("runtime_kill_succeeded") is True,
+        _CRASH.get("container_absent_before_recovery") is True,
+    ))
+    manifest_complete = bool(
+        _MANIFEST.get("authority_files_verified") is True
+        and _MANIFEST.get("recovery_files_verified") is True)
+    if (tests.get("crash_was_actually_observed") is True and not crash_complete) \
+            or not manifest_complete:
         tests["crash_was_actually_observed"] = False
         tests["crash_restart_integrity"] = False
         report["status"] = "FAIL"
         report["passed"] = False
-        report["reason"] = "durable crash lacked actual-container kill evidence"
+        report["reason"] = (
+            "durable v2 evidence incomplete: actual-container crash or declared-file verification")
     temporary = path + ".v2.tmp"
     with open(temporary, "w", encoding="utf-8") as handle:
         json.dump(report, handle, ensure_ascii=False, indent=1, sort_keys=True)
@@ -188,19 +247,21 @@ def _bind_crash_receipt(path):
 
 
 def main():
+    base._manifest = _safe_manifest
     base._crash = _safe_crash
     code = base.main()
-    report = _bind_crash_receipt(_out_argument())
+    report = _bind_receipt(_out_argument())
     if report.get("status") != "PASS" or report.get("passed") is not True:
         code = 1
     print(json.dumps({
-        "durable_v2_crash_receipt": "PASS",
+        "durable_v2_receipt": "PASS",
         "crash_was_actually_observed": (report.get("tests") or {}).get(
             "crash_was_actually_observed"),
         "crash_restart_integrity": (report.get("tests") or {}).get(
             "crash_restart_integrity"),
         "whole_process_crash_evidence": report.get(
             "whole_process_crash_evidence"),
+        "durable_manifest_evidence": report.get("durable_manifest_evidence"),
     }, ensure_ascii=False, indent=1, sort_keys=True))
     return code
 
