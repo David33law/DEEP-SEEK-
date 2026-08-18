@@ -1,8 +1,9 @@
-"""Expose causal genome-ablation receipts in the final independent audit campaign summary."""
+"""Expose causal genome-ablation and exact axis-probe receipts in the final audit."""
 from . import observatory_audit_v2 as audit
 
 
 PROBE_CONTRACT = "observatory-axis-probe-v1"
+PROBE_EVALUATOR = "observatory_axis_probe_arena_v2.py"
 
 
 def install(_ctx, handlers):
@@ -64,6 +65,8 @@ def install(_ctx, handlers):
                 "genome_axis_behavioral_probe_required", False),
             "axis_behavioral_probe_contract": summary.get(
                 "genome_axis_behavioral_probe_contract"),
+            "axis_behavioral_probe_evaluator": summary.get(
+                "genome_axis_behavioral_probe_evaluator"),
             "axis_behavioral_probe_replication_checked": summary.get(
                 "genome_axis_behavioral_probe_replication_checked", False),
             "axis_behavioral_probe_crown_checked": summary.get(
@@ -109,6 +112,7 @@ def install(_ctx, handlers):
         all_probe_pairs = bool(
             controlled["axis_behavioral_probe_required"] is True
             and controlled["axis_behavioral_probe_contract"] == PROBE_CONTRACT
+            and controlled["axis_behavioral_probe_evaluator"] == PROBE_EVALUATOR
             and controlled["axis_behavioral_probe_replication_checked"] is True
             and controlled["axis_behavioral_probe_crown_checked"] is True
             and int(controlled["axis_behavioral_probe_replication_tasks"]) > 0
@@ -155,6 +159,8 @@ def install(_ctx, handlers):
                 "axis_behavioral_probe_required"],
             "axis_behavioral_probe_contract": controlled[
                 "axis_behavioral_probe_contract"],
+            "axis_behavioral_probe_evaluator": controlled[
+                "axis_behavioral_probe_evaluator"],
             "all_tasks_have_baseline_mutant_probe_pairs": all_probe_pairs,
             "replication_axis_probe_tasks": controlled[
                 "axis_behavioral_probe_replication_tasks"],
