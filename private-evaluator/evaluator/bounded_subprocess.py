@@ -3,7 +3,8 @@
 Container isolation stops filesystem/network/process capabilities inside the candidate, but an
 untrusted candidate can still flood its already-open stdout/stderr pipes and exhaust the trusted
 parent. This helper streams both pipes, kills immediately at the declared cap, and never buffers
-unbounded output.
+unbounded output. Text-mode transport defaults to strict UTF-8: host locale is irrelevant and invalid
+byte sequences are never silently replaced inside trusted evaluator evidence.
 """
 from __future__ import annotations
 
@@ -32,7 +33,7 @@ def run_bounded(args, *, input=None, stdin=None, capture_output=False,
         stdin = PIPE
     requested_text = bool(text or encoding is not None or kwargs.pop("universal_newlines", False))
     codec = encoding or "utf-8"
-    codec_errors = errors or "replace"
+    codec_errors = errors or "strict"
     kwargs.pop("text", None); kwargs.pop("encoding", None); kwargs.pop("errors", None)
     process = _ORIGINAL_POPEN(args, stdin=stdin, stdout=stdout, stderr=stderr,
                               text=False, **kwargs)
