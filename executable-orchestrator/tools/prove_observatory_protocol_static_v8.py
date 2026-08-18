@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Static-v8 closure for cwd-independent authoritative proof entrypoints.
+"""Static-v8 closure for one cwd-independent Observatory proof authority.
 
-Static-v7 owns the complete calibrated fault topology.  This strictly stronger zero-provider layer
-adds one missing executable property: every authoritative proof entrypoint must import successfully
-when launched independently of the repository working directory and without inherited PYTHONPATH.
+Static-v7 owns the complete calibrated fault topology. This strictly stronger zero-provider layer
+adds two executable properties: every authoritative proof entrypoint must import successfully from
+an unrelated working directory without inherited PYTHONPATH, and every retired/public compatibility
+command must be a mechanically constrained monotonic shim to protocol-v6.
 
-The probe uses isolated Python subprocesses from unrelated temporary directories.  It explicitly
-provides only the tools directory, exactly matching Python's normal script-directory import seat; the
-entrypoints themselves must bootstrap ``executable-orchestrator`` before any ``lawmax21`` import.
-No proof main(), provider, candidate, Docker, owner ceremony or mutation is executed.
+The probes use isolated Python subprocesses and never call proof main(), a provider, a candidate,
+Docker, an owner ceremony or any mutating runtime path.
 """
 from __future__ import annotations
 
@@ -18,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 
+import prove_observatory_protocol_static as root_static
 import prove_observatory_protocol_static_v7 as previous
 
 ROOT = previous.ROOT
@@ -26,11 +26,13 @@ PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5"
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 ORCH = os.path.dirname(TOOLS)
 
-ENTRYPOINTS = (
+BOOTSTRAP_ENTRYPOINTS = {
     "executable-orchestrator/tools/run_observatory_proof.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_v6.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_fault_hardened.py",
-)
+}
+COMPATIBILITY_SHIMS = dict(root_static.AUTHORITATIVE_SHIMS)
+ENTRYPOINTS = tuple(sorted(BOOTSTRAP_ENTRYPOINTS | set(COMPATIBILITY_SHIMS)))
 
 
 def _path(relative):
@@ -49,27 +51,33 @@ def _write(path, value):
 def _source_contract(relative):
     path = _path(relative)
     if not os.path.isfile(path):
-        raise RuntimeError("authoritative entrypoint missing: " + relative)
-    text = open(path, encoding="utf-8").read()
-    required = (
-        'HERE = os.path.dirname(os.path.abspath(__file__))',
-        'ORCH = os.path.dirname(HERE)',
-        'LAWMAX_PACKAGE = os.path.join(ORCH, "lawmax21", "__init__.py")',
-        'if ORCH not in sys.path:',
-        'sys.path.insert(0, ORCH)',
-    )
-    missing = [token for token in required if token not in text]
-    if missing:
-        raise RuntimeError(
-            relative + " lacks cwd-independent package bootstrap: "
-            + ", ".join(missing))
+        raise RuntimeError("authoritative/compatibility entrypoint missing: " + relative)
+
+    if relative in COMPATIBILITY_SHIMS:
+        root_static._assert_authoritative_shim(
+            relative, require_bootstrap=COMPATIBILITY_SHIMS[relative])
+
+    if relative in BOOTSTRAP_ENTRYPOINTS:
+        text = open(path, encoding="utf-8").read()
+        required = (
+            'HERE = os.path.dirname(os.path.abspath(__file__))',
+            'ORCH = os.path.dirname(HERE)',
+            'LAWMAX_PACKAGE = os.path.join(ORCH, "lawmax21", "__init__.py")',
+            'if ORCH not in sys.path:',
+            'sys.path.insert(0, ORCH)',
+        )
+        missing = [token for token in required if token not in text]
+        if missing:
+            raise RuntimeError(
+                relative + " lacks cwd-independent package bootstrap: "
+                + ", ".join(missing))
     return path
 
 
 def _standalone_import(relative):
     target = _source_contract(relative)
-    # Script execution automatically exposes its own directory.  Reproduce only that normal seat;
-    # do not expose the repository root or executable-orchestrator through cwd/PYTHONPATH.
+    # Script execution exposes only its own tools directory. Reproduce that seat while withholding
+    # repository root/executable-orchestrator from cwd and PYTHONPATH.
     code = (
         "import importlib.util, os, sys; "
         f"tools={TOOLS!r}; target={target!r}; "
@@ -98,7 +106,9 @@ def _standalone_import(relative):
         "cwd_independent": True,
         "python_isolated": True,
         "inherited_pythonpath": False,
-        "lawmax21_bootstrap_required": True,
+        "final_authority": root_static.AUTHORITATIVE_PROOF_TARGET
+            if relative in COMPATIBILITY_SHIMS else "authoritative-core",
+        "compatibility_shim": relative in COMPATIBILITY_SHIMS,
     }
 
 
@@ -120,6 +130,9 @@ def main():
                 or inherited.get("protocol_version") != PROTOCOL_VERSION:
             raise RuntimeError("static-v7 receipt is not PASS")
 
+        if root_static.AUTHORITATIVE_PROOF_TARGET != \
+                "prove_complete_observatory_protocol_v6":
+            raise RuntimeError("root static proof authority drifted away from protocol-v6")
         probes = {relative: _standalone_import(relative)
                   for relative in ENTRYPOINTS}
 
@@ -141,8 +154,12 @@ def main():
             "protocol_bundle_sha256":
                 observatory_protocol.protocol_bundle_sha256(ROOT),
             "authoritative_entrypoint_standalone_import_static_bound": True,
+            "compatibility_proof_shims_monotonic_static_bound": True,
+            "authoritative_proof_target": root_static.AUTHORITATIVE_PROOF_TARGET,
             "authoritative_entrypoint_import_probes": probes,
             "authoritative_entrypoint_import_count": len(probes),
+            "compatibility_proof_shim_count": len(COMPATIBILITY_SHIMS),
+            "compatibility_proof_shims": sorted(COMPATIBILITY_SHIMS),
             "authoritative_entrypoints_cwd_independent": True,
             "authoritative_entrypoints_pythonpath_independent": True,
         })
