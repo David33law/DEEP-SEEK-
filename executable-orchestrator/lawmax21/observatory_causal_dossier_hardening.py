@@ -4,7 +4,8 @@ The final dossier independently rehashes every mutant source, evaluator receipt,
 trusted baseline-versus-mutant axis-probe pair. Diagnostic token matching, definition names and broad
 artifact failures remain review context only. Causal credit requires the original exact source to pass
 and the exact mutant to fail the same hidden ``observatory-axis-probe-v1`` probe ID, seed, axis, group
-and controlled-manifest digest. Both probe reports are indexed directly in the public evidence set.
+and controlled-manifest digest. Both probe reports and the exact v2 evaluator bytes are bound into the
+public machine-checkable dossier.
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ from .handlers import A
 
 LABELS = ("replication", "crown")
 PROBE_CONTRACT = "observatory-axis-probe-v1"
+PROBE_EVALUATOR = "observatory_axis_probe_arena_v2.py"
 
 
 def _inside_runtime(ctx, relative):
@@ -27,6 +29,28 @@ def _inside_runtime(ctx, relative):
         raise RuntimeError(
             "causal dossier evidence escapes runtime: " + str(relative))
     return path
+
+
+def _inside_root(ctx, path):
+    path = os.path.abspath(path)
+    root = os.path.abspath(ctx.root)
+    if path != root and not path.startswith(root + os.sep):
+        raise RuntimeError("causal dossier protocol file escapes root: " + path)
+    return path
+
+
+def _probe_evaluator_receipt(ctx):
+    path = _inside_root(
+        ctx, os.path.join(ctx.evaluator_dir, PROBE_EVALUATOR))
+    if not os.path.isfile(path):
+        raise RuntimeError(
+            "supremacy dossier: hardened axis-probe evaluator is missing")
+    return {
+        "name": PROBE_EVALUATOR,
+        "path": os.path.relpath(path, ctx.root).replace("\\", "/"),
+        "sha256": sha256_file(path),
+        "bytes": os.path.getsize(path),
+    }
 
 
 def _hex64(value):
@@ -117,6 +141,7 @@ def _probe_report(ctx, label, task, attribution, variant):
             "is not bound to the exact source bytes")
     if report.get("evidence_path") != relative \
             or report.get("contract") != PROBE_CONTRACT \
+            or attribution.get("axis_probe_evaluator") != PROBE_EVALUATOR \
             or report.get("variant") != variant \
             or report.get("axis") != task.get("axis") \
             or report.get("group") != task.get("group") \
@@ -126,7 +151,7 @@ def _probe_report(ctx, label, task, attribution, variant):
                 "axis_probe_task_identity_sha256"):
         raise RuntimeError(
             f"supremacy dossier: causal genome {label} {variant} axis-probe "
-            "identity drift")
+            "identity/evaluator drift")
     checks = report.get("checks") or []
     if not isinstance(checks, list) or not checks \
             or not all(isinstance(row, dict)
@@ -177,6 +202,7 @@ def _probe_pair(ctx, label, task):
     attribution = task.get("attribution") or {}
     if attribution.get("mode") != "baseline-versus-mutant-axis-probe" \
             or attribution.get("axis_probe_contract") != PROBE_CONTRACT \
+            or attribution.get("axis_probe_evaluator") != PROBE_EVALUATOR \
             or attribution.get("same_axis_probe") is not True \
             or attribution.get("baseline_axis_probe_passed") is not True \
             or attribution.get("mutant_axis_probe_failed") is not True \
@@ -214,6 +240,7 @@ def _probe_pair(ctx, label, task):
         "group": task.get("group"),
         "artifact": task.get("artifact"),
         "probe_contract": PROBE_CONTRACT,
+        "probe_evaluator": PROBE_EVALUATOR,
         "probe_id": baseline["probe_id"],
         "seed": baseline["seed"],
         "expected_sha256": baseline["expected_sha256"],
@@ -321,6 +348,7 @@ def install(_ctx, handlers):
         incumbent = artifact.get("candidate_id")
         if not incumbent:
             raise RuntimeError("causal dossier hardening has no incumbent")
+        evaluator_receipt = _probe_evaluator_receipt(context)
         rows = list(artifact.get("evidence_index") or [])
         existing = {row.get("path") for row in rows}
         receipts = {}
@@ -364,6 +392,7 @@ def install(_ctx, handlers):
                     "group": pair["group"],
                     "artifact": pair["artifact"],
                     "probe_contract": pair["probe_contract"],
+                    "probe_evaluator": pair["probe_evaluator"],
                     "probe_id": pair["probe_id"],
                     "seed": pair["seed"],
                     "expected_sha256": pair["expected_sha256"],
@@ -385,6 +414,7 @@ def install(_ctx, handlers):
                 "axis_specific_tasks": verified["task_count"],
                 "axis_behavioral_failures": verified["task_count"],
                 "axis_probe_contract": PROBE_CONTRACT,
+                "axis_probe_evaluator": dict(evaluator_receipt),
                 "axis_probe_pairs": len(pair_receipts),
                 "axis_probe_reports": 2 * len(pair_receipts),
                 "all_tasks_have_baseline_mutant_probe_pairs": bool(
@@ -411,6 +441,7 @@ def install(_ctx, handlers):
                 "evidence_sha256": sha256_file(verified["causal_path"]),
             }
         artifact["evidence_index"] = rows
+        artifact["axis_probe_evaluator"] = evaluator_receipt
         artifact["causal_genome_realization"] = receipts
         artifact.setdefault("search_closure", {})[
             "causal_genome_replication"] = "PASS"
