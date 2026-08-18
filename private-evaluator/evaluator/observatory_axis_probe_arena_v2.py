@@ -3,9 +3,9 @@
 
 Version 2 keeps the exact ``observatory-axis-probe-v1`` report contract and isolation path. Semantic
 probe thresholds are loaded from the same owner-signed ``PARETO-DIMENSIONS.json`` used by frontier
-admission, eliminating a duplicated policy seat. Formal state-derivation probes require admission
-order convergence only when the candidate manifest explicitly claims independent admissions are
-commutative. All other baseline/mutant identity and fail-closed behavior remains in the base arena.
+admission. Formal state-derivation probes require admission-order convergence only when explicitly
+claimed, and formal load/operation failures are preserved as structured false checks rather than
+empty failure reports. All other baseline/mutant identity and fail-closed behavior remains in base.
 """
 from __future__ import annotations
 
@@ -52,6 +52,7 @@ def _load_hard_minima():
 
 SEMANTIC_HARD_MINIMA = _load_hard_minima()
 _ORIGINAL_SEMANTIC_PROBE = base._semantic_probe
+_ORIGINAL_FORMAL_PROBE = base._formal_probe
 
 
 def _semantic_probe(source, axis, seed, runtime, expected):
@@ -130,8 +131,28 @@ if _OLD_DERIVATION not in base.FORMAL_PROBE:
         "axis-probe v2 cannot locate the formal state-derivation seat")
 base.FORMAL_PROBE = base.FORMAL_PROBE.replace(
     _OLD_DERIVATION, _NEW_DERIVATION, 1)
+
+
+def _formal_probe(source, axis, seed, runtime, expected):
+    checks, detail = _ORIGINAL_FORMAL_PROBE(
+        source, axis, seed, runtime, expected)
+    if checks:
+        return checks, detail
+    reason = (detail or {}).get("candidate_reason")
+    trace = (detail or {}).get("candidate_traceback")
+    return [base._check(
+        "formal-axis-candidate-operation", False,
+        {"reason": reason, "traceback": trace})], {
+            **(detail or {}),
+            "probe_family": "formal-axis-transition-v2",
+            "structured_candidate_failure": True,
+        }
+
+
 base._semantic_probe = _semantic_probe
+base._formal_probe = _formal_probe
 base.PROBES["semantic"] = _semantic_probe
+base.PROBES["formal"] = _formal_probe
 
 main = base.main
 
