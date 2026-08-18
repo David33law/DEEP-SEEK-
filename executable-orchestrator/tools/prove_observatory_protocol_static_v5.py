@@ -293,6 +293,7 @@ def main():
             "executable-orchestrator/lawmax21/"
             "observatory_causal_dossier_hardening.py")
         _require(causal_dossier, (
+            'LABELS = ("replication", "crown")',
             "def _probe_report", "def _probe_pair",
             "all_ablation_mutations_destroyed_claimed_behavior",
             "axis_specific_failure_attributed",
@@ -304,8 +305,11 @@ def main():
             "group_path_is_sufficient",
             "whole_receipt_searched",
             "negative_controls_passed",
-            "genome_causal_ablation_replication",
-            "genome_causal_ablation_crown",
+            'artifact["causal_genome_realization"] = receipts',
+            '"causal_genome_replication"',
+            '"causal_genome_crown"',
+            '"axis_probe_pairs_replication"',
+            '"axis_probe_pairs_crown"',
             "evaluator_receipt_sha256"),
             "causal dossier binding")
 
