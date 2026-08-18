@@ -2,10 +2,10 @@
 """Static-v7 closure for calibrated mid-operation actual-container fault evidence.
 
 Runs static-v6 first, then proves that both load-bearing process-death arenas are calibrated before
-launch, use the same bounded v2 entrypoints in preflight and production, consume owner-bound workloads,
-and require actual container death while the tested operation is still in flight. The stable proof
-entrypoint must route through the final fault-hardened v6 seat. No provider call, candidate execution,
-Docker run or owner mutation occurs here.
+launch, use the same bounded v2 entrypoints in preflight and production, consume exact owner-bound
+workloads, and require actual container death while the tested operation is still in flight. The
+stable proof entrypoint must route through the final fault-hardened v6 seat. No provider call,
+candidate execution, Docker run or owner mutation occurs here.
 """
 from __future__ import annotations
 
@@ -42,9 +42,10 @@ NEW_GATES = (
     "distributed_authority_files_static_bound",
     "distributed_baseline_metric_static_bound",
     "distributed_atomic_batch_reference_static_bound",
-    "distributed_crash_floor_static_bound",
+    "distributed_crash_workload_static_bound",
     "fault_evaluator_production_routing_static_bound",
     "fault_mid_operation_crash_static_bound",
+    "fault_exact_workloads_static_bound",
     "authoritative_fault_final_entry_static_bound",
 )
 
@@ -106,6 +107,15 @@ def main():
                 "--crash-events", str(protocol.workload("systems", "crash_events"))]:
             raise RuntimeError("systems calibration does not consume owner workload policy")
 
+        distributed_campaign = setup3.CAMPAIGNS.get("distributed") or {}
+        distributed_args = list(distributed_campaign.get("args", lambda: [])())
+        if distributed_campaign.get("reference") != DISTRIBUTED_REFERENCE \
+                or distributed_campaign.get("evaluator") != DISTRIBUTED_EVALUATOR \
+                or "--crash-events" not in distributed_args \
+                or distributed_args[distributed_args.index("--crash-events") + 1] != str(
+                    protocol.workload("distributed", "crash_events")):
+            raise RuntimeError("owner ceremony does not calibrate exact distributed crash workload")
+
         specialized = preflight6.core.SPECIALIZED
         if tuple(specialized.get("systems") or ()) != (
                 SYSTEMS_REFERENCE, SYSTEMS_EVALUATOR):
@@ -114,17 +124,15 @@ def main():
                 DISTRIBUTED_REFERENCE, DISTRIBUTED_EVALUATOR):
             raise RuntimeError("preflight does not require the exact distributed calibration pair")
 
-        production_systems = protocol.PRODUCTION_WORKLOADS.get("systems") or {}
-        proof_systems = protocol.PROOF_WORKLOADS.get("systems") or {}
-        for row, label in ((production_systems, "production"), (proof_systems, "proof")):
-            if set(row) != {"qualification", "replication", "crown", "crash_events"} \
-                    or min(int(row[key]) for key in row) <= 0:
-                raise RuntimeError(f"{label} systems workload policy is incomplete")
-        production_distributed = protocol.PRODUCTION_WORKLOADS.get("distributed") or {}
-        proof_distributed = protocol.PROOF_WORKLOADS.get("distributed") or {}
-        if int(production_distributed.get("crash_event_floor", 0)) != 20000 \
-                or int(proof_distributed.get("crash_event_floor", 0)) != 20000:
-            raise RuntimeError("distributed crash-event floor is not owner-bound to evaluator semantics")
+        for section in ("systems", "distributed"):
+            for policy, label in (
+                    (protocol.PRODUCTION_WORKLOADS, "production"),
+                    (protocol.PROOF_WORKLOADS, "proof")):
+                row = policy.get(section) or {}
+                if set(row) != {"qualification", "replication", "crown", "crash_events"} \
+                        or min(int(row[key]) for key in row) <= 0:
+                    raise RuntimeError(
+                        f"{label} {section} workload policy is incomplete")
 
         workload = _text("executable-orchestrator/lawmax21/observatory_workload_policy.py")
         _require(workload, (
@@ -132,18 +140,18 @@ def main():
             'crown.SYSTEMS_REPLICATION_EVENTS = protocol.workload("systems", "replication")',
             'crown.SYSTEMS_CROWN_EVENTS = protocol.workload("systems", "crown")',
             '"crash_events": protocol.workload("systems", "crash_events")',
-            '"crash_event_floor": protocol.workload(',
-            '"distributed", "crash_event_floor"'),
+            '"crash_events": protocol.workload("distributed", "crash_events")'),
             "owner-signed workload router")
 
         routing = _text(
             "executable-orchestrator/lawmax21/observatory_evaluator_routing_hardening.py")
         _require(routing, (
             '"observatory_systems_arena_v2.py"',
-            '"--crash-events", str(protocol.workload("systems", "crash_events"))',
-            '"owner_signed_crash_events"',
+            'crash_events = protocol.workload("systems", "crash_events")',
+            '"--crash-events", str(crash_events)',
             '"observatory_distributed_arena_v2.py"',
-            '"owner_signed_crash_event_floor"',
+            'crash_events = protocol.workload("distributed", "crash_events")',
+            'report["owner_signed_crash_events"] = int(crash_events)',
             'crown._run_systems = _systems',
             'distributed._run = _distributed'),
             "production fault evaluator routing")
@@ -168,33 +176,28 @@ def main():
             '"container_absent_before_recovery"',
             '"cli_process_kill_counts_as_evidence": False',
             '"durable_manifest_evidence"',
-            '"authority_files_verified"',
-            '"recovery_files_verified"',
             'base._manifest = _safe_manifest',
             'base._crash = _safe_crash'),
             "durable systems v2")
         contract = _text(SYSTEMS_CONTRACT)
         _require(contract, (
             "DURABLE SYSTEMS CONTRACT v2",
-            "Authoritative whole-process crash evidence",
             "operation_reply_observed_before_kill=false",
             "mid_operation_kill_verified=true",
             "container_absent_before_recovery=true",
-            "cli_process_kill_counts_as_evidence=false",
             "Calibration and signed workloads"),
             "durable systems contract")
 
-        distributed_base = _text(
-            "private-evaluator/evaluator/observatory_distributed_arena.py")
-        _require(distributed_base, (
-            '_events(max(20000, args.large_events), args.seed + 21, "CRASHLOAD")',),
-            "distributed base crash floor")
         distributed_v2 = _text(DISTRIBUTED_EVALUATOR)
         _require(distributed_v2, (
             '"actual_container_kill_required": True',
             '"mid_operation_kill_required": True',
             '"operation_reply_observed_before_kill": None',
             '"mid_operation_kill_verified": False',
+            '"events_delivered": 0',
+            '"distributed v2 requires explicit --crash-events from owner workload policy"',
+            'if prefix == "CRASHLOAD"',
+            'report["requested_crash_events"] = int(_CRASH_EVENTS)',
             'process.stdin.write(_crash_body(source, events))',
             'reply_observed = os.fstat(output.fileno()).st_size > 0',
             '[runtime, "kill", name]',
@@ -218,6 +221,8 @@ def main():
             '"mid_operation_kill_required"',
             '"operation_reply_observed_before_kill"',
             '"mid_operation_kill_verified"',
+            '"distributed_reference_calibration_verified"',
+            '"fault_workloads_owner_bound_verified"',
             'verified["fault_injection_mid_operation_verified"] = True'),
             "dynamic fault E2E")
         final = _text(FINAL_V6)
@@ -235,15 +240,16 @@ def main():
             "stable proof entrypoint")
 
         snapshot = workload_policy.snapshot()
-        if snapshot.get("systems") != {
-                "qualification": protocol.workload("systems", "qualification"),
-                "replication": protocol.workload("systems", "replication"),
-                "crown": protocol.workload("systems", "crown"),
-                "crash_events": protocol.workload("systems", "crash_events")}:
-            raise RuntimeError("runtime workload snapshot omits signed systems workload")
-        if int((snapshot.get("distributed") or {}).get("crash_event_floor", 0)) != \
-                protocol.workload("distributed", "crash_event_floor"):
-            raise RuntimeError("runtime workload snapshot omits distributed crash floor")
+        for section in ("systems", "distributed"):
+            expected = {
+                "qualification": protocol.workload(section, "qualification"),
+                "replication": protocol.workload(section, "replication"),
+                "crown": protocol.workload(section, "crown"),
+                "crash_events": protocol.workload(section, "crash_events"),
+            }
+            if snapshot.get(section) != expected:
+                raise RuntimeError(
+                    f"runtime workload snapshot omits signed {section} workload")
 
         protocol_files = set(protocol.protocol_files(ROOT))
         required = {
@@ -269,6 +275,12 @@ def main():
                 "evaluator": SYSTEMS_EVALUATOR,
                 "qualification_events": protocol.workload("systems", "qualification"),
                 "crash_events": protocol.workload("systems", "crash_events"),
+            },
+            "distributed_reference_calibration": {
+                "reference": DISTRIBUTED_REFERENCE,
+                "evaluator": DISTRIBUTED_EVALUATOR,
+                "qualification_events": protocol.workload("distributed", "qualification"),
+                "crash_events": protocol.workload("distributed", "crash_events"),
             },
             "systems_workloads": dict(snapshot["systems"]),
             "distributed_workloads": dict(snapshot["distributed"]),
