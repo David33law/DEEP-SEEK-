@@ -1,4 +1,4 @@
-# National Legal Observatory — Distributed Systems Contract v1
+# National Legal Observatory — Distributed Systems Contract v2
 
 ## 1. Purpose
 
@@ -33,6 +33,8 @@ The returned object must implement:
 
 The implementation may serialize operations or reject writes that cannot be committed safely. It may not acknowledge mutually incompatible canonical histories as committed.
 
+`ingest_batch` may implement a single durable batch transition. If it does, per-event admission semantics must remain deterministic, and a process death during serialization must leave either the previous durable canonical authority or the fully committed batch. A partially serialized canonical authority is never acceptable.
+
 ## 3. Manifest
 
 `cluster_manifest()` must return:
@@ -40,6 +42,7 @@ The implementation may serialize operations or reject writes that cannot be comm
 - `replication_model` — one controlled `replication_distribution_model` class;
 - `commit_model` — one controlled `consistency_commit_model` class;
 - `node_authority_files` — relative durable authority files per node;
+- `cluster_authority_files` — relative durable files that carry canonical cluster authority;
 - `fault_assumptions` — explicit quorum/synchrony/failure assumptions;
 - `canonical_root_rule` — how the one canonical root is determined;
 - `publication_channels` — human, api, linked_data, eli, public_sector and ai.
@@ -61,9 +64,17 @@ The evaluator will test at least:
 9. **publication consistency** — every required channel reports the same committed root;
 10. **fault assumption honesty** — writes outside the declared safe regime are rejected or remain explicitly pending, never silently committed.
 
+### Whole-process crash evidence
+
+A whole-process crash counts only when the trusted evaluator kills the **actual named candidate container** through the container runtime and confirms that the container no longer exists before recovery starts. Killing or disconnecting only the local Docker/Podman CLI client is not crash evidence, because it can leave an orphaned container writing concurrently to the same authority files.
+
+Recovery must therefore begin only after the crashed candidate container is confirmed absent. A surviving writer, ambiguous container state, failed runtime kill, or concurrent mutation of the recovery bind mount is a failed/invalid crash trial, never a PASS.
+
 ## 5. Isolation
 
 The evaluator runs inside network-disabled containers with a read-only root filesystem, one explicit writable cluster directory, bounded memory and process count, no inherited secrets and no model calls.
+
+Crash trials use a unique ephemeral container identity, explicit runtime kill, and absence verification before reuse of the writable cluster directory.
 
 ## 6. Revision and replication
 
