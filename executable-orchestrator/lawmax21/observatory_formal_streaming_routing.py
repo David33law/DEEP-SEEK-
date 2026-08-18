@@ -1,10 +1,10 @@
 """Route formal campaigns through the memory-bounded v3 evaluator."""
 import hashlib
 import os
-import subprocess
 import sys
 
 from . import observatory_formal_overlay as formal
+from . import observatory_utf8_process as utf8_process
 from .canonical import atomic_write_json, read_json
 from .handlers import A
 
@@ -35,11 +35,12 @@ def _run(ctx, cid, perspective, label, depth, candidate_path=None):
         "--depth", str(depth), "--timeout", "14400"]
     for axis, value in formal._expected(ctx, cid).items():
         command.extend(["--expected-" + axis.replace("_", "-"), value])
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = utf8_process.run(command, capture_output=True)
     process = {
         "evaluator_returncode": result.returncode,
         "evaluator_stdout_tail": (result.stdout or "")[-_EVALUATOR_TAIL_LIMIT:],
         "evaluator_stderr_tail": (result.stderr or "")[-_EVALUATOR_TAIL_LIMIT:],
+        "evaluator_transport_encoding": utf8_process.ENCODING,
     }
     if not os.path.exists(out):
         return {
