@@ -1,4 +1,4 @@
-# National Legal Observatory — Controlled Genome Realization Contract v4
+# National Legal Observatory — Controlled Genome Realization Contract v5
 
 ## 1. Purpose
 
@@ -94,43 +94,85 @@ For each obligation the trusted ablation engine must:
 6. persist the evaluator process return code and bounded stdout/stderr witnesses for specialized arenas;
 7. verify that the evaluator report records the SHA-256 of the exact mutated source bytes;
 8. classify timeout, OOM, missing output, container refusal, output flooding, harness failure and other infrastructure outcomes as non-evidence;
-9. require a candidate-origin failure and the axis-specific behavioral attribution defined below.
+9. require a candidate-origin failure and the axis-specific behavioral proof defined below.
 
 Every obligation from both independent auditors must be causally falsified. Unioning the two auditor maps into one oversized mutation is insufficient; each auditor's claimed definition set must fail independently.
 
-## 7. Axis-specific behavioral failure attribution
+## 7. Diagnostic attribution is not causal authority
 
 A central function may be load-bearing while remaining irrelevant to the particular architecture axis for which it was cited. Therefore a generic candidate crash does not prove an axis. A failure somewhere in the same broad artifact group does not prove an axis either.
-
-Every failed load-bearing mutant must expose one of the following behavioral witnesses:
-
-- for a semantic artifact, at least one violated hard semantic dimension mechanically mapped to the claimed axis;
-- for a specialized artifact, a failure-specific diagnostic signature explicitly mapped to the claimed axis.
 
 The following remain useful diagnostics but are never independently sufficient:
 
 - the exception or report naming a removed definition;
 - axis vocabulary appearing in the removed definition body;
 - a failed test or counterexample path that identifies only the broad artifact group;
+- text-token overlap between an error and an axis vocabulary;
 - successful receipt metadata, manifest text, source labels or family names.
 
-The trusted attribution layer must record:
+The diagnostic layer must still record:
 
 - the exact failure-only payload fields inspected;
 - `whole_receipt_searched=false`;
-- the matched hard dimensions or axis-specific failure tokens;
+- matched hard dimensions or axis-specific failure tokens, when present;
 - failed test and directed-test paths as supporting context;
 - whether a removed definition was named;
 - `removed_definition_name_is_sufficient=false`;
 - `group_path_is_sufficient=false`;
-- `behavioral_axis_evidence=true`;
-- deterministic SHA-256 receipts for the recovered AST bodies and normalized definition vocabulary.
+- deterministic SHA-256 receipts for recovered AST bodies and normalized definition vocabulary;
+- `diagnostic_failure_attribution_is_sufficient=false`.
 
-If no axis-specific behavioral witness exists, the mutation is treated as unrelated failure and the causal obligation remains open, even when the candidate failed and the cited definition was genuinely load-bearing for some other purpose.
+These records explain a failure and permit independent review. They do not decide causal credit.
 
-Every task in replication and crown must carry `axis_specific_failure_attributed=true` and `behavioral_axis_evidence=true`. The independent audit, deterministic supremacy dossier and external Docker E2E verifier must independently reproduce the complete task and behavioral-failure counts.
+## 8. Authoritative baseline-versus-mutant axis probes
 
-## 8. Inert negative controls
+The authoritative causal attribution mechanism is `observatory-axis-probe-v1`.
+
+For every auditor/axis/group/artifact obligation, the trusted runner must execute the same hidden axis probe twice:
+
+1. **baseline probe** — against the exact original source bytes identified by the current source census;
+2. **mutant probe** — against the exact load-bearing mutant produced for that obligation.
+
+The pair must use the same:
+
+- controlled axis and artifact group;
+- deterministic hidden seed;
+- `probe_id`;
+- expected controlled-class manifest values;
+- trusted evaluator implementation and isolation policy.
+
+Causal credit requires all of the following:
+
+- the baseline report is `PASS`;
+- the baseline report has `valid_execution=true` and `failure_origin=none`;
+- every baseline axis check passed;
+- the mutant report is `FAIL`;
+- the mutant report has `valid_execution=true` and `failure_origin=candidate_axis_behavior`;
+- at least one structured mutant axis check failed;
+- the baseline report is bound to the exact original source SHA-256;
+- the mutant report is bound to the exact mutated source SHA-256;
+- both reports and both process receipts are persisted and independently hash-verifiable;
+- `same_axis_probe=true`;
+- `baseline_axis_probe_passed=true`;
+- `mutant_axis_probe_failed=true`;
+- `behavioral_axis_evidence=true`.
+
+A probe outcome with `status=INVALID` is never evidence. Missing Docker/Podman, parent timeout, container transport failure, output flooding, missing report, malformed report, evaluator defect, source-hash drift or any other infrastructure/harness failure leaves the obligation open.
+
+The axis probe must exercise behavior rather than labels:
+
+- semantic axes use hidden generated legal-change scenarios or the governed extension interface;
+- durable trusted-core topology uses restart, integrity, canonical-root and publication behavior;
+- distributed consistency and replication use partition, quorum, crash, heal and convergence behavior;
+- scale uses deterministic ingestion, partition roots, restart and publication behavior;
+- formal axes use hidden transition/query/publication scenarios specific to the claimed axis;
+- interoperability axes use hidden canonical bundles and axis-specific identity, temporal, effect, provenance or publication projections.
+
+Diagnostic token matching, definition-body vocabulary and broad group failures may be preserved alongside the probe pair, but `diagnostic_failure_attribution_is_sufficient` must remain `false`.
+
+Every task in replication and crown must carry a complete passing baseline/failing mutant probe pair. The independent audit, deterministic supremacy dossier and external Docker E2E verifier must independently reopen and rehash both reports, reproduce pair identity and confirm that the number of valid probe pairs equals the complete task count.
+
+## 9. Inert negative controls
 
 A failed mutant is meaningful only if failure was caused by the cited mechanism rather than AST rewriting, source hashing or evaluator routing.
 
@@ -138,7 +180,9 @@ Before load-bearing mutations, the engine must run one inert negative control fo
 
 A failed control invalidates the causal environment. Infrastructure refusal, timeout, missing output, evaluator invalidation, source-hash drift or malformed reports never count as evidence that an architecture mechanism is load-bearing.
 
-## 9. Qualification, replication and crown
+The inert mutation control and the axis-probe baseline serve different purposes. The inert control proves that AST mutation and evaluator routing are not intrinsically destructive. The baseline axis probe proves that the exact original source actually realizes the behavioral obligation being attributed.
+
+## 10. Qualification, replication and crown
 
 The complete citation/evidence realization audit runs:
 
@@ -146,9 +190,9 @@ The complete citation/evidence realization audit runs:
 - again after independent replication with fresh auditor calls and replication evidence;
 - again at the final crown after all crown arenas have completed.
 
-Qualification proves source/evidence binding across the broad field. Replication and crown additionally require the full auditor-specific causal-ablation campaign, axis-specific behavioral failure attribution and inert controls. No architecture revision is allowed during replication or crown realization audit.
+Qualification proves source/evidence binding across the broad field. Replication and crown additionally require the full auditor-specific causal-ablation campaign, inert controls and complete baseline-versus-mutant axis-probe pairs. No architecture revision is allowed during replication or crown realization audit.
 
-## 10. Persisted evidence
+## 11. Persisted evidence
 
 Each causal campaign persists:
 
@@ -160,22 +204,27 @@ Each causal campaign persists:
 - every evaluator receipt path and SHA-256;
 - process return codes and bounded output witnesses for specialized evaluators;
 - candidate-versus-infrastructure failure classification;
-- axis-specific behavioral attribution mode and failure-only evidence;
+- failure-only diagnostic attribution;
 - AST-body and normalized-vocabulary SHA-256 receipts;
+- every baseline axis-probe report path and SHA-256;
+- every mutant axis-probe report path and SHA-256;
+- shared probe IDs, seeds and expected-manifest hashes;
+- every structured baseline and mutant axis check;
 - all inert negative-control outcomes;
-- verified axis, behavioral-failure and obligation counts;
+- verified axis, behavioral-probe-pair and obligation counts;
 - an explicit proof boundary.
 
-The genome-realization report binds the causal campaign path and SHA-256. The deterministic supremacy dossier independently rehashes the mutated sources and evaluator receipts, verifies every process/source classification and axis-specific behavioral attribution, and indexes the replication and crown causal campaign bytes directly.
+The genome-realization report binds the causal campaign path and SHA-256. The deterministic supremacy dossier independently rehashes the mutated sources, evaluator receipts and both axis-probe reports, verifies pair identity, process/source classification and axis behavior, and indexes the replication and crown causal campaign bytes directly.
 
-## 11. Owner-signed consequence
+## 12. Owner-signed consequence
 
 The owner-signed mission must require:
 
 - `causal_genome_ablation_required=true`;
 - `causal_genome_negative_controls_required=true`;
 - `axis_specific_causal_attribution_required=true`;
-- `axis_specific_behavioral_failure_required=true`.
+- `axis_specific_behavioral_failure_required=true`;
+- `axis_behavioral_probe_required=true`.
 
 A signed mission lacking any of these requirements is stale and must be rejected before launch.
 
@@ -187,6 +236,6 @@ The following are explicit supremacy conditions:
 - `genome_causal_ablation_replication_passed`;
 - `genome_causal_ablation_crown_passed`.
 
-A missing axis, class mismatch, invented definition, missing `INV-*` obligation, stale evidence, generic citation map, auditor dependence, passing load-bearing mutant, unrelated failure, group-only failure, definition-name-only failure, failing inert control or infrastructure-only failure blocks `COMMITTED`. Resource exhaustion yields only `BEST_DISCOVERED_SO_FAR`.
+A missing axis, class mismatch, invented definition, missing `INV-*` obligation, stale evidence, generic citation map, auditor dependence, passing load-bearing mutant, weak or invalid baseline probe, passing mutant probe, unrelated failure, group-only failure, definition-name-only failure, failing inert control or infrastructure-only failure blocks `COMMITTED`. Resource exhaustion yields only `BEST_DISCOVERED_SO_FAR`.
 
-The causal proof is bounded to the exact cited source bytes, hidden corpora, fault workloads, attribution mappings and definition-set mutations. It does not claim an unbounded theorem about all semantically equivalent rewrites or all future deployments.
+The causal proof is bounded to the exact cited source bytes, hidden corpora, fault workloads, axis-probe implementations, attribution mappings and definition-set mutations. It does not claim an unbounded theorem about all semantically equivalent rewrites or all future deployments.
