@@ -3,9 +3,9 @@
 The earlier attribution layers retain valuable failure-only diagnostics and deterministic AST-body
 receipts. They are not allowed to decide causal credit. This hardening runs the private axis-probe
 arena twice for every auditor/axis/group/artifact task: once over the exact original source and once
-over the exact load-bearing mutant, with the same hidden seed and probe ID. Credit requires a valid
-passing baseline and a valid candidate-origin failing mutant. Infrastructure-invalid probes, a weak
-baseline or a passing mutant leave the obligation open.
+over the exact load-bearing mutant, with the same hidden seed, task identity and probe ID. Credit
+requires a valid passing baseline and a valid candidate-origin failing mutant. Infrastructure-invalid
+probes, a weak baseline or a passing mutant leave the obligation open.
 """
 from __future__ import annotations
 
@@ -70,8 +70,6 @@ def _probe(ctx, cid, label, task, source_path, variant, seed, identity):
     source_path = os.path.abspath(source_path)
     runtime = os.path.abspath(ctx.runtime)
     if source_path != runtime and not source_path.startswith(runtime + os.sep):
-        # Original candidate artifacts are also under the runtime. Refuse any future routing drift
-        # rather than letting a probe read an arbitrary checkout path.
         raise RuntimeError(
             "axis-probe source escapes runtime: " + source_path)
     expected = _expected(ctx, cid, task)
@@ -166,7 +164,9 @@ def _campaign_state(context, report):
         and (task.get("attribution") or {}).get(
             "baseline_axis_probe_passed") is True
         and (task.get("attribution") or {}).get(
-            "mutant_axis_probe_failed") is True)
+            "mutant_axis_probe_failed") is True
+        and len(str((task.get("attribution") or {}).get(
+            "axis_probe_task_identity_sha256") or "")) == 64)
     return {
         "checked": bool(tasks and pairs == len(tasks)),
         "tasks": len(tasks),
@@ -209,7 +209,9 @@ def install(ctx, handlers):
             and baseline.get("group") == task["group"]
             and mutant.get("group") == task["group"]
             and baseline.get("seed") == mutant.get("seed") == seed
-            and baseline.get("expected_sha256") == mutant.get("expected_sha256"))
+            and baseline.get("expected_sha256") == mutant.get("expected_sha256")
+            and baseline.get("task_identity_sha256")
+            == mutant.get("task_identity_sha256") == identity)
         baseline_passed = _valid_baseline(baseline)
         mutant_failed = _valid_mutant_failure(mutant)
         attributed = bool(same_probe and baseline_passed and mutant_failed)
@@ -219,6 +221,7 @@ def install(ctx, handlers):
             "axis_probe_contract": PROBE_CONTRACT,
             "axis_probe_id": baseline.get("probe_id"),
             "axis_probe_seed": seed,
+            "axis_probe_task_identity_sha256": identity,
             "same_axis_probe": same_probe,
             "baseline_axis_probe_passed": baseline_passed,
             "mutant_axis_probe_failed": mutant_failed,
