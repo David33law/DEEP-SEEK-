@@ -3,8 +3,8 @@
 A failing mutant is evidence only when the signed evaluator actually ran against the exact mutated
 source and returned either a completed behavioral failure record or an explicit candidate-origin
 exception. Missing container engines, process/container exits, isolation refusal, parent timeout,
-resource exhaustion, output truncation, missing reports and harness transport failures invalidate the
-ablation instead of proving that a genome mechanism is load-bearing.
+resource exhaustion, output truncation, missing reports, host Unicode/locale failures and harness
+transport failures invalidate the ablation instead of proving that a genome mechanism is load-bearing.
 """
 from __future__ import annotations
 
@@ -39,6 +39,12 @@ _INFRASTRUCTURE_MARKERS = (
     "timed out after",
     "timed out",
     "process timeout",
+    "unicodeencodeerror",
+    "unicodedecodeerror",
+    "charmap codec",
+    "character maps to <undefined>",
+    "codec can't encode",
+    "codec can't decode",
     "image pull",
     "manifest unknown",
     "no such image",
@@ -86,7 +92,8 @@ _STRUCTURED_FAILURE_FIELDS = (
 def _diagnostic_text(report):
     keys = (
         "reason", "error", "stderr", "stderr_tail", "stdout_tail",
-        "evaluator_stdout_tail", "evaluator_stderr_tail")
+        "evaluator_stdout_tail", "evaluator_stderr_tail",
+        "axis_probe_stdout_tail", "axis_probe_stderr_tail")
     return " ".join(str(report.get(key) or "") for key in keys)
 
 
@@ -123,6 +130,7 @@ def install(_ctx, handlers):
             "infrastructure_failure_excluded": True,
             "candidate_source_receipt_verified": True,
             "evaluator_returncode_verified": returncode,
+            "host_locale_failure_cannot_earn_causal_credit": True,
         })
         if passed:
             if returncode != 0:
