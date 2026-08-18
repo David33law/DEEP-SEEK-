@@ -1,9 +1,9 @@
 """Make trusted baseline-versus-mutant axis probes authoritative for causal attribution.
 
 The earlier attribution layers retain valuable failure-only diagnostics and deterministic AST-body
-receipts. They are not allowed to decide causal credit. This hardening runs the private axis-probe
+receipts. They are not allowed to decide causal credit. This hardening runs the private axis-probe v2
 arena twice for every auditor/axis/group/artifact task: once over the exact original source and once
-over the exact load-bearing mutant, with the same hidden seed, task identity and probe ID. Credit
+over the exact load-bearing mutant, with the same hidden seed, full task identity and probe ID. Credit
 requires a valid passing baseline and a valid candidate-origin failing mutant. Infrastructure-invalid
 probes, a weak baseline or a passing mutant leave the obligation open.
 """
@@ -75,9 +75,9 @@ def _probe(ctx, cid, label, task, source_path, variant, seed, identity):
     expected = _expected(ctx, cid, task)
     output = A(
         ctx, "reports",
-        f"axis-probe-{label}-{identity[:20]}-{variant}.json")
+        f"axis-probe-{label}-{identity}-{variant}.json")
     evaluator = os.path.join(
-        ctx.evaluator_dir, "observatory_axis_probe_arena.py")
+        ctx.evaluator_dir, "observatory_axis_probe_arena_v2.py")
     if not os.path.isfile(evaluator):
         raise RuntimeError("trusted axis-probe evaluator is missing: " + evaluator)
     command = [
@@ -219,6 +219,7 @@ def install(ctx, handlers):
         details.update({
             "mode": "baseline-versus-mutant-axis-probe",
             "axis_probe_contract": PROBE_CONTRACT,
+            "axis_probe_evaluator": "observatory_axis_probe_arena_v2.py",
             "axis_probe_id": baseline.get("probe_id"),
             "axis_probe_seed": seed,
             "axis_probe_task_identity_sha256": identity,
@@ -259,6 +260,8 @@ def install(ctx, handlers):
         result.update({
             "genome_axis_behavioral_probe_required": True,
             "genome_axis_behavioral_probe_contract": PROBE_CONTRACT,
+            "genome_axis_behavioral_probe_evaluator":
+                "observatory_axis_probe_arena_v2.py",
             "genome_axis_behavioral_probe_replication_checked":
                 replication["checked"],
             "genome_axis_behavioral_probe_crown_checked": crown["checked"],
