@@ -3,8 +3,8 @@
 
 Whole-process crash evidence requires the actual named candidate container to die through the
 container runtime while the submitted distributed admission has not yet produced an operation reply,
-and that container must be absent before recovery begins. Killing only the local CLI, or an idle
-container after the operation completed, cannot earn crash evidence.
+and that container must be absent before recovery begins. The crash event count is an explicit
+owner-bound v2 argument rather than a hidden function of the normal large-history workload.
 
 The wrapper also verifies declared authority files and measures the 1000-event healthy baseline
 separately from the later fault campaign.
@@ -26,12 +26,15 @@ bounded_subprocess.install(base.subprocess)
 
 _ORIGINAL_SESSION = base._session
 _ORIGINAL_MANIFEST = base._manifest
+_ORIGINAL_EVENTS = base._events
 _BASELINE = {"elapsed_seconds": None, "events": None}
+_CRASH_EVENTS = None
 _CRASH = {
     "actual_container_kill_required": True,
     "mid_operation_kill_required": True,
     "container_started": False,
     "workload_delivered": False,
+    "events_delivered": 0,
     "operation_reply_observed_before_kill": None,
     "mid_operation_kill_verified": False,
     "runtime_kill_returncode": None,
@@ -39,6 +42,27 @@ _CRASH = {
     "container_absent_before_recovery": False,
     "cli_process_kill_counts_as_evidence": False,
 }
+
+
+def _consume_crash_events(argv):
+    try:
+        index = argv.index("--crash-events")
+        value = int(argv[index + 1])
+    except (ValueError, IndexError) as exc:
+        raise RuntimeError(
+            "distributed v2 requires explicit --crash-events from owner workload policy") from exc
+    if value < 1000:
+        raise RuntimeError("distributed v2 crash workload must contain at least 1000 events")
+    del argv[index:index + 2]
+    return value
+
+
+def _events(n, seed, prefix="DIST"):
+    if prefix == "CRASHLOAD":
+        if _CRASH_EVENTS is None:
+            raise RuntimeError("distributed crash workload was not owner-bound")
+        n = int(_CRASH_EVENTS)
+    return _ORIGINAL_EVENTS(n, seed, prefix)
 
 
 def _inside(root, relative):
@@ -116,8 +140,6 @@ def _named_argv(runtime, cluster_dir, name):
 
 
 def _crash_body(source, events):
-    # No ``quit`` command: after a fast reply the container would remain idle, allowing the trusted
-    # host to reject that as post-operation death instead of mistaking it for mid-operation evidence.
     return "\n".join((
         json.dumps({"candidate_source": source, "node_ids": base.NODE_IDS},
                    ensure_ascii=False),
@@ -165,6 +187,7 @@ def _force_remove(runtime, name):
 
 def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
     os.makedirs(cluster_dir, exist_ok=True)
+    _CRASH["events_delivered"] = len(events)
     name = "obs-dist-crash-" + uuid.uuid4().hex
     with tempfile.TemporaryFile(mode="w+b") as output:
         process = subprocess.Popen(
@@ -220,6 +243,7 @@ def _safe_crash_process(runtime, source, cluster_dir, events, delay=0.015):
             return bool(
                 started
                 and _CRASH["workload_delivered"] is True
+                and _CRASH["events_delivered"] == int(_CRASH_EVENTS)
                 and _CRASH["mid_operation_kill_verified"] is True
                 and _CRASH["runtime_kill_succeeded"] is True
                 and absent)
@@ -258,6 +282,7 @@ def _rewrite_receipt(path):
     with open(path, encoding="utf-8") as handle:
         report = json.load(handle)
     campaign_elapsed = report.get("elapsed_seconds")
+    report["requested_crash_events"] = int(_CRASH_EVENTS)
     report["campaign_elapsed_seconds"] = campaign_elapsed
     report["baseline_elapsed_seconds"] = float(elapsed)
     report["baseline_events"] = int(events)
@@ -270,6 +295,7 @@ def _rewrite_receipt(path):
     crash_complete = all((
         _CRASH.get("container_started") is True,
         _CRASH.get("workload_delivered") is True,
+        int(_CRASH.get("events_delivered", 0)) == int(_CRASH_EVENTS),
         _CRASH.get("operation_reply_observed_before_kill") is False,
         _CRASH.get("mid_operation_kill_verified") is True,
         _CRASH.get("runtime_kill_succeeded") is True,
@@ -279,7 +305,7 @@ def _rewrite_receipt(path):
         report["status"] = "FAIL"
         report["passed"] = False
         report.setdefault("tests", {})["whole_process_crash_recovery"] = False
-        report["reason"] = "whole-process crash lacked mid-operation actual-container kill evidence"
+        report["reason"] = "whole-process crash lacked signed mid-operation container-kill evidence"
     temporary = path + ".v2.tmp"
     with open(temporary, "w", encoding="utf-8") as handle:
         json.dump(report, handle, ensure_ascii=False, indent=1, sort_keys=True)
@@ -290,6 +316,9 @@ def _rewrite_receipt(path):
 
 
 def main():
+    global _CRASH_EVENTS
+    _CRASH_EVENTS = _consume_crash_events(sys.argv)
+    base._events = _events
     base._manifest = _manifest
     base._session = _timed_session
     base._crash_process = _safe_crash_process
@@ -299,6 +328,7 @@ def main():
         code = 1
     print(json.dumps({
         "distributed_v2_receipt_rewrite": "PASS",
+        "requested_crash_events": report["requested_crash_events"],
         "baseline_events": report["baseline_events"],
         "baseline_elapsed_seconds": report["baseline_elapsed_seconds"],
         "events_per_second_baseline": report["events_per_second_baseline"],
