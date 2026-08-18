@@ -47,6 +47,8 @@ The implementation may serialize operations or reject writes that cannot be comm
 - `canonical_root_rule` — how the one canonical root is determined;
 - `publication_channels` — human, api, linked_data, eli, public_sector and ai.
 
+Every declared authority file must be relative to the cluster root, exist when inspected by the trusted evaluator, remain inside that root and not alias another declared authority file.
+
 The reported controlled classes must match the architecture genome supplied to the builder. A label mismatch or generic substitution is a fidelity failure.
 
 ## 4. Required behavior
@@ -66,15 +68,41 @@ The evaluator will test at least:
 
 ### Whole-process crash evidence
 
-A whole-process crash counts only when the trusted evaluator kills the **actual named candidate container** through the container runtime and confirms that the container no longer exists before recovery starts. Killing or disconnecting only the local Docker/Podman CLI client is not crash evidence, because it can leave an orphaned container writing concurrently to the same authority files.
+A whole-process crash counts only when the trusted evaluator:
 
-Recovery must therefore begin only after the crashed candidate container is confirmed absent. A surviving writer, ambiguous container state, failed runtime kill, or concurrent mutation of the recovery bind mount is a failed/invalid crash trial, never a PASS.
+1. starts a uniquely named candidate container and proves it is running;
+2. delivers the crash workload **without** a graceful `quit` request;
+3. observes that the candidate has emitted no operation reply before the kill point, proving the distributed admission is still in flight;
+4. kills the actual named candidate container through the container runtime;
+5. obtains successful runtime-kill evidence; and
+6. confirms that the container no longer exists before recovery starts.
+
+Killing or disconnecting only the local Docker/Podman CLI client is not crash evidence, because it can leave an orphaned container writing concurrently to the same authority files. Killing an idle container after `ingest_batch` already replied is also not crash-atomicity evidence.
+
+The crash receipt must prove at least:
+
+- `actual_container_kill_required=true`;
+- `mid_operation_kill_required=true`;
+- `container_started=true`;
+- `workload_delivered=true`;
+- `operation_reply_observed_before_kill=false`;
+- `mid_operation_kill_verified=true`;
+- `runtime_kill_returncode=0`;
+- `runtime_kill_succeeded=true`;
+- `container_absent_before_recovery=true`;
+- `cli_process_kill_counts_as_evidence=false`.
+
+Recovery begins only after the crashed candidate container is confirmed absent. A completed operation before kill, surviving writer, ambiguous container state, failed runtime kill or concurrent mutation of the recovery bind mount is a failed/invalid crash trial, never a PASS.
+
+### Throughput evidence
+
+`distributed_events_per_second` is measured only across the deterministic 1000-event healthy baseline session together with its integrity/root/publication/close verification. Partition, corruption, process-death and rebuild time is reported separately as campaign time and is scored by `distributed_fault_survival`, not silently mixed into the baseline throughput denominator.
 
 ## 5. Isolation
 
 The evaluator runs inside network-disabled containers with a read-only root filesystem, one explicit writable cluster directory, bounded memory and process count, no inherited secrets and no model calls.
 
-Crash trials use a unique ephemeral container identity, explicit runtime kill, and absence verification before reuse of the writable cluster directory.
+Crash trials use a unique ephemeral container identity, explicit runtime kill, mid-operation reply observation and absence verification before reuse of the writable cluster directory.
 
 ## 6. Revision and replication
 
