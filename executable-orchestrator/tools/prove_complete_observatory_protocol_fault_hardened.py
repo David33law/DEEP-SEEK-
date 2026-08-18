@@ -2,9 +2,9 @@
 """Fault-evidence extension of the calibrated Observatory Docker E2E proof.
 
 This wrapper reopens the owner-ceremony durable systems calibration and the final durable/distributed
-crown reports while the disposable proof clone/runtime still exist.  A PASS requires runtime-kill
-receipts proving actual container death and absence before recovery.  Durable manifest declarations,
-signed proof workloads and the corrected distributed baseline metric are rechecked independently.
+crown reports while the disposable proof clone/runtime still exist. A PASS requires actual runtime
+container death *during an in-flight operation*, absence before recovery, complete durable manifest
+evidence, signed proof workloads and the corrected distributed baseline metric.
 """
 from __future__ import annotations
 
@@ -39,6 +39,8 @@ FAULT_FILES = {
     "benchmark/observatory_distributed_reference_candidate.py",
     "executable-orchestrator/tools/prove_observatory_protocol_static_v7.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_fault_hardened.py",
+    "executable-orchestrator/tools/prove_complete_observatory_protocol_v6.py",
+    "executable-orchestrator/tools/run_observatory_proof.py",
 }
 CORE.REQUIRED_PROTOCOL_FILES.update(FAULT_FILES)
 
@@ -70,21 +72,25 @@ def _crash_evidence(report, label):
     evidence = report.get("whole_process_crash_evidence") or {}
     required_true = (
         "actual_container_kill_required",
+        "mid_operation_kill_required",
         "container_started",
         "workload_delivered",
+        "mid_operation_kill_verified",
         "runtime_kill_succeeded",
         "container_absent_before_recovery",
     )
     missing = [key for key in required_true if evidence.get(key) is not True]
     if missing \
+            or evidence.get("operation_reply_observed_before_kill") is not False \
             or evidence.get("cli_process_kill_counts_as_evidence") is not False \
             or int(evidence.get("runtime_kill_returncode", -1)) != 0:
         raise RuntimeError(
-            label + " lacks authoritative actual-container crash evidence: "
-            + ", ".join(missing or ["kill-returncode/CLI-credit"]))
+            label + " lacks authoritative mid-operation container crash evidence: "
+            + ", ".join(missing or ["reply/kill-returncode/CLI-credit"]))
     return {
         key: evidence.get(key) for key in (
             *required_true,
+            "operation_reply_observed_before_kill",
             "runtime_kill_returncode",
             "cli_process_kill_counts_as_evidence",
         )
@@ -146,7 +152,7 @@ def _verify_systems_calibration(repo, preflight):
     tests = report.get("tests") or {}
     if tests.get("crash_was_actually_observed") is not True \
             or tests.get("crash_restart_integrity") is not True:
-        raise RuntimeError("systems reference calibration did not survive actual process death")
+        raise RuntimeError("systems reference calibration did not survive mid-operation process death")
     return {
         "status": "PASS",
         "report_path": SYSTEMS_REPORT,
@@ -235,6 +241,7 @@ def _verify(repo, runtime, source_head, preflight, launch):
     verified["distributed_actual_container_crown_verified"] = (
         _verify_distributed_crown(runtime, incumbent))
     verified["fault_injection_actual_container_verified"] = True
+    verified["fault_injection_mid_operation_verified"] = True
     return verified
 
 
