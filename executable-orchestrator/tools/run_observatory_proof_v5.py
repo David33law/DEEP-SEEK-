@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Stable final proof command for the complete National Observatory protocol v5."""
+"""Compatibility entrypoint: historical v5 command delegates to final protocol-v6 authority."""
 import sys
-from prove_complete_observatory_protocol_v4 import main
+from prove_complete_observatory_protocol_v6 import main
 
 
 if __name__ == "__main__":
