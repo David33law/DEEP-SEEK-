@@ -2,8 +2,10 @@
 """Static proof for the complete owner-signed Observatory research protocol.
 
 No provider call, owner mutation or candidate execution. Compiles/imports the full protocol census,
-parses every JSON contract, validates the Pareto/mission/workload/overlay topology and proves the old
-partial proof entrypoints are only compatibility shims to the v5 E2E seat.
+parses every JSON contract, validates the Pareto/mission/workload/overlay topology and proves every
+retired public proof command is only a mechanically constrained shim to the single protocol-v6
+proof authority. Shim identity is verified structurally with AST rules rather than line-count or
+substring heuristics.
 """
 import ast
 import importlib
@@ -68,10 +70,128 @@ EXPECTED_FILES = {
     "executable-orchestrator/tools/prove_terminal_condition_closure.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol.py"}
 
+AUTHORITATIVE_PROOF_TARGET = "prove_complete_observatory_protocol_v6"
+AUTHORITATIVE_SHIMS = {
+    "executable-orchestrator/tools/run_observatory_proof.py": True,
+    "executable-orchestrator/tools/prove_active_novelty_saturation.py": False,
+    "executable-orchestrator/tools/prove_complete_observatory_protocol_v2.py": False,
+    "executable-orchestrator/tools/prove_complete_observatory_protocol_v3.py": False,
+    "executable-orchestrator/tools/prove_complete_observatory_protocol_v4.py": False,
+    "executable-orchestrator/tools/run_observatory_proof_final.py": False,
+    "executable-orchestrator/tools/run_observatory_proof_v5.py": False,
+    "executable-orchestrator/tools/run_observatory_supremacy_proof.py": False,
+}
+
 
 def _source(relative):
     return open(
         os.path.join(ROOT, *relative.split("/")), encoding="utf-8").read()
+
+
+def _qualified_name(node):
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _qualified_name(node.value)
+        return (parent + "." if parent else "") + node.attr
+    return None
+
+
+def _is_main_guard(node):
+    if not isinstance(node, ast.If) or not isinstance(node.test, ast.Compare):
+        return False
+    test = node.test
+    return bool(
+        isinstance(test.left, ast.Name)
+        and test.left.id == "__name__"
+        and len(test.ops) == 1
+        and isinstance(test.ops[0], ast.Eq)
+        and len(test.comparators) == 1
+        and isinstance(test.comparators[0], ast.Constant)
+        and test.comparators[0].value == "__main__")
+
+
+def _assert_authoritative_shim(relative, require_bootstrap=False):
+    text = _source(relative)
+    tree = ast.parse(text, filename=relative)
+    forbidden = (
+        ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef,
+        ast.For, ast.AsyncFor, ast.While, ast.Try, ast.With, ast.AsyncWith,
+        ast.Lambda, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp,
+    )
+    bad = [type(node).__name__ for node in ast.walk(tree)
+           if isinstance(node, forbidden)]
+    if bad:
+        raise RuntimeError(
+            relative + " is not a compatibility shim; executable logic remains: "
+            + ", ".join(sorted(set(bad))))
+
+    target_imports = [
+        node for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.module == AUTHORITATIVE_PROOF_TARGET]
+    if len(target_imports) != 1 \
+            or [(alias.name, alias.asname) for alias in target_imports[0].names] != [
+                ("main", None)]:
+        raise RuntimeError(
+            relative + " does not delegate exactly once to final protocol-v6 main")
+
+    allowed_plain = {"sys"} | ({"os"} if require_bootstrap else set())
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            names = {alias.name for alias in node.names}
+            if not names.issubset(allowed_plain):
+                raise RuntimeError(relative + " imports non-shim modules: " + ", ".join(names))
+        elif isinstance(node, ast.ImportFrom):
+            if node.module != AUTHORITATIVE_PROOF_TARGET:
+                raise RuntimeError(relative + " imports a non-authoritative proof seat")
+        elif isinstance(node, ast.Assign):
+            if not require_bootstrap:
+                raise RuntimeError(relative + " contains state assignment outside the final authority")
+            targets = {
+                target.id for target in node.targets if isinstance(target, ast.Name)}
+            if not targets or not targets.issubset({"HERE", "ORCH", "LAWMAX_PACKAGE"}):
+                raise RuntimeError(relative + " contains non-bootstrap state assignment")
+        elif isinstance(node, ast.Expr):
+            if not isinstance(node.value, ast.Constant) or not isinstance(node.value.value, str):
+                raise RuntimeError(relative + " contains executable top-level expression")
+        elif isinstance(node, ast.If):
+            pass
+        else:
+            raise RuntimeError(
+                relative + " contains non-shim top-level node: " + type(node).__name__)
+
+    guards = [node for node in tree.body if _is_main_guard(node)]
+    expected_if_count = 3 if require_bootstrap else 1
+    if len(guards) != 1 \
+            or sum(isinstance(node, ast.If) for node in tree.body) != expected_if_count:
+        raise RuntimeError(relative + " has unexpected control flow for a compatibility shim")
+
+    calls = {_qualified_name(node.func) for node in ast.walk(tree)
+             if isinstance(node, ast.Call)}
+    allowed_calls = {"sys.exit", "main"}
+    if require_bootstrap:
+        allowed_calls.update({
+            "os.path.dirname", "os.path.abspath", "os.path.join",
+            "os.path.isfile", "RuntimeError", "sys.path.insert"})
+    unexpected_calls = sorted(str(name) for name in calls if name not in allowed_calls)
+    if unexpected_calls:
+        raise RuntimeError(
+            relative + " contains non-shim calls: " + ", ".join(unexpected_calls))
+
+    if "sys.exit(main())" not in text:
+        raise RuntimeError(relative + " does not terminate through authoritative main")
+    if require_bootstrap:
+        for token in (
+                'HERE = os.path.dirname(os.path.abspath(__file__))',
+                'ORCH = os.path.dirname(HERE)',
+                'LAWMAX_PACKAGE = os.path.join(ORCH, "lawmax21", "__init__.py")',
+                'if not os.path.isfile(LAWMAX_PACKAGE):',
+                'if ORCH not in sys.path:',
+                'sys.path.insert(0, ORCH)'):
+            if token not in text:
+                raise RuntimeError(relative + " lacks required cwd-independent bootstrap: " + token)
+    return True
 
 
 def main():
@@ -164,15 +284,15 @@ def main():
         if positions != sorted(positions):
             raise RuntimeError(
                 "final audit overlay order is not the declared order")
-        for relative in (
-                "executable-orchestrator/tools/run_observatory_proof.py",
-                "executable-orchestrator/tools/"
-                "prove_active_novelty_saturation.py"):
-            text = _source(relative)
-            if "prove_complete_observatory_protocol" not in text \
-                    or len(text.splitlines()) > 15:
-                raise RuntimeError(
-                    relative + " remains a duplicate proof implementation")
+
+        missing_shims = sorted(set(AUTHORITATIVE_SHIMS) - set(files))
+        if missing_shims:
+            raise RuntimeError(
+                "protocol census omitted proof compatibility shims: "
+                + ", ".join(missing_shims))
+        for relative, require_bootstrap in AUTHORITATIVE_SHIMS.items():
+            _assert_authoritative_shim(relative, require_bootstrap=require_bootstrap)
+
         bundle = observatory_protocol.protocol_bundle_sha256(ROOT)
         if len(bundle) != 64:
             raise RuntimeError("protocol bundle hash malformed")
@@ -191,6 +311,9 @@ def main():
             "prior_art_sources": len(source_ids),
             "protocol_bundle_sha256": bundle,
             "partial_proof_seats_retired": True,
+            "authoritative_proof_target": AUTHORITATIVE_PROOF_TARGET,
+            "authoritative_proof_shims_verified": sorted(AUTHORITATIVE_SHIMS),
+            "authoritative_proof_shim_count": len(AUTHORITATIVE_SHIMS),
             "final_overlay_order_verified": True,
             "executable_genome_realization_bound": True})
     except Exception as exc:
