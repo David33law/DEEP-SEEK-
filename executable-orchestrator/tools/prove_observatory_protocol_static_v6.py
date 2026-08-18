@@ -2,10 +2,10 @@
 """Final zero-provider static closure for protocol-v5 calibrated causal verification.
 
 Runs the complete inherited causal/static proof and binds the current owner ceremony, preflight-v6,
-exhaustive 28-route axis calibration, exact imported v2 axis evaluator, and the distributed
-whole-process-crash/authority/throughput hardening into the causal static receipt consumed by the
-authoritative E2E driver. This proof performs no provider calls, candidate executions, Docker runs,
-or owner mutations.
+exhaustive 28-route axis calibration, exact imported v2 axis evaluator, the distributed
+whole-process-crash/authority/throughput hardening, and the durable systems actual-container crash
+hardening into the causal static receipt consumed by the authoritative E2E driver. This proof performs
+no provider calls, candidate executions, Docker runs, or owner mutations.
 """
 from __future__ import annotations
 
@@ -28,6 +28,10 @@ DISTRIBUTED_REFERENCE = (
     "benchmark/observatory_distributed_reference_candidate.py")
 DISTRIBUTED_CONTRACT = (
     "profiles/national-observatory/DISTRIBUTED-SYSTEMS-CONTRACT.md")
+SYSTEMS_EVALUATOR = (
+    "private-evaluator/evaluator/observatory_systems_arena_v2.py")
+SYSTEMS_REFERENCE = (
+    "benchmark/observatory_systems_reference_candidate.py")
 PARETO = "profiles/national-observatory/PARETO-DIMENSIONS.json"
 REQUIRED_FILES = {
     "executable-orchestrator/lawmax21/observatory_setup_v5.py",
@@ -38,6 +42,8 @@ REQUIRED_FILES = {
     DISTRIBUTED_EVALUATOR,
     DISTRIBUTED_REFERENCE,
     DISTRIBUTED_CONTRACT,
+    SYSTEMS_EVALUATOR,
+    SYSTEMS_REFERENCE,
     PARETO,
     "executable-orchestrator/tools/"
     "prove_complete_observatory_protocol_calibration_hardened.py",
@@ -201,6 +207,41 @@ def _verify_distributed_hardening():
     }
 
 
+def _verify_systems_hardening():
+    evaluator = _text(SYSTEMS_EVALUATOR)
+    reference = _text(SYSTEMS_REFERENCE)
+    compile(evaluator, _path(SYSTEMS_EVALUATOR), "exec")
+    compile(reference, _path(SYSTEMS_REFERENCE), "exec")
+    _require(evaluator, (
+        '"actual_container_kill_required": True',
+        '"cli_process_kill_counts_as_evidence": False',
+        '[runtime, "kill", name]',
+        '"runtime_kill_succeeded"',
+        '"container_absent_before_recovery"',
+        '"workload_delivered"',
+        '"whole_process_crash_evidence"',
+        'base._crash = _safe_crash'),
+        "durable systems v2 evaluator")
+    _require(reference, (
+        "BEGIN IMMEDIATE",
+        "PRAGMA synchronous=FULL",
+        "self.conn.backup(dest)",
+        "def ingest_batch",
+        "self.conn.execute(\"COMMIT\")",
+        '"authority_files": ["authority.sqlite3"]',
+        '"recovery_files": ["recovery.sqlite3"]'),
+        "durable systems reference")
+    return {
+        "evaluator_path": SYSTEMS_EVALUATOR,
+        "evaluator_sha256": _sha256(_path(SYSTEMS_EVALUATOR)),
+        "reference_path": SYSTEMS_REFERENCE,
+        "reference_sha256": _sha256(_path(SYSTEMS_REFERENCE)),
+        "actual_container_kill_required": True,
+        "container_absence_required_before_recovery": True,
+        "durable_batch_transaction_reference_bound": True,
+    }
+
+
 def main():
     if previous.main() != 0:
         return 1
@@ -231,7 +272,7 @@ def main():
         omitted = sorted(REQUIRED_FILES - protocol_files)
         if omitted:
             raise RuntimeError(
-                "protocol census omitted calibration/distributed closure files: "
+                "protocol census omitted calibration/fault closure files: "
                 + ", ".join(omitted))
         specialized = tuple(preflight.core.SPECIALIZED.get("axis_probe") or ())
         if specialized != tuple(setup.AXIS_PROBE_SOURCES):
@@ -300,6 +341,7 @@ def main():
         compile(probe_source, _path(PROBE_EVALUATOR), "exec")
         evaluator = _import_and_verify_v2_evaluator()
         distributed = _verify_distributed_hardening()
+        systems = _verify_systems_hardening()
 
         e2e = _text(
             "executable-orchestrator/tools/"
@@ -363,6 +405,9 @@ def main():
             "distributed_baseline_metric_static_bound": True,
             "distributed_atomic_batch_reference_static_bound": True,
             "distributed_static_hardening": distributed,
+            "systems_actual_container_crash_static_bound": True,
+            "systems_durable_transaction_static_bound": True,
+            "systems_static_hardening": systems,
         })
     except Exception as exc:
         receipt["status"] = "FAIL"
