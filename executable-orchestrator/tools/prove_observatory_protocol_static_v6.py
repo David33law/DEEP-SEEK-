@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Final zero-provider static closure for protocol-v5 axis-probe calibration.
+"""Final zero-provider static closure for protocol-v5 calibrated causal verification.
 
-Runs the complete inherited causal/static proof and then binds the current owner ceremony,
-preflight-v6, exhaustive 28-route calibration, and the exact imported v2 axis evaluator into the
-causal static receipt consumed by the authoritative E2E driver.  This proof performs no provider
-calls, candidate executions, Docker runs, or owner mutations.
+Runs the complete inherited causal/static proof and binds the current owner ceremony, preflight-v6,
+exhaustive 28-route axis calibration, exact imported v2 axis evaluator, and the distributed
+whole-process-crash/authority/throughput hardening into the causal static receipt consumed by the
+authoritative E2E driver. This proof performs no provider calls, candidate executions, Docker runs,
+or owner mutations.
 """
 from __future__ import annotations
 
@@ -21,12 +22,23 @@ REPORT = previous.REPORT
 PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5"
 PROBE_EVALUATOR = (
     "private-evaluator/evaluator/observatory_axis_probe_arena_v2.py")
+DISTRIBUTED_EVALUATOR = (
+    "private-evaluator/evaluator/observatory_distributed_arena_v2.py")
+DISTRIBUTED_REFERENCE = (
+    "benchmark/observatory_distributed_reference_candidate.py")
+DISTRIBUTED_CONTRACT = (
+    "profiles/national-observatory/DISTRIBUTED-SYSTEMS-CONTRACT.md")
+PARETO = "profiles/national-observatory/PARETO-DIMENSIONS.json"
 REQUIRED_FILES = {
     "executable-orchestrator/lawmax21/observatory_setup_v5.py",
     "executable-orchestrator/lawmax21/observatory_preflight_v6.py",
     "private-evaluator/evaluator/observatory_axis_probe_arena.py",
     PROBE_EVALUATOR,
     "private-evaluator/evaluator/observatory_axis_probe_calibration.py",
+    DISTRIBUTED_EVALUATOR,
+    DISTRIBUTED_REFERENCE,
+    DISTRIBUTED_CONTRACT,
+    PARETO,
     "executable-orchestrator/tools/"
     "prove_complete_observatory_protocol_calibration_hardened.py",
     "executable-orchestrator/tools/prove_observatory_protocol_static_v6.py",
@@ -57,7 +69,7 @@ def _sha256(path):
 
 
 def _signed_semantic_minima(probe):
-    pareto_path = _path("profiles/national-observatory/PARETO-DIMENSIONS.json")
+    pareto_path = _path(PARETO)
     with open(pareto_path, encoding="utf-8") as handle:
         rows = json.load(handle)
     if not isinstance(rows, list):
@@ -119,6 +131,76 @@ def _import_and_verify_v2_evaluator():
     }
 
 
+def _verify_distributed_hardening():
+    evaluator = _text(DISTRIBUTED_EVALUATOR)
+    reference = _text(DISTRIBUTED_REFERENCE)
+    contract = _text(DISTRIBUTED_CONTRACT)
+    compile(evaluator, _path(DISTRIBUTED_EVALUATOR), "exec")
+    compile(reference, _path(DISTRIBUTED_REFERENCE), "exec")
+
+    _require(evaluator, (
+        '"actual_container_kill_required": True',
+        '"cli_process_kill_counts_as_evidence": False',
+        '[runtime, "kill", name]',
+        '"runtime_kill_succeeded"',
+        '"container_absent_before_recovery"',
+        '"workload_delivered"',
+        '"cluster_authority_files"',
+        '"declared cluster authority file does not exist',
+        '"baseline_elapsed_seconds"',
+        '"campaign_elapsed_seconds"',
+        '"throughput_measurement"',
+        'base._manifest = _manifest',
+        'base._crash_process = _safe_crash_process'),
+        "distributed v2 evaluator")
+
+    _require(reference, (
+        "def _stage_event",
+        "def ingest_batch",
+        "one durable canonical write",
+        "self._persist()",
+        "self._sync_group(safe)",
+        '"cluster_authority_files": ["cluster.json"]'),
+        "distributed calibration reference")
+
+    _require(contract, (
+        "Distributed Systems Contract v2",
+        "cluster_authority_files",
+        "actual named candidate container",
+        "Killing or disconnecting only the local Docker/Podman CLI client is not crash evidence",
+        "confirmed absent",
+        "partially serialized canonical authority is never acceptable"),
+        "distributed systems contract")
+
+    with open(_path(PARETO), encoding="utf-8") as handle:
+        rows = json.load(handle)
+    dimensions = {
+        row.get("id"): row for row in rows if isinstance(row, dict)}
+    throughput = dimensions.get("distributed_events_per_second") or {}
+    survival = dimensions.get("distributed_fault_survival") or {}
+    measurement = str(throughput.get("measurement") or "")
+    if throughput.get("direction") != "higher" \
+            or "1000-event healthy distributed baseline session" not in measurement \
+            or "distributed_fault_survival" not in measurement \
+            or survival.get("hard_minimum") != 1.0:
+        raise RuntimeError(
+            "owner-signed distributed throughput/fault metrics are not separated correctly")
+
+    return {
+        "evaluator_path": DISTRIBUTED_EVALUATOR,
+        "evaluator_sha256": _sha256(_path(DISTRIBUTED_EVALUATOR)),
+        "reference_path": DISTRIBUTED_REFERENCE,
+        "reference_sha256": _sha256(_path(DISTRIBUTED_REFERENCE)),
+        "contract_path": DISTRIBUTED_CONTRACT,
+        "contract_sha256": _sha256(_path(DISTRIBUTED_CONTRACT)),
+        "actual_container_kill_required": True,
+        "container_absence_required_before_recovery": True,
+        "authority_files_verified": True,
+        "baseline_metric_separated_from_fault_campaign": True,
+        "atomic_batch_reference_bound": True,
+    }
+
+
 def main():
     if previous.main() != 0:
         return 1
@@ -149,7 +231,7 @@ def main():
         omitted = sorted(REQUIRED_FILES - protocol_files)
         if omitted:
             raise RuntimeError(
-                "protocol census omitted calibration closure files: "
+                "protocol census omitted calibration/distributed closure files: "
                 + ", ".join(omitted))
         specialized = tuple(preflight.core.SPECIALIZED.get("axis_probe") or ())
         if specialized != tuple(setup.AXIS_PROBE_SOURCES):
@@ -217,6 +299,7 @@ def main():
             "structured v2 axis-probe route")
         compile(probe_source, _path(PROBE_EVALUATOR), "exec")
         evaluator = _import_and_verify_v2_evaluator()
+        distributed = _verify_distributed_hardening()
 
         e2e = _text(
             "executable-orchestrator/tools/"
@@ -230,7 +313,8 @@ def main():
             "valid_probe_pairs", "evidence_files", "provider_calls"),
             "calibration-hardened Docker E2E")
         final = _text(
-            "executable-orchestrator/tools/prove_complete_observatory_protocol_v5.py")
+            "executable-orchestrator/tools/"
+            "prove_complete_observatory_protocol_v5.py")
         _require(final, (
             "prove_complete_observatory_protocol_calibration_hardened",
             "prove_observatory_protocol_static_v6.py",
@@ -274,6 +358,11 @@ def main():
             "axis_probe_calibration_report": setup.AXIS_PROBE_REPORT,
             "axis_probe_calibration_modules_imported": [
                 setup.__name__, preflight.__name__],
+            "distributed_actual_container_crash_static_bound": True,
+            "distributed_authority_files_static_bound": True,
+            "distributed_baseline_metric_static_bound": True,
+            "distributed_atomic_batch_reference_static_bound": True,
+            "distributed_static_hardening": distributed,
         })
     except Exception as exc:
         receipt["status"] = "FAIL"
