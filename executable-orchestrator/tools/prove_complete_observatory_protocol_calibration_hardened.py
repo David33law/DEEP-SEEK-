@@ -4,7 +4,8 @@
 The inherited axis proof verifies every runtime baseline/mutant causal pair and the exact v2 evaluator
 bytes. This wrapper requires an owner-signed calibration mandate, independently reopens the owner-
 ceremony calibration in the disposable clone, rehashes its 56 reports, 28 controlled mutant sources,
-six references and evaluator, compares them with preflight-v6 and requires zero provider calls.
+six references and evaluator, compares them with preflight-v6, requires strict UTF-8 transport on
+every report, and requires zero provider calls.
 """
 from __future__ import annotations
 
@@ -34,6 +35,7 @@ AXIS_PROBE_SOURCES = {
 CALIBRATION_FILES = {
     "executable-orchestrator/lawmax21/observatory_setup_v5.py",
     "executable-orchestrator/lawmax21/observatory_preflight_v6.py",
+    "executable-orchestrator/lawmax21/observatory_utf8_process.py",
     "executable-orchestrator/tools/"
     "prove_complete_observatory_protocol_calibration_hardened.py",
     *AXIS_PROBE_SOURCES,
@@ -89,6 +91,7 @@ def _valid_pair_report(report, baseline, pair):
         and report.get("seed") == pair.get("seed")
         and report.get("expected_sha256") == pair.get("expected_sha256")
         and report.get("candidate_sha256") == expected_candidate
+        and report.get("calibration_transport_encoding") == "utf-8"
         and isinstance(checks, list) and checks
         and all(isinstance(row, dict)
                 and isinstance(row.get("passed"), bool)
@@ -119,12 +122,13 @@ def _verify_calibration(repo, preflight):
     preflight_receipt = protocol.get("axis_probe_calibration") or {}
     if preflight_receipt.get("axis_probe_contract") != PROBE_CONTRACT \
             or preflight_receipt.get("evaluator_path") != PROBE_EVALUATOR \
+            or preflight_receipt.get("transport_encoding") != "utf-8" \
             or int(preflight_receipt.get("axis_routes", 0)) != 28 \
             or int(preflight_receipt.get("valid_probe_pairs", 0)) != 28 \
             or int(preflight_receipt.get("evidence_files", 0)) != 84 \
             or preflight_receipt.get("provider_calls") != 0:
         raise RuntimeError(
-            "preflight-v6 did not close exhaustive axis-probe calibration")
+            "preflight-v6 did not close UTF-8 exhaustive axis-probe calibration")
 
     receipt_path = _repo_path(repo, CALIBRATION_RECEIPT)
     report_path = _repo_path(repo, CALIBRATION_REPORT)
@@ -164,12 +168,14 @@ def _verify_calibration(repo, preflight):
     if report.get("status") != "PASS" \
             or report.get("passed") is not True \
             or report.get("axis_probe_contract") != PROBE_CONTRACT \
+            or report.get("transport_encoding") != "utf-8" \
+            or report.get("failed_route") not in (None, {}, []) \
             or report.get("provider_calls") != 0 \
             or report.get("axis_routes") != 28 \
             or report.get("valid_probe_pairs") != 28 \
             or report.get("baseline_reports") != 28 \
             or report.get("mutant_reports") != 28:
-        raise RuntimeError("axis-probe aggregate calibration is not PASS")
+        raise RuntimeError("axis-probe aggregate UTF-8 calibration is not PASS")
 
     identities = set(); routes = set(); evidence = set(); references = set()
     pairs = report.get("pairs") or []
@@ -248,6 +254,7 @@ def _verify_calibration(repo, preflight):
         "axis_probe_contract": PROBE_CONTRACT,
         "evaluator_path": PROBE_EVALUATOR,
         "evaluator_sha256": evaluator["sha256"],
+        "transport_encoding": "utf-8",
         "axis_routes": len(routes),
         "valid_probe_pairs": len(identities),
         "baseline_reports": len(routes),
