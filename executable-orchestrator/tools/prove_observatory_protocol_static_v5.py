@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Static closure for owner-bound causal genome realization with axis-probe pairs.
+"""Static closure for owner-bound causal genome realization with v2 axis probes.
 
 The inherited portable-owner proof remains responsible for the full Observatory protocol. This final
-extension verifies that causal source ablation is no longer credited by names, tokens or broad crash
-paths: every task is routed through one trusted ``observatory-axis-probe-v1`` baseline/mutant pair,
-its task identity is persisted, the final audit requires complete pair counts, the deterministic
-supremacy dossier rehashes and indexes both reports, and the Docker E2E verifier independently
-reopens the same evidence. No provider call, candidate execution or owner mutation occurs here.
+extension verifies that every causal task is routed through the exact hardened
+``observatory_axis_probe_arena_v2.py`` seat, that the owner-signed protocol census includes its bytes,
+that semantic thresholds equal the signed Pareto minima, that formal commutativity is required only
+when claimed, and that audit, dossier, Docker E2E and final proof all bind the same evaluator.
+No provider call, candidate execution or owner mutation occurs here.
 """
 from __future__ import annotations
 
@@ -24,6 +24,9 @@ REPORT = os.path.join(
     ROOT, "proof", "observatory-protocol-static-v5-causal.json")
 PROTOCOL_VERSION = "OBSERVATORY-OMEGA-RESEARCH-PROTOCOL-5"
 PROBE_CONTRACT = "observatory-axis-probe-v1"
+PROBE_EVALUATOR = "observatory_axis_probe_arena_v2.py"
+PROBE_EVALUATOR_PATH = (
+    "private-evaluator/evaluator/" + PROBE_EVALUATOR)
 CAUSAL_CONDITIONS = {
     "genome_causal_ablation_replication_passed",
     "genome_causal_ablation_crown_passed",
@@ -56,6 +59,7 @@ REQUIRED_FILES = {
     "executable-orchestrator/lawmax21/observatory_evaluator_routing_hardening.py",
     "executable-orchestrator/lawmax21/observatory_formal_streaming_routing.py",
     "private-evaluator/evaluator/observatory_axis_probe_arena.py",
+    PROBE_EVALUATOR_PATH,
     "executable-orchestrator/tools/mock_observatory_causal_server.py",
     "executable-orchestrator/tools/prove_observatory_protocol_static_v5.py",
     "executable-orchestrator/tools/prove_complete_observatory_protocol_causal_hardened.py",
@@ -101,7 +105,7 @@ def _ordered(text, tokens, label):
 
 def main():
     result = {
-        "proof": "observatory-protocol-static-v5-axis-probe-closure",
+        "proof": "observatory-protocol-static-v5-axis-probe-v2-closure",
         "provider_calls": 0,
         "candidate_executions": 0,
         "status": "FAIL",
@@ -192,8 +196,10 @@ def main():
             "observatory_causal_behavioral_probe_hardening.py")
         _require(probe_hardening, (
             'PROBE_CONTRACT = "observatory-axis-probe-v1"',
+            '"observatory_axis_probe_arena_v2.py"',
             "def _identity", "def _probe",
             "axis_probe_task_identity_sha256",
+            "axis_probe_evaluator",
             "baseline_axis_probe_path", "mutant_axis_probe_path",
             "baseline_axis_probe_sha256", "mutant_axis_probe_sha256",
             "baseline_axis_probe_source_sha256",
@@ -204,9 +210,9 @@ def main():
             "causal._run_task = run_task"),
             "baseline-versus-mutant axis-probe hardening")
 
-        probe_arena = _text(
+        base_probe = _text(
             "private-evaluator/evaluator/observatory_axis_probe_arena.py")
-        _require(probe_arena, (
+        _require(base_probe, (
             'CONTRACT = "observatory-axis-probe-v1"',
             "GROUP_AXES", "SEMANTIC_DIMENSIONS",
             "def _semantic_probe", "def _systems_probe",
@@ -216,7 +222,26 @@ def main():
             '"failure_origin": "infrastructure_or_harness"',
             '"failure_origin": "candidate_axis_behavior"',
             '"proof_boundary"'),
-            "trusted axis-probe arena")
+            "base trusted axis-probe arena")
+        probe_v2 = _text(PROBE_EVALUATOR_PATH)
+        _require(probe_v2, (
+            "Contract-compatible hardening",
+            "SEMANTIC_HARD_MINIMA",
+            '"temporal_reconstruction_accuracy": 0.99',
+            '"canonical_identity_accuracy": 0.995',
+            '"jurisprudence_temporal_link_accuracy": 0.98',
+            '"provenance_completeness": 0.995',
+            "commutative_independent_admissions",
+            "derivation-order-claimed",
+            "derivation-order-not-claimed",
+            "base.FORMAL_PROBE = base.FORMAL_PROBE.replace",
+            'base.PROBES["semantic"] = _semantic_probe',
+            "main = base.main"),
+            "hardened v2 axis-probe arena")
+        compile(base_probe, _path(
+            "private-evaluator/evaluator/observatory_axis_probe_arena.py"),
+            "exec")
+        compile(probe_v2, _path(PROBE_EVALUATOR_PATH), "exec")
 
         evaluator_routing = _text(
             "executable-orchestrator/lawmax21/"
@@ -283,6 +308,8 @@ def main():
             "observatory_causal_audit_hardening.py")
         _require(causal_audit, (
             'PROBE_CONTRACT = "observatory-axis-probe-v1"',
+            'PROBE_EVALUATOR = "observatory_axis_probe_arena_v2.py"',
+            "axis_behavioral_probe_evaluator",
             "all_tasks_have_baseline_mutant_probe_pairs",
             "replication_axis_probe_tasks",
             "replication_axis_probe_pairs",
@@ -296,8 +323,11 @@ def main():
             "observatory_causal_dossier_hardening.py")
         _require(causal_dossier, (
             'PROBE_CONTRACT = "observatory-axis-probe-v1"',
+            'PROBE_EVALUATOR = "observatory_axis_probe_arena_v2.py"',
+            "def _probe_evaluator_receipt",
             "def _probe_report", "def _probe_pair",
             "axis_probe_task_identity_sha256",
+            "axis_probe_evaluator",
             "axis_probe_pair_receipts",
             "axis_probe_pairs_replication",
             "axis_probe_pairs_crown",
@@ -312,9 +342,12 @@ def main():
             "prove_complete_observatory_protocol_axis_hardened.py")
         _require(axis_e2e, (
             'PROBE_CONTRACT = "observatory-axis-probe-v1"',
+            'PROBE_EVALUATOR = "observatory_axis_probe_arena_v2.py"',
+            "PROBE_EVALUATOR_PATH",
             "def _probe_report", "def _probe_pair",
             "axis_behavioral_probe_required",
             "axis_probe_pairs_verified",
+            "axis_probe_evaluator_verified",
             "axis_probe_dossier_index_verified",
             "all_tasks_have_baseline_mutant_probe_pairs",
             "evidence_index",
@@ -339,8 +372,10 @@ def main():
             "prove_observatory_protocol_static_v5.py",
             "prove_complete_observatory_protocol_axis_hardened",
             "axis_probe_pairs_verified",
+            "axis_probe_evaluator_verified",
             "axis_probe_dossier_index_verified",
             "axis_probe_pairs_bound",
+            "axis_probe_evaluator_v2_bound",
             "final_closure_verified"),
             "authoritative final proof")
         stable = _text(
@@ -374,6 +409,10 @@ def main():
             "axis_specific_causal_attribution_verified": True,
             "axis_specific_behavioral_failure_verified": True,
             "axis_probe_contract_verified": True,
+            "axis_probe_evaluator_v2_verified": True,
+            "axis_probe_evaluator_bytes_bound": True,
+            "axis_probe_signed_hard_minima_verified": True,
+            "axis_probe_conditional_commutativity_verified": True,
             "axis_probe_task_identity_bound": True,
             "axis_probe_baseline_mutant_pair_required": True,
             "axis_probe_dossier_direct_indexing_required": True,
@@ -390,6 +429,8 @@ def main():
             "causal_aware_local_provider_verified": True,
             "causal_local_provider_execution_route_verified": True,
             "authoritative_causal_e2e_verified": True,
+            "axis_probe_evaluator_sha256": _sha256(
+                _path(PROBE_EVALUATOR_PATH)),
             "inherited_static_report_sha256":
                 _sha256(PREVIOUS_REPORT),
         })
