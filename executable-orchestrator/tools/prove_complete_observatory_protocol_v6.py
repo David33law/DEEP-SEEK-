@@ -2,7 +2,8 @@
 """Authoritative protocol-v6 proof wrapper for the protocol-v5 Observatory mission.
 
 The mission/protocol version remains Observatory Research Protocol 5. Static-v8 strictly extends the
-calibrated static-v7 fault topology with standalone cwd/PYTHONPATH-independent import closure;
+calibrated static-v7 fault topology with standalone cwd/PYTHONPATH-independent import closure and
+mechanically proves that every retired/public proof command is a monotonic shim to this v6 authority;
 ``prove_observatory_protocol_static_v8.py`` executes ``prove_observatory_protocol_static_v7.py`` as
 its inherited fault-closure seat rather than replacing that evidence chain. The dynamic E2E passes
 through the actual-container fault verifier, and the final receipt requires both durable and
@@ -57,6 +58,7 @@ REQUIRED_STATIC_V8_GATES = (
     "fault_exact_workloads_static_bound",
     "authoritative_fault_final_entry_static_bound",
     "authoritative_entrypoint_standalone_import_static_bound",
+    "compatibility_proof_shims_monotonic_static_bound",
 )
 
 
@@ -99,6 +101,12 @@ def main(argv=None):
                 or missing:
             raise RuntimeError(
                 "static-v8 closure incomplete: " + ", ".join(missing))
+        if static.get("authoritative_proof_target") != \
+                "prove_complete_observatory_protocol_v6" \
+                or int(static.get("compatibility_proof_shim_count", 0)) != 8 \
+                or int(static.get("authoritative_entrypoint_import_count", 0)) != 10:
+            raise RuntimeError(
+                "static-v8 proof-authority/shim census is incomplete")
 
         verification = report.get("protocol_verification") or {}
         systems_calibration = verification.get(
@@ -143,6 +151,9 @@ def main(argv=None):
             "status": static["status"],
             "protocol_bundle_sha256": static.get("protocol_bundle_sha256"),
             **{key: static.get(key) for key in REQUIRED_STATIC_V8_GATES},
+            "authoritative_proof_target": static.get("authoritative_proof_target"),
+            "entrypoint_import_count": static.get("authoritative_entrypoint_import_count"),
+            "compatibility_proof_shim_count": static.get("compatibility_proof_shim_count"),
             "entrypoint_import_probes": static.get(
                 "authoritative_entrypoint_import_probes"),
             "report_sha256": fault_e2e.sha256_file(STATIC_V8_REPORT),
@@ -155,6 +166,9 @@ def main(argv=None):
         report["fault_injection_mid_operation_bound"] = True
         report["fault_workloads_owner_bound"] = True
         report["authoritative_entrypoint_standalone_import_bound"] = True
+        report["compatibility_proof_shims_monotonic_bound"] = True
+        report["authoritative_proof_target"] = static.get("authoritative_proof_target")
+        report["compatibility_proof_shims"] = static.get("compatibility_proof_shims")
         report["systems_reference_calibration"] = systems_calibration
         report["distributed_reference_calibration"] = distributed_calibration
         report["systems_actual_container_crown"] = systems
@@ -162,6 +176,7 @@ def main(argv=None):
         report["cli_process_death_cannot_earn_fault_credit"] = True
         report["post_operation_container_death_cannot_earn_crash_credit"] = True
         report["implicit_fault_workload_cannot_earn_credit"] = True
+        report["legacy_proof_commands_cannot_bypass_v6"] = True
         report["final_closure_v6_verified"] = True
         report["final_closure_verified"] = True
         base._atomic_write(E2E_REPORT, report)
