@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Static-v7 closure for calibrated actual-container fault evidence.
+"""Static-v7 closure for calibrated mid-operation actual-container fault evidence.
 
 Runs static-v6 first, then proves that both load-bearing process-death arenas are calibrated before
 launch, use the same bounded v2 entrypoints in preflight and production, consume owner-bound workloads,
-and require actual container death rather than local CLI death.  No provider call, candidate execution,
+and require actual container death while the tested operation is still in flight. The stable proof
+entrypoint must route through the final fault-hardened v6 seat. No provider call, candidate execution,
 Docker run or owner mutation occurs here.
 """
 from __future__ import annotations
@@ -25,6 +26,9 @@ SYSTEMS_CONTRACT = "profiles/national-observatory/SYSTEMS-CONTRACT.md"
 DISTRIBUTED_REFERENCE = "benchmark/observatory_distributed_reference_candidate.py"
 DISTRIBUTED_EVALUATOR = "private-evaluator/evaluator/observatory_distributed_arena_v2.py"
 DISTRIBUTED_CONTRACT = "profiles/national-observatory/DISTRIBUTED-SYSTEMS-CONTRACT.md"
+FAULT_E2E = "executable-orchestrator/tools/prove_complete_observatory_protocol_fault_hardened.py"
+FINAL_V6 = "executable-orchestrator/tools/prove_complete_observatory_protocol_v6.py"
+STABLE = "executable-orchestrator/tools/run_observatory_proof.py"
 
 NEW_GATES = (
     "systems_reference_calibration_static_bound",
@@ -40,6 +44,8 @@ NEW_GATES = (
     "distributed_atomic_batch_reference_static_bound",
     "distributed_crash_floor_static_bound",
     "fault_evaluator_production_routing_static_bound",
+    "fault_mid_operation_crash_static_bound",
+    "authoritative_fault_final_entry_static_bound",
 )
 
 
@@ -152,10 +158,15 @@ def main():
         systems_v2 = _text(SYSTEMS_EVALUATOR)
         _require(systems_v2, (
             '"actual_container_kill_required": True',
-            '"cli_process_kill_counts_as_evidence": False',
+            '"mid_operation_kill_required": True',
+            '"operation_reply_observed_before_kill": None',
+            '"mid_operation_kill_verified": False',
+            'process.stdin.write(_crash_body(source, events))',
+            'reply_observed = os.fstat(output.fileno()).st_size > 0',
             '[runtime, "kill", name]',
             '"runtime_kill_succeeded"',
             '"container_absent_before_recovery"',
+            '"cli_process_kill_counts_as_evidence": False',
             '"durable_manifest_evidence"',
             '"authority_files_verified"',
             '"recovery_files_verified"',
@@ -166,7 +177,8 @@ def main():
         _require(contract, (
             "DURABLE SYSTEMS CONTRACT v2",
             "Authoritative whole-process crash evidence",
-            "runtime-kill",
+            "operation_reply_observed_before_kill=false",
+            "mid_operation_kill_verified=true",
             "container_absent_before_recovery=true",
             "cli_process_kill_counts_as_evidence=false",
             "Calibration and signed workloads"),
@@ -180,9 +192,14 @@ def main():
         distributed_v2 = _text(DISTRIBUTED_EVALUATOR)
         _require(distributed_v2, (
             '"actual_container_kill_required": True',
-            '"cli_process_kill_counts_as_evidence": False',
+            '"mid_operation_kill_required": True',
+            '"operation_reply_observed_before_kill": None',
+            '"mid_operation_kill_verified": False',
+            'process.stdin.write(_crash_body(source, events))',
+            'reply_observed = os.fstat(output.fileno()).st_size > 0',
             '[runtime, "kill", name]',
             '"container_absent_before_recovery"',
+            '"cli_process_kill_counts_as_evidence": False',
             '"cluster_authority_files"',
             '"baseline_elapsed_seconds"',
             '"campaign_elapsed_seconds"'),
@@ -190,10 +207,32 @@ def main():
         distributed_contract = _text(DISTRIBUTED_CONTRACT)
         _require(distributed_contract, (
             "Distributed Systems Contract v2",
-            "actual named candidate container",
+            "operation_reply_observed_before_kill=false",
+            "mid_operation_kill_verified=true",
             "confirmed absent",
             "partially serialized canonical authority is never acceptable"),
             "distributed contract")
+
+        fault = _text(FAULT_E2E)
+        _require(fault, (
+            '"mid_operation_kill_required"',
+            '"operation_reply_observed_before_kill"',
+            '"mid_operation_kill_verified"',
+            'verified["fault_injection_mid_operation_verified"] = True'),
+            "dynamic fault E2E")
+        final = _text(FINAL_V6)
+        _require(final, (
+            "prove_complete_observatory_protocol_fault_hardened",
+            "prove_observatory_protocol_static_v7.py",
+            'verification.get("fault_injection_mid_operation_verified") is not True',
+            'report["fault_injection_mid_operation_bound"] = True',
+            'report["final_closure_v6_verified"] = True'),
+            "final protocol-v6 proof")
+        stable = _text(STABLE)
+        _require(stable, (
+            "from prove_complete_observatory_protocol_v6 import main",
+            "execution always enters prove_complete_observatory_protocol_v6"),
+            "stable proof entrypoint")
 
         snapshot = workload_policy.snapshot()
         if snapshot.get("systems") != {
@@ -215,6 +254,7 @@ def main():
             "executable-orchestrator/lawmax21/observatory_workload_policy.py",
             "executable-orchestrator/lawmax21/observatory_evaluator_routing_hardening.py",
             "executable-orchestrator/tools/prove_observatory_protocol_static_v7.py",
+            FAULT_E2E, FINAL_V6, STABLE,
         }
         missing = sorted(required - protocol_files)
         if missing:
@@ -232,6 +272,7 @@ def main():
             },
             "systems_workloads": dict(snapshot["systems"]),
             "distributed_workloads": dict(snapshot["distributed"]),
+            "authoritative_entrypoint": "prove_complete_observatory_protocol_v6.py",
         })
     except Exception as exc:
         result["reason"] = f"{type(exc).__name__}: {exc}"
