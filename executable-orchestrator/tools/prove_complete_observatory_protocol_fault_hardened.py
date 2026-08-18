@@ -7,13 +7,16 @@ container death during an in-flight operation, absence before recovery, complete
 evidence, exact signed proof workloads and the corrected distributed baseline metric.
 
 The wrapper bootstraps ``executable-orchestrator`` before importing ``lawmax21`` so it is directly
-executable from any working directory with no inherited PYTHONPATH.
+executable from any working directory with no inherited PYTHONPATH. It also replaces the inherited
+E2E core's single trusted ``run`` seat with strict UTF-8 process transport before setup/preflight/
+launch execution, so Windows active-code-page state cannot alter proof behavior.
 """
 from __future__ import annotations
 
 import json
 import math
 import os
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +34,30 @@ from lawmax21 import observatory_protocol
 CORE = previous.CORE
 _ORIGINAL_VERIFY = CORE.verify_protocol
 
+
+def _utf8_child_env(env=None):
+    result = dict(os.environ if env is None else env)
+    result["PYTHONIOENCODING"] = "utf-8"
+    result["PYTHONUTF8"] = "1"
+    return result
+
+
+def _utf8_core_run(command, *, cwd=None, env=None, timeout=28800):
+    return subprocess.run(
+        command,
+        cwd=cwd,
+        env=_utf8_child_env(env),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="strict",
+        timeout=timeout)
+
+
+# CORE.py() and every clone/setup/preflight/launch/guard call resolve CORE.run dynamically.
+# One assignment therefore hardens the whole inherited E2E transport without copying its logic.
+CORE.run = _utf8_core_run
+
 SYSTEMS_REFERENCE = "benchmark/observatory_systems_reference_candidate.py"
 SYSTEMS_EVALUATOR = "private-evaluator/evaluator/observatory_systems_arena_v2.py"
 SYSTEMS_REPORT = "proof/systems-reference-calibration.json"
@@ -42,6 +69,7 @@ FAULT_FILES = {
     "profiles/national-observatory/DISTRIBUTED-SYSTEMS-CONTRACT.md",
     "executable-orchestrator/lawmax21/observatory_protocol.py",
     "executable-orchestrator/lawmax21/observatory_workload_policy.py",
+    "executable-orchestrator/lawmax21/observatory_utf8_process.py",
     "executable-orchestrator/lawmax21/observatory_setup_v3.py",
     "executable-orchestrator/lawmax21/observatory_preflight_v3.py",
     "executable-orchestrator/lawmax21/observatory_evaluator_routing_hardening.py",
@@ -162,9 +190,10 @@ def _verify_systems_calibration(repo, preflight):
     report = _read(report_path)
     expected = observatory_protocol.PROOF_WORKLOADS["systems"]
     if report.get("status") != "PASS" or report.get("passed") is not True \
+            or report.get("transport_encoding") != "utf-8" \
             or int(report.get("requested_large_events", -1)) != int(expected["qualification"]) \
             or int(report.get("requested_crash_events", -1)) != int(expected["crash_events"]):
-        raise RuntimeError("systems reference calibration used the wrong proof workload")
+        raise RuntimeError("systems reference calibration used the wrong proof workload/transport")
     tests = report.get("tests") or {}
     if tests.get("crash_was_actually_observed") is not True \
             or tests.get("crash_restart_integrity") is not True:
@@ -175,6 +204,7 @@ def _verify_systems_calibration(repo, preflight):
         "report_sha256": CORE.sha256_file(report_path),
         "qualification_events": int(expected["qualification"]),
         "crash_events": int(expected["crash_events"]),
+        "transport_encoding": report.get("transport_encoding"),
         "crash": _crash_evidence(report, "systems reference calibration"),
         "manifest": _manifest_evidence(report, "systems reference calibration"),
         "provider_calls": 0,
@@ -214,14 +244,16 @@ def _verify_distributed_calibration(repo, preflight):
     expected = observatory_protocol.PROOF_WORKLOADS["distributed"]
     crash = _crash_evidence(report, "distributed reference calibration")
     if report.get("status") != "PASS" or report.get("passed") is not True \
+            or report.get("transport_encoding") != "utf-8" \
             or int(report.get("requested_crash_events", -1)) != int(expected["crash_events"]) \
             or int(crash.get("events_delivered", -1)) != int(expected["crash_events"]):
-        raise RuntimeError("distributed reference calibration used the wrong crash workload")
+        raise RuntimeError("distributed reference calibration used the wrong crash workload/transport")
     return {
         "status": "PASS",
         "report_path": DISTRIBUTED_REPORT,
         "report_sha256": CORE.sha256_file(report_path),
         "crash_events": int(expected["crash_events"]),
+        "transport_encoding": report.get("transport_encoding"),
         "crash": crash,
         "provider_calls": 0,
     }
@@ -236,19 +268,21 @@ def _verify_systems_crown(runtime, incumbent):
     expected = observatory_protocol.PROOF_WORKLOADS["systems"]
     tests = report.get("tests") or {}
     if report.get("status") != "PASS" or report.get("passed") is not True \
+            or report.get("transport_encoding") != "utf-8" \
             or tests.get("crash_was_actually_observed") is not True \
             or tests.get("crash_restart_integrity") is not True \
             or int(report.get("requested_large_events", -1)) != int(expected["crown"]) \
             or int(report.get("requested_crash_events", -1)) != int(expected["crash_events"]) \
             or int(report.get("owner_signed_large_events", -1)) != int(expected["crown"]) \
             or int(report.get("owner_signed_crash_events", -1)) != int(expected["crash_events"]):
-        raise RuntimeError("durable systems crown workload/crash receipt is incomplete")
+        raise RuntimeError("durable systems crown workload/crash/transport receipt is incomplete")
     return {
         "status": "PASS",
         "path": os.path.relpath(path, runtime).replace("\\", "/"),
         "sha256": CORE.sha256_file(path),
         "large_events": int(expected["crown"]),
         "crash_events": int(expected["crash_events"]),
+        "transport_encoding": report.get("transport_encoding"),
         "crash": _crash_evidence(report, "durable systems crown"),
         "manifest": _manifest_evidence(report, "durable systems crown"),
     }
@@ -268,6 +302,7 @@ def _verify_distributed_crown(runtime, incumbent):
     expected_eps = baseline_events / max(baseline_elapsed, 1e-9)
     crash = _crash_evidence(report, "distributed crown")
     if report.get("status") != "PASS" or report.get("passed") is not True \
+            or report.get("transport_encoding") != "utf-8" \
             or tests.get("whole_process_crash_recovery") is not True \
             or int(report.get("owner_signed_large_events", -1)) != int(expected["crown"]) \
             or int(report.get("requested_crash_events", -1)) != int(expected["crash_events"]) \
@@ -276,13 +311,14 @@ def _verify_distributed_crown(runtime, incumbent):
             or baseline_events != 1000 or baseline_elapsed <= 0.0 \
             or not math.isclose(observed_eps, expected_eps, rel_tol=1e-12, abs_tol=1e-12) \
             or float(report.get("campaign_elapsed_seconds", 0.0)) < baseline_elapsed:
-        raise RuntimeError("distributed crown crash/baseline receipt is incomplete")
+        raise RuntimeError("distributed crown crash/baseline/transport receipt is incomplete")
     return {
         "status": "PASS",
         "path": os.path.relpath(path, runtime).replace("\\", "/"),
         "sha256": CORE.sha256_file(path),
         "large_events": int(expected["crown"]),
         "crash_events": int(expected["crash_events"]),
+        "transport_encoding": report.get("transport_encoding"),
         "baseline_events": baseline_events,
         "baseline_elapsed_seconds": baseline_elapsed,
         "events_per_second_baseline": observed_eps,
@@ -309,6 +345,7 @@ def _verify(repo, runtime, source_head, preflight, launch):
     verified["fault_injection_actual_container_verified"] = True
     verified["fault_injection_mid_operation_verified"] = True
     verified["fault_workloads_owner_bound_verified"] = True
+    verified["trusted_process_transport_utf8_verified"] = True
     return verified
 
 
