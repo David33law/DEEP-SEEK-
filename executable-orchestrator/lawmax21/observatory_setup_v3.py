@@ -1,4 +1,10 @@
-"""Final setup wrapper using the same bounded evaluator entrypoints as production."""
+"""Final setup wrapper using the same bounded evaluator entrypoints as production.
+
+Every load-bearing specialized arena is reference-calibrated with the same bounded entrypoint used by
+production before the owner ceremony can complete.  Durable systems is a first-class campaign: its
+actual-container crash injector, restart, corruption, concurrency and rebuild path are therefore
+proved executable before any architecture tournament begins.
+"""
 import os
 
 from . import observatory_protocol
@@ -7,6 +13,15 @@ from . import observatory_setup_v2 as wrapper
 from .canonical import atomic_write_json
 
 CAMPAIGNS = {
+    "systems": {
+        "reference": "benchmark/observatory_systems_reference_candidate.py",
+        "evaluator": "private-evaluator/evaluator/observatory_systems_arena_v2.py",
+        "report": "proof/systems-reference-calibration.json",
+        "args": lambda: [
+            "--large-events", str(observatory_protocol.workload(
+                "systems", "qualification")),
+            "--crash-events", str(observatory_protocol.workload(
+                "systems", "crash_events"))]},
     "distributed": {
         "reference": "benchmark/observatory_distributed_reference_candidate.py",
         "evaluator": "private-evaluator/evaluator/observatory_distributed_arena_v2.py",
@@ -91,4 +106,4 @@ def _calibrate():
 
 core._calibrate_specialized_references = _calibrate
 main = wrapper.main
-__all__ = ["main"]
+__all__ = ["main", "CAMPAIGNS"]
